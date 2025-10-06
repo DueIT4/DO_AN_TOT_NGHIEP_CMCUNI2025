@@ -1,0 +1,4 @@
+pomelo_fruit_healthy
+pomelo_fruit_scorch
+pomelo_leaf_healthy
+pomelo_leaf_yellowing

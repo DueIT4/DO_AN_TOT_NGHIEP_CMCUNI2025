@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: plantdb
+    ports: ["3306:3306"]
+    volumes: [db_data:/var/lib/mysql]
+  backend:
+    build: ../../backend
+    env_file:
+      - ../../backend/.env
+    volumes:
+      - ../../backend:/app
+      - ../../ml/exports/v1.0:/app/ml_exports:ro
+    ports: ["8000:8000"]
+    depends_on: [db]
+volumes:
+  db_data:

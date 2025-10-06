@@ -1,0 +1,8 @@
+# This file keeps the db folder in git
+# Database files and migrations will be stored here
+# 
+# Common files in this folder:
+# - *.sql (SQL scripts and queries)
+# - database dumps
+# - migration files
+# - database configuration

@@ -1,0 +1,11 @@
+{
+  "version": "v1.0",
+  "input_size": [
+    640,
+    640
+  ],
+  "classes": [
+    "pomelo_leaf_healthy",
+    "pomelo_fruit_healthy"
+  ]
+}

@@ -1,0 +1,15 @@
+.env
+*.pyc
+__pycache__/
+.venv/
+dist/
+build/
+*.log
+**/node_modules/
+**/.dart_tool/
+**/.idea/
+**/.vscode/
+ml/training/runs/
+ml/datasets/
+*.onnx
+ml/exports/v1.0/best.onnx

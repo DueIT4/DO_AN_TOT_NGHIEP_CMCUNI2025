@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+SQLAlchemy
+alembic
+python-multipart
+pymysql
+onnxruntime
+Pillow

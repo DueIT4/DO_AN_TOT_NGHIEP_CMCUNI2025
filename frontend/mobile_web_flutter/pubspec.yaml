@@ -1,0 +1,29 @@
+name: mobile_web_flutter
+description: A Flutter web app for AI Plant Health
+publish_to: 'none' # không publish lên pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Gói cơ bản
+  cupertino_icons: ^1.0.8
+
+  # Gọi API backend
+  http: ^1.2.2
+
+  # Chọn ảnh (gallery/camera)
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
