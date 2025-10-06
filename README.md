@@ -68,7 +68,7 @@ flutter doctor
 
 ### 1. Clone repository
 ```bash
-git clone https://github.com/DueIT4/ai-plant-health-separated.git
+git clone https://github.com/DueIT4/DO_AN_TOT_NGHIEP_CMCUNI2025.git
 cd ai-plant-health-separated
 ```
 
