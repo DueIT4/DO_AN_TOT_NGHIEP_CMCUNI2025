@@ -1,141 +1,207 @@
-# backend/app/services/inference_service.py
+# app/services/inference_service.py
+import io
 import os
-from typing import Optional, List, Union, Tuple
+from typing import Dict, Any
+
 import numpy as np
-import onnxruntime as ort
-from PIL import Image, ImageFile
+from fastapi import UploadFile, HTTPException
+from PIL import Image, ImageOps, ImageFilter
 
-ImageFile.LOAD_TRUNCATED_IMAGES = True  # tránh lỗi ảnh bị cắt ngang
+from app.models.onnx_detector import OnnxDetector
+from app.services.llm_service import explain_disease_with_llm
+from app.utils.logger import logger
 
-def sigmoid(x): 
-    return 1 / (1 + np.exp(-x))
+# ====== ĐƯỜNG DẪN MODEL/LABELS ======
+# Lưu ý: cấu trúc dự án của bạn là:
+#   <project_root>/
+#     ml/exports/v1.0/best.onnx
+#     backend/app/services/...
+# Từ file này (backend/app/services), "../../../ml/..." sẽ trỏ tới <project_root>/ml/...
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "../../../ml/exports/v1.0/best.onnx")
+LABELS_PATH = os.path.join(BASE_DIR, "../../../ml/exports/v1.0/labels.txt")  # fallback nếu ONNX không có metadata
 
-def _is_int(x):
+# ====== THAM SỐ CHẤT LƯỢNG HIỂN THỊ ======
+DISPLAY_MIN = 0.10      # ẩn dự đoán quá thấp (<10%). Điều chỉnh tùy ý.
+BLUR_TOO_LOW = 50.0     # rất mờ → thử tăng cường + infer lại
+BLUR_A_BIT_LOW = 120.0  # hơi mờ
+DARK_THRES = 80.0       # quá tối (0..255)
+BRIGHT_THRES = 200.0    # quá sáng
+
+
+# ====== HELPERS: đo mờ, sáng, tăng cường ảnh ======
+def variance_of_laplacian_pil(im: Image.Image) -> float:
+    """Đo độ sắc nét ảnh bằng phương pháp Laplacian (không cần OpenCV)."""
+    g = ImageOps.grayscale(im)
+    w, h = g.size
+    if max(w, h) > 512:
+        scale_w = min(w, 512)
+        scale_h = min(h, 512)
+        g = g.resize((scale_w, scale_h), Image.BILINEAR)
+    a = np.asarray(g, dtype=np.float32)
+    k = np.array([[0, 1, 0],
+                  [1, -4, 1],
+                  [0, 1, 0]], dtype=np.float32)
+    H, W = a.shape
+    if H < 3 or W < 3:
+        return 0.0
+    # conv valid 3x3 đơn giản
+    out = np.zeros((H - 2, W - 2), dtype=np.float32)
+    for i in range(H - 2):
+        for j in range(W - 2):
+            patch = a[i:i+3, j:j+3]
+            out[i, j] = float((patch * k).sum())
+    return float(out.var())
+
+
+def estimate_brightness(im: Image.Image) -> float:
+    """Ước lượng độ sáng [0..255] bằng trung bình mức xám."""
+    g = ImageOps.grayscale(im)
+    w, h = g.size
+    if max(w, h) > 512:
+        g = g.resize((min(w, 512), min(h, 512)), Image.BILINEAR)
+    arr = np.asarray(g, dtype=np.float32)
+    return float(arr.mean())
+
+
+def enhance_image_soft(im: Image.Image) -> Image.Image:
+    """
+    Tăng cường ảnh nhẹ: UnsharpMask (tăng nét) + equalize kênh Y (tăng tương phản nhẹ).
+    Không dùng OpenCV để tránh thêm phụ thuộc.
+    """
+    im = im.convert("RGB")
+    # 1) tăng nét nhẹ
+    im = im.filter(ImageFilter.UnsharpMask(radius=1.2, percent=130, threshold=2))
+    # 2) equalize nhẹ trên kênh Y
     try:
-        return int(x) == x or isinstance(x, int)
+        ycbcr = im.convert("YCbCr")
+        y, cb, cr = ycbcr.split()
+        y_eq = ImageOps.equalize(y)
+        y_mix = Image.blend(y, y_eq, alpha=0.3)
+        out = Image.merge("YCbCr", (y_mix, cb, cr)).convert("RGB")
+        return out
     except Exception:
-        return False
+        return im
 
-def _make_divisible(x, divisor=32):
-    return int(np.ceil(x / divisor) * divisor)
 
-def letterbox(im: Image.Image, new_shape: Union[int, Tuple[int,int]] = 640, color=(114,114,114)) -> Image.Image:
-    """Resize giữ tỉ lệ + padding về (W,H) mong muốn (bội số 32)."""
-    if isinstance(new_shape, int):
-        new_w = new_h = new_shape
-    else:
-        new_w, new_h = new_shape
+class InferenceService:
+    def __init__(self):
+        try:
+            # OnnxDetector mới đọc labels từ ONNX metadata (fallback labels.txt)
+            self.detector = OnnxDetector(
+                model_path=MODEL_PATH,
+                labels_path=LABELS_PATH,
+                input_size=(640, 640),
+                conf_thres=0.25,                # dùng ở mức parser; vote theo lớp vẫn chạy
+                iou_thres=0.45,
+                providers=["CPUExecutionProvider"],  # đổi nếu dùng CUDA/DML
+            )
+            logger.info("✅ ONNX model loaded successfully.")
+        except Exception as e:
+            logger.error(f"❌ Failed to load ONNX model: {e}")
+            self.detector = None
 
-    w, h = im.size
-    r = min(new_w / w, new_h / h)
-    nw, nh = int(round(w * r)), int(round(h * r))
-    im = im.resize((nw, nh), Image.BILINEAR)
-    new_im = Image.new("RGB", (new_w, new_h), color)
-    new_im.paste(im, ((new_w - nw) // 2, (new_h - nh) // 2))
-    return new_im
+    def _wrap(self, disease: str, confidence: float, llm_text: str,
+              quality: Dict[str, Any], debug: Dict[str, Any] | None = None):
+        res = {
+            "success": True,
+            "result": {
+                "disease": disease,
+                "confidence": round(float(confidence), 4),
+                "llm_explanation": llm_text,
+                "quality": quality,
+            }
+        }
+        if debug:
+            res["result"]["debug"] = debug
+        return res
 
-class OnnxDetector:
-    def __init__(self, model_path: str, labels_path: Optional[str] = None, imgsz: Optional[int] = None, max_side: int = 1920):
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(model_path)
+    async def analyze(self, image_file: UploadFile):
+        if not self.detector:
+            raise HTTPException(status_code=500, detail="Model chưa được load.")
 
-        # Load model
-        self.session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
-        self.input_name = self.session.get_inputs()[0].name
-        self.output_name = self.session.get_outputs()[0].name
+        try:
+            raw_bytes = await image_file.read()
+            if not raw_bytes:
+                raise HTTPException(status_code=400, detail="Ảnh rỗng.")
 
-        # Đọc shape input từ ONNX, ví dụ: [1, 3, 640, 640] hoặc [1, 3, 'height', 'width']
-        in_shape = self.session.get_inputs()[0].shape  # [N,C,H,W]
-        H, W = None, None
-        if len(in_shape) == 4:
-            H = in_shape[2] if _is_int(in_shape[2]) else None
-            W = in_shape[3] if _is_int(in_shape[3]) else None
-        # Nếu model quy định cố định (vd 640x640) thì dùng luôn, ngược lại để None để auto-chọn
-        self.fixed_hw: Optional[Tuple[int,int]] = (int(W), int(H)) if (H and W) else None
+            image = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
 
-        # nếu người dùng truyền imgsz thì ưu tiên (cho cả fixed/dynamic)
-        self.user_imgsz = int(imgsz) if imgsz else None
-        self.max_side = int(max_side)
+            # ===== 1) đánh giá chất lượng ảnh =====
+            blur = variance_of_laplacian_pil(image)
+            bright = estimate_brightness(image)
+            too_dark = bright < DARK_THRES
+            too_bright = bright > BRIGHT_THRES
+            quality = {
+                "blur_score": round(blur, 2),
+                "brightness": round(bright, 1),
+                "too_dark": too_dark,
+                "too_bright": too_bright,
+            }
 
-        # labels
-        self.labels: List[str] = []
-        if labels_path and os.path.exists(labels_path):
-            with open(labels_path, "r", encoding="utf-8") as f:
-                self.labels = [ln.strip() for ln in f if ln.strip()]
+            # ===== 2) suy luận lần 1 =====
+            pred1 = self.detector.predict(image)  # {'label','confidence','best_cls','debug'}
+            logger.info(f"📸 Pred#1: {pred1}")
+            disease = pred1.get("label", "Không xác định") or "Không xác định"
+            confidence = float(pred1.get("confidence", 0.0))
+            debug = {
+                "display_threshold": DISPLAY_MIN,
+                "model_nc": len(self.detector.labels),  # sẽ là 5
+                **(pred1.get("debug") or {})
+            }
+            enhanced_used = False
 
-    def _choose_size(self, im: Image.Image) -> Tuple[int,int]:
-        """Chọn (W,H) input cho model:
-           - Nếu model FIXED: dùng fixed (hoặc override bằng user_imgsz nếu có).
-           - Nếu model DYNAMIC: lấy min(size ảnh, max_side), rồi làm tròn lên bội số 32."""
-        if self.fixed_hw:
-            fw, fh = self.fixed_hw
-            if self.user_imgsz:  # cho phép override thành vuông user_imgsz nếu muốn
-                s = _make_divisible(self.user_imgsz, 32)
-                return (s, s)
-            return (fw, fh)
+            # ===== 3) nếu ảnh rất mờ → thử tăng cường & infer lại đúng 1 lần =====
+            if blur < BLUR_TOO_LOW:
+                enhanced = enhance_image_soft(image)
+                pred2 = self.detector.predict(enhanced)
+                logger.info(f"📸 Pred#2 (enhanced): {pred2}")
+                enhanced_used = True
+                debug["enhanced_used"] = True
+                # chọn kết quả tốt hơn
+                if float(pred2.get("confidence", 0.0)) > confidence:
+                    disease = pred2.get("label", disease)
+                    confidence = float(pred2.get("confidence", confidence))
 
-        # dynamic: tự tính theo ảnh
-        w, h = im.size
-        if self.user_imgsz:
-            s = _make_divisible(self.user_imgsz, 32)
-            return (s, s)
-        # giới hạn cạnh dài để tránh OOM
-        scale = min(self.max_side / max(w, h), 1.0)
-        tw, th = int(w * scale), int(h * scale)
-        tw, th = _make_divisible(tw, 32), _make_divisible(th, 32)
-        tw = max(tw, 32); th = max(th, 32)
-        return (tw, th)
+            # ===== 4) ẩn dự đoán quá thấp cho UI (không ảnh hưởng debug) =====
+            shown_disease = disease
+            shown_conf = confidence
+            if shown_conf < DISPLAY_MIN:
+                shown_disease = "Không xác định"
+                shown_conf = 0.0
 
-    def _preprocess(self, img: Image.Image) -> np.ndarray:
-        img = img.convert("RGB")
-        target_w, target_h = self._choose_size(img)
-        img = letterbox(img, (target_w, target_h))
-        arr = np.array(img).astype(np.float32) / 255.0
-        arr = np.transpose(arr, (2,0,1))[None, ...]  # (1,3,H,W)
-        return arr
+            # ===== 5) gọi LLM để giải thích (KHÔNG truyền extra_context) =====
+            try:
+                llm_text = explain_disease_with_llm(
+                    disease_name=shown_disease,
+                    confidence=shown_conf
+                )
+            except Exception as e:
+                logger.error(f"❌ LLM error: {e}")
+                if shown_conf > 0 and shown_disease != "Không xác định":
+                    llm_text = f"Bệnh dự đoán: {shown_disease}. Độ tin cậy: {shown_conf*100:.2f}%."
+                else:
+                    tips = []
+                    if blur < BLUR_A_BIT_LOW:
+                        tips.append("Chụp gần hơn và giữ máy ổn định để ảnh rõ nét.")
+                    if too_dark:
+                        tips.append("Tăng ánh sáng (đèn/ánh sáng tự nhiên), tránh ngược sáng.")
+                    if too_bright:
+                        tips.append("Giảm chói, tránh ánh sáng gắt chiếu trực tiếp.")
+                    llm_text = "Không thể sinh giải thích từ LLM." + (f" {' '.join(tips)}" if tips else "")
 
-    def infer_top1(self, img: Image.Image):
-        x = self._preprocess(img)
-        pred = self.session.run([self.output_name], {self.input_name: x})[0]
-        pred = np.squeeze(pred)  # chấp nhận (1,C,A)->(C,A), (C,A), (A,C), (N,K)
+            # ===== 6) trả kết quả =====
+            debug["enhanced_used"] = enhanced_used
+            return self._wrap(
+                disease=shown_disease,
+                confidence=shown_conf,
+                llm_text=llm_text,
+                quality=quality,
+                debug=debug
+            )
 
-        # ---- chuẩn hoá về (N,K) ----
-        if pred.ndim == 3:
-            if pred.shape[0] == 1:
-                pred = np.squeeze(pred, 0)  # (C,A)
-            else:
-                raise RuntimeError(f"Unsupported 3D output: {pred.shape}")
-        if pred.ndim != 2:
-            raise RuntimeError(f"Unsupported output shape: {pred.shape}")
-
-        H, W = pred.shape
-        nc_from_labels = len(self.labels) if self.labels else None
-        def looks_like_ck(val: int) -> bool:
-            if nc_from_labels is None: return False
-            return val in (4 + nc_from_labels, 5 + nc_from_labels)
-        # nếu đang (C,A) (vd 8 x 8400) thì transpose (khi kênh nhỏ và anchors lớn)
-        if W > H and (looks_like_ck(H) or H <= 32):
-            pred = pred.T  # -> (A,C)
-
-        N, K = pred.shape  # (A,C)
-        nc = nc_from_labels if nc_from_labels is not None else max(K - 4, 1)
-
-        # Giải mã linh hoạt: nếu K lớn hơn 5+nc, giả định cột cuối là logits lớp
-        if K >= 5 + nc:  # YOLOv5/biến thể: có objectness
-            obj = sigmoid(pred[:, 4])
-            cls = sigmoid(pred[:, -nc:])
-            cls_id = np.argmax(cls, axis=1)
-            cls_conf = cls[np.arange(cls.shape[0]), cls_id]
-            scores = obj * cls_conf
-        elif K >= 4 + nc:  # YOLOv8/biến thể: không có objectness
-            cls = sigmoid(pred[:, -nc:])
-            cls_id = np.argmax(cls, axis=1)
-            scores = cls[np.arange(cls.shape[0]), cls_id]
-        else:
-            raise RuntimeError(f"Unsupported decoded shape (N={N}, K={K}, nc={nc}).")
-
-        i = int(np.argmax(scores))
-        best_score = float(scores[i])
-        best_cls = int(cls_id[i])
-        name = self.labels[best_cls] if self.labels else str(best_cls)
-        return {"disease": name, "confidence": round(best_score, 4)}
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Inference error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))

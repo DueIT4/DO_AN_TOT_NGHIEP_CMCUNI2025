@@ -6,4 +6,8 @@ alembic
 python-multipart
 pymysql
 onnxruntime
+pymysql
+pydantic
+pydantic-settings
+requests
 Pillow
