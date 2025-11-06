@@ -192,13 +192,15 @@ class InferenceService:
 
             # ===== 6) trả kết quả =====
             debug["enhanced_used"] = enhanced_used
-            return self._wrap(
-                disease=shown_disease,
-                confidence=shown_conf,
-                llm_text=llm_text,
-                quality=quality,
-                debug=debug
-            )
+            return {
+                "success": True,
+                "result": {
+                    "disease": shown_disease,
+                    "confidence": round(shown_conf, 4),
+                    "description": llm_text
+                }
+            }
+
 
         except HTTPException:
             raise

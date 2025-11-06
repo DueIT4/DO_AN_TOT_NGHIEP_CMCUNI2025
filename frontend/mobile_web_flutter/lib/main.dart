@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'core/firebase_init.dart';
 import 'src/routes/web_routes.dart';
 
-void main() => runApp(const App());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseInit.ensureInited();       // ✅ thêm dòng này
+  runApp(const App());
+}
 
 class App extends StatelessWidget {
   const App({super.key});

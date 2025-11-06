@@ -1,60 +1,73 @@
-from __future__ import annotations
-from typing import Optional
 from sqlalchemy.orm import Session
-from app.models.devices import Devices
-from app.models.device_type import DeviceType
+from fastapi import HTTPException, status
+from datetime import datetime
+from app.models.devices import Devices, DeviceState
 from app.models.device_logs import DeviceLogs
-from app.services.common import get_or_404, commit_refresh, paginate, NotFoundError
+from app.models.device_type import DeviceType
+from app.services.common import get_or_404, commit_refresh, paginate
 
-# ---------- Device Type ----------
-def create_device_type(db: Session, name: str, has_stream: bool = False, status: str = "active") -> DeviceType:
-    dt = DeviceType(device_type_name=name, has_stream=has_stream, status=status)
-    return commit_refresh(db, dt)
 
-def list_device_types(db: Session):
-    return db.query(DeviceType).order_by(DeviceType.device_type_name.asc()).all()
+class DeviceService:
+    """💡 Service layer xử lý nghiệp vụ cho bảng devices"""
 
-# ---------- Device ----------
-def create_device(
-    db: Session,
-    *,
-    device_type_id: int,
-    name: Optional[str] = None,
-    serial_no: Optional[str] = None,
-    location: Optional[str] = None,
-    status: str = "active",
-    parent_device_id: Optional[int] = None,
-    user_id: Optional[int] = None,
-    stream_url: Optional[str] = None,
-) -> Devices:
-    # ensure type exists
-    get_or_404(db, DeviceType, device_type_id)
-    if parent_device_id:
-        get_or_404(db, Devices, parent_device_id)
-    dev = Devices(
-        user_id=user_id,
-        name=name,
-        device_type_id=device_type_id,
-        parent_device_id=parent_device_id,
-        serial_no=serial_no,
-        location=location,
-        status=status,
-        stream_url=stream_url,
-    )
-    return commit_refresh(db, dev)
+    # -----------------------------
+    # Lấy danh sách thiết bị
+    # -----------------------------
+    def list(self, db: Session, page: int = 1, size: int = 20):
+        q = db.query(Devices).order_by(Devices.created_at.desc())
+        return paginate(q, page, size)
 
-def update_device(db: Session, device_id: int, **fields) -> Devices:
-    dev = get_or_404(db, Devices, device_id)
-    for k, v in fields.items():
-        if v is not None and hasattr(dev, k):
-            setattr(dev, k, v)
-    return commit_refresh(db, dev)
+    # -----------------------------
+    # Lấy chi tiết thiết bị
+    # -----------------------------
+    def get(self, db: Session, device_id: int):
+        return get_or_404(db, Devices, device_id)
 
-def list_devices(db: Session, page: int = 1, size: int = 20):
-    q = db.query(Devices).order_by(Devices.created_at.desc())
-    return paginate(q, page, size)
+    # -----------------------------
+    # Tạo mới thiết bị
+    # -----------------------------
+    def create(self, db: Session, data: dict):
+        # Kiểm tra trùng serial
+        if db.query(Devices).filter(Devices.serial_no == data["serial_no"]).first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Serial đã tồn tại",
+            )
+        device = Devices(**data)
+        return commit_refresh(db, device)
 
-def add_device_log(db: Session, device_id: int, event_type: str, description: str) -> DeviceLogs:
-    get_or_404(db, Devices, device_id)
-    log = DeviceLogs(device_id=device_id, event_type=event_type, description=description)
-    return commit_refresh(db, log)
+    # -----------------------------
+    # Cập nhật thiết bị
+    # -----------------------------
+    def update(self, db: Session, device_id: int, data: dict):
+        device = get_or_404(db, Devices, device_id)
+        for key, value in data.items():
+            if hasattr(device, key):
+                setattr(device, key, value)
+        return commit_refresh(db, device)
+
+    # -----------------------------
+    # Xoá thiết bị
+    # -----------------------------
+    def delete(self, db: Session, device_id: int):
+        device = get_or_404(db, Devices, device_id)
+        db.delete(device)
+        db.commit()
+        return {"message": f"Đã xoá thiết bị ID={device_id}"}
+
+    # -----------------------------
+    # Ghi log sự kiện thiết bị
+    # -----------------------------
+    def add_log(self, db: Session, device_id: int, event_type: str, description: str):
+        get_or_404(db, Devices, device_id)
+        log = DeviceLogs(
+            device_id=device_id,
+            event_type=event_type,
+            description=description,
+            created_at=datetime.utcnow(),
+        )
+        return commit_refresh(db, log)
+
+
+# ✅ Khởi tạo instance dùng chung
+devices_service = DeviceService()

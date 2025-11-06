@@ -1,58 +1,72 @@
 import 'package:flutter/material.dart';
-import '../screens/home.dart';
-import '../screens/detect.dart';
-import '../screens/device.dart';
-import '../screens/login.dart';
-import '../screens/profile.dart';
-import '../screens/signup.dart';
-import '../screens/support.dart';
-import '../screens/user.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
-import '../screens/library.dart';
-import '../screens/news.dart';
-import '../screens/company.dart';
-import '../screens/business.dart';
-import '../screens/app_download.dart';
+import '../../core/api_base.dart';
+
+import '../../modules/home/home_web.dart';
+import '../../modules/home/home_mobile.dart';
+import '../../modules/detect/detect_web.dart';
+import '../../modules/detect/detect_mobile.dart';
+import '../../modules/devices/device_web.dart';
+import '../../modules/devices/device_mobile.dart';
+import '../../modules/sensors/sensors_web.dart';
+import '../../modules/sensors/sensors_mobile.dart';
+import '../../modules/auth/login_web.dart';
+import '../../modules/auth/login_mobile.dart';
+
+// các trang nội dung “tĩnh” tạm thời
+import '../../modules/misc/library_web.dart';
+import '../../modules/misc/company_web.dart';
+import '../../modules/misc/news_web.dart';
+import '../../modules/misc/app_download_web.dart';
 
 class WebRoutes {
-  static const home = '/';
-  static const detect = '/detect';
-  static const device = '/device';
-  static const login = '/login';
-  static const signup = '/signup';
-  static const profile = '/profile';
-  static const support = '/support';
-  static const user = '/user';
-  static const app = '/app';
-  static const library = '/library';
-  static const news = '/news';
-  static const company = '/company';
-  static const business = '/business';
+  static const home     = '/';
+  static const detect   = '/detect';
+  static const device   = '/device';
+  static const sensors  = '/sensors';
+  static const login    = '/login';
+
+  // các tuyến bạn muốn có trên navbar
+  static const library  = '/library';
+  static const news     = '/news';
+  static const company  = '/company';
+  static const app      = '/app';
+
+  // ✅ danh sách route cần đăng nhập mới vào được
+  static const _protected = {
+ 
+  };
 
   static Route<dynamic> onGenerate(RouteSettings s) {
-    switch (s.name) {
-      case home:     return _p(const HomeScreen());
-      case detect:   return _p(const DetectScreen());
-      case device:   return _p(const DeviceScreen());
-      case login:    return _p(const LoginScreen());
-      case signup:   return _p(const SignupScreen());
-      case profile:  return _p(const ProfileScreen());
-      case support:  return _p(const SupportScreen());
-      case user:     return _p(const UserScreen());
-      case app:      return _p(const AppDownloadScreen());
-      case library:  return _p(const LibraryScreen());
-      case news:     return _p(const NewsScreen());
-      case company:  return _p(const CompanyScreen());
-      case business: return _p(const BusinessScreen());
+    final name = s.name ?? '/';
+
+    // Nếu route thuộc protected & chưa có token → ép về /login, kèm “returnTo”
+    // if (_protected.contains(name) && (ApiBase.bearerToken == null || ApiBase.bearerToken!.isEmpty)) {
+    //   return _p(
+    //     kIsWeb ? const LoginWebPage() : const LoginMobilePage(),
+    //     arguments: name, // giữ nguyên chuỗi tên route (có thể có query)
+    //   );
+    // }
+
+    switch (name) {
+      case home:    return _p(kIsWeb ? const HomeWebPage()    : const HomeMobilePage());
+      case detect:  return _p(kIsWeb ? const DetectWebPage()  : const DetectMobilePage());
+      case device:  return _p(kIsWeb ? const DeviceWebPage()  : const DeviceMobilePage());
+      case sensors: return _p(kIsWeb ? const SensorsWebPage() : const SensorsMobilePage());
+      case login:   return _p(kIsWeb ? const LoginWebPage()   : const LoginMobilePage());
+
+      // các tuyến ở navbar (đã bảo vệ ở trên)
+      case library: return _p(const LibraryWebPage());
+      case news:    return _p(const NewsWebPage());
+      case company: return _p(const CompanyWebPage());
+      case app:     return _p(const AppDownloadWebPage());
+
       default:
-        return MaterialPageRoute(
-          builder: (_) => Scaffold(
-            body: Center(child: Text('404: ${s.name}')),
-          ),
-        );
+        return MaterialPageRoute(builder: (_) => Scaffold(body: Center(child: Text('404: $name'))));
     }
   }
 
-  static MaterialPageRoute _p(Widget w) =>
-      MaterialPageRoute(builder: (_) => w);
+  static MaterialPageRoute _p(Widget w, {Object? arguments}) =>
+      MaterialPageRoute(builder: (_) => w, settings: RouteSettings(arguments: arguments));
 }

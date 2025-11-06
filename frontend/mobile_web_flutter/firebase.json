@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"android":{"default":{"projectId":"ai-plant-health","appId":"1:527208522475:android:2038d6cf5e9ed29770d4ae","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"ai-plant-health","configurations":{"android":"1:527208522475:android:2038d6cf5e9ed29770d4ae","web":"1:527208522475:web:1a1fc5c1144c199970d4ae"}}}}}}
