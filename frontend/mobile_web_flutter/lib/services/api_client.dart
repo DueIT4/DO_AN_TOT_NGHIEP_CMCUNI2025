@@ -112,6 +112,44 @@ class ApiClient {
       };
 
   // ======================
+  // ĐĂNG KÝ (generic - dùng cho login_page.dart)
+  // ======================
+  static Future<(bool, String)> register({
+    required String name,
+    required String identity, // phone hoặc email
+    required String password,
+  }) async {
+    // Nếu identity là số điện thoại (chỉ chứa số)
+    if (RegExp(r'^[0-9]+$').hasMatch(identity)) {
+      return registerPhone(
+        username: name,
+        phone: identity,
+        password: password,
+      );
+    }
+    // TODO: Thêm register email nếu cần
+    return (false, 'Chỉ hỗ trợ đăng ký bằng số điện thoại');
+  }
+
+  // ======================
+  // ĐĂNG NHẬP (generic - dùng cho login_page.dart)
+  // ======================
+  static Future<(bool, String)> login({
+    required String identity, // phone hoặc email
+    required String password,
+  }) async {
+    // Nếu identity là số điện thoại (chỉ chứa số)
+    if (RegExp(r'^[0-9]+$').hasMatch(identity)) {
+      return loginPhone(
+        phone: identity,
+        password: password,
+      );
+    }
+    // TODO: Thêm login email nếu cần
+    return (false, 'Chỉ hỗ trợ đăng nhập bằng số điện thoại');
+  }
+
+  // ======================
   // ĐĂNG KÝ SỐ ĐIỆN THOẠI
   // ======================
   static Future<(bool, String)> registerPhone({

@@ -13,8 +13,15 @@ class DeviceService:
     # -----------------------------
     # Lấy danh sách thiết bị
     # -----------------------------
-    def list(self, db: Session, page: int = 1, size: int = 20):
-        q = db.query(Devices).order_by(Devices.created_at.desc())
+    def list(self, db: Session, page: int = 1, size: int = 20, query=None):
+        """
+        Lấy danh sách thiết bị với pagination.
+        Nếu query được truyền vào, dùng query đó; nếu không, tạo query mới.
+        """
+        if query is None:
+            q = db.query(Devices).order_by(Devices.created_at.desc())
+        else:
+            q = query
         return paginate(q, page, size)
 
     # -----------------------------

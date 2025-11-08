@@ -55,6 +55,7 @@ from app.api.v1.routes_health import router as health_router
 from app.api.v1.routes_detect import router as detect_router
 from app.api.v1.routes_ingest import router as ingest_router  
 from app.api.v1.routes_devices import router as devices_router
+from app.api.v1.routes_device_types import router as device_types_router
 from app.api.v1.routes_diseases import router as diseases_router
 from app.api.v1.routes_sensors import router as sensors_router
 from app.api.v1.routes_notifications import router as notif_router
@@ -143,6 +144,7 @@ app.mount("/media", StaticFiles(directory=str(MEDIA_DIR), html=False), name="med
 app.include_router(health_router,  prefix=API_PREFIX)
 app.include_router(detect_router,  prefix=API_PREFIX)
 app.include_router(devices_router, prefix=API_PREFIX)
+app.include_router(device_types_router, prefix=API_PREFIX)
 app.include_router(diseases_router, prefix=API_PREFIX)
 app.include_router(sensors_router, prefix=API_PREFIX)
 app.include_router(notif_router,   prefix=API_PREFIX)

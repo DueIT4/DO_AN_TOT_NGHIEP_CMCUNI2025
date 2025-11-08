@@ -21,6 +21,7 @@
 from typing import List
 import json
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -35,6 +36,14 @@ class Settings(BaseSettings):
 
     # DB
     DATABASE_URL: str  # đọc từ .env
+    DB_URL: str = ""  # alias cho DATABASE_URL
+    
+    @model_validator(mode='after')
+    def set_db_url(self):
+        """Set DB_URL từ DATABASE_URL nếu chưa được set."""
+        if not self.DB_URL:
+            self.DB_URL = self.DATABASE_URL
+        return self
 
     # Auth
     JWT_SECRET: str = "change_me"

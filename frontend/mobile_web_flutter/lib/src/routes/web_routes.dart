@@ -14,11 +14,17 @@ import '../../modules/sensors/sensors_mobile.dart';
 import '../../modules/auth/login_web.dart';
 import '../../modules/auth/login_mobile.dart';
 
-// các trang nội dung “tĩnh” tạm thời
+// các trang nội dung "tĩnh" tạm thời
 import '../../modules/misc/library_web.dart';
 import '../../modules/misc/company_web.dart';
 import '../../modules/misc/news_web.dart';
 import '../../modules/misc/app_download_web.dart';
+
+// Admin pages
+import '../../modules/admin/dashboard/admin_dashboard_page.dart';
+import '../../modules/admin/user/admin_users_page.dart';
+import '../../modules/admin/device/admin_devices_page.dart';
+import '../../modules/admin/notifications/admin_notifications_page.dart';
 
 class WebRoutes {
   static const home     = '/';
@@ -33,21 +39,30 @@ class WebRoutes {
   static const company  = '/company';
   static const app      = '/app';
 
+  // Admin routes
+  static const adminDashboard = '/admin/dashboard';
+  static const adminUsers = '/admin/users';
+  static const adminDevices = '/admin/devices';
+  static const adminNotifications = '/admin/notifications';
+
   // ✅ danh sách route cần đăng nhập mới vào được
   static const _protected = {
- 
+    adminDashboard,
+    adminUsers,
+    adminDevices,
+    adminNotifications,
   };
 
   static Route<dynamic> onGenerate(RouteSettings s) {
     final name = s.name ?? '/';
 
-    // Nếu route thuộc protected & chưa có token → ép về /login, kèm “returnTo”
-    // if (_protected.contains(name) && (ApiBase.bearerToken == null || ApiBase.bearerToken!.isEmpty)) {
-    //   return _p(
-    //     kIsWeb ? const LoginWebPage() : const LoginMobilePage(),
-    //     arguments: name, // giữ nguyên chuỗi tên route (có thể có query)
-    //   );
-    // }
+    // Nếu route thuộc protected & chưa có token → ép về /login
+    if (_protected.contains(name) && (ApiBase.bearerToken == null || ApiBase.bearerToken!.isEmpty)) {
+      return _p(
+        kIsWeb ? const LoginWebPage() : const LoginMobilePage(),
+        arguments: name, // giữ nguyên chuỗi tên route (có thể có query)
+      );
+    }
 
     switch (name) {
       case home:    return _p(kIsWeb ? const HomeWebPage()    : const HomeMobilePage());
@@ -61,6 +76,16 @@ class WebRoutes {
       case news:    return _p(const NewsWebPage());
       case company: return _p(const CompanyWebPage());
       case app:     return _p(const AppDownloadWebPage());
+
+      // Admin routes
+      case adminDashboard:
+        return _p(const AdminDashboardPage());
+      case adminUsers:
+        return _p(const AdminUsersPage());
+      case adminDevices:
+        return _p(const AdminDevicesPage());
+      case adminNotifications:
+        return _p(const AdminNotificationsPage());
 
       default:
         return MaterialPageRoute(builder: (_) => Scaffold(body: Center(child: Text('404: $name'))));

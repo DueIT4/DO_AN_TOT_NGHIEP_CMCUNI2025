@@ -1,5 +1,6 @@
 from sqlalchemy import Column, BigInteger, String, Enum, ForeignKey, TIMESTAMP
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.core.db import Base
 import enum
 
@@ -22,3 +23,7 @@ class Devices(Base):
     stream_url = Column(String(700))
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, onupdate=func.now())
+    
+    # Relationships
+    device_type = relationship("DeviceType", backref="devices", lazy="joined")
+    parent_device = relationship("Devices", remote_side=[device_id], backref="child_devices")
