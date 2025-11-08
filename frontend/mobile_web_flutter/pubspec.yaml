@@ -16,6 +16,8 @@ dependencies:
 
   # Gọi API backend
   http: ^1.2.2
+  google_sign_in: ^6.2.1
+  flutter_facebook_auth: ^7.0.1
 
   # Chọn ảnh (gallery/camera)
   image_picker: ^1.1.2

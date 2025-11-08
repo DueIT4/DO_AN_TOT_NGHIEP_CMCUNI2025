@@ -1,35 +1,64 @@
+# app/main.py
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.models import user, role, auth_account 
 from app.api.v1.routes_health import router as health_router
 from app.api.v1.routes_detect import router as detect_router
+from app.api.v1.routes_auth import router as auth_router
+from app.api.v1.routes_users import router as users_router
+from fastapi.staticfiles import StaticFiles
+from app.core.config import settings
+from app.api.v1.routes_me import router as me_router
+from app.api.v1.routes_support import router as support_router
+from app.api.v1.routes_notifications import router as notifications_router
+from sqlalchemy.orm import configure_mappers
+from fastapi.middleware.cors import CORSMiddleware
+configure_mappers()
+from pathlib import Path
 
-app = FastAPI(title=settings.APP_NAME)
+app = FastAPI(
+    title=settings.APP_NAME,
+    docs_url="/docs",           # ép bật Swagger
+    redoc_url="/redoc",         # (tuỳ chọn)
+    openapi_url="/openapi.json" # schema
+)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=getattr(settings, 'CORS_ORIGIN_REGEX', None),
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(health_router, prefix=f"{settings.API_V1}")
-app.include_router(detect_router, prefix=f"{settings.API_V1}")
+app.include_router(health_router, prefix=settings.API_V1)
+app.include_router(detect_router, prefix=settings.API_V1)
+app.include_router(auth_router, prefix=settings.API_V1)
+app.include_router(users_router, prefix=settings.API_V1)
+app.include_router(me_router, prefix=settings.API_V1)
+app.include_router(support_router, prefix=settings.API_V1)
+app.include_router(notifications_router, prefix=settings.API_V1)
 
 @app.get("/")
 def root():
-    # Return a minimal JSON; alternatively redirect to docs
-    return JSONResponse({"name": settings.APP_NAME, "health": "ok", "docs": f"{settings.API_V1}/docs"})
+    # Trỏ đúng /docs (KHÔNG phải /api/v1/docs)
+    return JSONResponse({"name": settings.APP_NAME, "health": "ok", "docs": "/docs"})
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
-    # Avoid 404 noise for browser favicon requests
     return Response(status_code=204)
 
 @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
 def chrome_devtools_probe():
-    # Silence Chrome DevTools probe 404s
     return Response(status_code=204)
+# Tạo thư mục media/avatars nếu chưa có
+Path("./media/avatars").mkdir(parents=True, exist_ok=True)
+# Cho phép truy cập file tĩnh qua /media
+app.mount("/media", StaticFiles(directory="media"), name="media")
+
+# support uploads (đính kèm trong hỗ trợ)
+Path("uploads/support").mkdir(parents=True, exist_ok=True)  
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads") 
