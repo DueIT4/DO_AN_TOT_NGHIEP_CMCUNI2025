@@ -4,7 +4,14 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   file_selector_windows
+<<<<<<< HEAD
   flutter_secure_storage_windows
+=======
+  firebase_auth
+  firebase_core
+  flutter_secure_storage_windows
+  url_launcher_windows
+>>>>>>> 11d9fd14ef0953ddc8cc89054bcd533fde9e4f7c
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

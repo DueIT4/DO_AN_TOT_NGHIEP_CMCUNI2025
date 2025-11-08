@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # app/api/v1/routes_support.py
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
@@ -185,3 +186,36 @@ def delete_message(message_id: int, db: Session = Depends(get_db)):
     db.delete(msg)
     db.commit()
     return {"ok": True}
+=======
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.core.db import get_db
+from app.models.support_tickets import SupportTickets
+from app.models.support_messages import SupportMessages
+from pydantic import BaseModel
+from datetime import datetime
+
+router = APIRouter(prefix="/support", tags=["Support"])
+
+class TicketSchema(BaseModel):
+    user_id: int
+    title: str
+    description: str
+
+class MessageSchema(BaseModel):
+    ticket_id: int
+    sender_id: int
+    message: str
+
+@router.post("/ticket")
+def create_ticket(data: TicketSchema, db: Session = Depends(get_db)):
+    t = SupportTickets(**data.dict(), created_at=datetime.utcnow())
+    db.add(t); db.commit()
+    return {"message": "Đã gửi yêu cầu hỗ trợ", "ticket_id": t.ticket_id}
+
+@router.post("/message")
+def send_message(data: MessageSchema, db: Session = Depends(get_db)):
+    msg = SupportMessages(**data.dict(), created_at=datetime.utcnow())
+    db.add(msg); db.commit()
+    return {"message": "Đã gửi phản hồi"}
+>>>>>>> 11d9fd14ef0953ddc8cc89054bcd533fde9e4f7c

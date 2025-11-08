@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update, and_
@@ -278,3 +279,20 @@ def login_facebook(payload: SocialLoginIn, db: Session = Depends(get_db)):
     user = db.get(Users, acc.user_id)
     token = make_access_token(user.user_id)
     return TokenOut(access_token=token, user_id=user.user_id, username=user.username)
+=======
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.core.db import get_db
+from app.core.firebase_admin import init_firebase
+from app.services.auth_service import login_with_firebase_idtoken
+
+router = APIRouter(prefix="/auth", tags=["Auth"])
+
+@router.post("/firebase")
+def login_with_firebase(id_token: str, db: Session = Depends(get_db)):
+    try:
+        init_firebase()
+        return login_with_firebase_idtoken(db, id_token)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+>>>>>>> 11d9fd14ef0953ddc8cc89054bcd533fde9e4f7c
