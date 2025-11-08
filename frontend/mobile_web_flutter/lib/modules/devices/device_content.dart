@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/api_base.dart';
+import 'device_detail_page.dart';
 
 class DeviceContent extends StatefulWidget {
   const DeviceContent({super.key});
@@ -115,113 +116,121 @@ class _DeviceContentState extends State<DeviceContent> {
     }
   }
 
+  void _openDetail(Map<String, dynamic> m) {
+    final id = m['device_id'];
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DeviceDetailPage(deviceId: id, deviceLite: m),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.of(context).size.width >= 900;
 
-    return Padding(
-      padding: EdgeInsets.all(wide ? 32 : 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header hàng nút
-          Row(
-            children: [
-              Text('Danh sách thiết bị', style: Theme.of(context).textTheme.titleLarge),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: _openCreateDialog,
-                icon: const Icon(Icons.add),
-                label: const Text('Thêm thiết bị'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Nội dung danh sách
-          Expanded(
-            child: FutureBuilder<List<dynamic>>(
-              future: _future,
-              builder: (c, s) {
-                if (s.connectionState != ConnectionState.done) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (s.hasError) return Center(child: Text('Lỗi: ${s.error}'));
-                final items = s.data ?? [];
-
-                if (items.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('Chưa có thiết bị'),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          onPressed: _openCreateDialog,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Thêm thiết bị đầu tiên'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return LayoutBuilder(
-                  builder: (_, cons) {
-                    if (cons.maxWidth >= 800) {
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columns: const [
-                            DataColumn(label: Text('ID')),
-                            DataColumn(label: Text('Tên')),
-                            DataColumn(label: Text('Serial')),
-                            DataColumn(label: Text('Loại')),
-                            DataColumn(label: Text('Trạng thái')),
-                          ],
-                          rows: items.map((m) {
-                            return DataRow(
-                              cells: [
-                                DataCell(Text('${m['device_id']}')),
-                                DataCell(Text(m['name'] ?? '')),
-                                DataCell(Text(m['serial_no'] ?? '')),
-                                DataCell(Text('${m['device_type_id'] ?? ''}')),
-                                DataCell(Text(m['status'] ?? '')),
-                              ],
-                              onSelectChanged: (_) {
-                                final id = m['device_id'];
-                                Navigator.pushNamed(context, '/sensors?device_id=$id');
-                              },
-                            );
-                          }).toList(),
-                        ),
-                      );
-                    }
-
-                    // mobile-ish
-                    return ListView.separated(
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (_, i) {
-                        final m = items[i] as Map<String, dynamic>;
-                        return ListTile(
-                          leading: const Icon(Icons.devices),
-                          title: Text(m['name'] ?? 'Thiết bị'),
-                          subtitle: Text('Serial: ${m['serial_no'] ?? ''}'),
-                          trailing: Text('${m['status'] ?? ''}'),
-                          onTap: () {
-                            final id = m['device_id'];
-                            Navigator.pushNamed(context, '/sensors?device_id=$id');
-                          },
-                        );
-                      },
-                    );
-                  },
-                );
-              },
+    return Scaffold(
+      appBar: AppBar(title: const Text('Danh sách thiết bị')),
+      body: Padding(
+        padding: EdgeInsets.all(wide ? 24 : 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header hàng nút
+            Row(
+              children: [
+                Text('Thiết bị', style: Theme.of(context).textTheme.titleLarge),
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: _openCreateDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Thêm thiết bị'),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+
+            // Nội dung danh sách
+            Expanded(
+              child: FutureBuilder<List<dynamic>>(
+                future: _future,
+                builder: (c, s) {
+                  if (s.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (s.hasError) return Center(child: Text('Lỗi: ${s.error}'));
+                  final items = s.data ?? [];
+
+                  if (items.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Chưa có thiết bị'),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: _openCreateDialog,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Thêm thiết bị đầu tiên'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return LayoutBuilder(
+                    builder: (_, cons) {
+                      if (cons.maxWidth >= 800) {
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            columns: const [
+                              DataColumn(label: Text('ID')),
+                              DataColumn(label: Text('Tên')),
+                              DataColumn(label: Text('Serial')),
+                              DataColumn(label: Text('Loại')),
+                              DataColumn(label: Text('Trạng thái')),
+                            ],
+                            rows: items.map((m) {
+                              final mm = m as Map<String, dynamic>;
+                              return DataRow(
+                                cells: [
+                                  DataCell(Text('${mm['device_id']}')),
+                                  DataCell(Text(mm['name'] ?? '')),
+                                  DataCell(Text(mm['serial_no'] ?? '')),
+                                  DataCell(Text('${mm['device_type_id'] ?? ''}')),
+                                  DataCell(Text(mm['status'] ?? '')),
+                                ],
+                                onSelectChanged: (_) => _openDetail(mm),
+                              );
+                            }).toList(),
+                          ),
+                        );
+                      }
+
+                      // mobile-ish
+                      return ListView.separated(
+                        itemCount: items.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final m = items[i] as Map<String, dynamic>;
+                          return ListTile(
+                            leading: const Icon(Icons.devices),
+                            title: Text(m['name'] ?? 'Thiết bị'),
+                            subtitle: Text('Serial: ${m['serial_no'] ?? ''}'),
+                            trailing: Text('${m['status'] ?? ''}'),
+                            onTap: () => _openDetail(m),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

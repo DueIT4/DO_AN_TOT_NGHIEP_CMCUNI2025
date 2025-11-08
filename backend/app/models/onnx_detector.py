@@ -164,7 +164,7 @@ class OnnxDetector:
 
             if has_obj:
                 obj = 1.0 / (1.0 + np.exp(-arr[:, 4]))  # sigmoid
-                scores = obj * cls_conf
+                scores = np.clip(obj * cls_conf * 1.5, 0, 1)  # nhân hệ số nhẹ để scale confidence
             else:
                 # YOLOv8: không có obj_conf
                 scores = cls_conf

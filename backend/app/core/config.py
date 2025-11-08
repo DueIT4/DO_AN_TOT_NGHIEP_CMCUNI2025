@@ -1,28 +1,22 @@
+# app/core/config.py
 from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    APP_NAME: str = "AI Plant Health API"
-    API_V1: str = "/api/v1"
-    
-from urllib.parse import quote_plus
+from typing import List, Optional
 
 class Settings(BaseSettings):
     APP_NAME: str = "AI Plant Health API"
     API_V1: str = "/api/v1"
 
-    # Mã hóa mật khẩu để tránh lỗi ký tự đặc biệt
-    _password = quote_plus("changeme-StrongPwd!")
-    DB_URL: str = f"mysql+pymysql://plantai:{_password}@localhost:3306/ai_plant_db"
+    DB_URL: str = "mysql+pymysql://root:password@localhost:3306/plantdb"
 
-    CORS_ORIGINS: list[str] = [
-        "http://localhost",
-        "http://localhost:5173",
-        "http://localhost:8080",
-        "http://127.0.0.1:8000",
-        "http://127.0.0.1:55971",
-    ]
+    # LLM
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+
+    # CORS: pydantic sẽ parse JSON array trong .env
+    CORS_ORIGINS: List[str] = ["http://localhost"]
 
     class Config:
         env_file = ".env"
+        env_file_encoding = "utf-8"
 
 settings = Settings()

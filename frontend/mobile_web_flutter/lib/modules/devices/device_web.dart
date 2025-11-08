@@ -4,6 +4,11 @@ import 'device_content.dart';
 
 class DeviceWebPage extends StatelessWidget {
   const DeviceWebPage({super.key});
+
   @override
-  Widget build(BuildContext context) => const ShellWeb(body: DeviceContent());
+  Widget build(BuildContext context) {
+    return const ShellWeb(
+      body: DeviceContent(),
+    );
+  }
 }
