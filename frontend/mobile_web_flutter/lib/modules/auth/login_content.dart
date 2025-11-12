@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api_base.dart';
 import '../../src/routes/web_routes.dart';
+import '../../core/user_service.dart';
 import 'auth_service.dart'; // ✅ thêm
 
 class LoginContent extends StatefulWidget {
@@ -39,6 +40,10 @@ class _LoginContentState extends State<LoginContent> {
       });
 
       ApiBase.bearer = res['access_token'] as String?;
+      
+      // Clear cache để load lại thông tin user
+      UserService.clearCache();
+      await UserService.getCurrentUser(forceRefresh: true);
 
       if (!mounted) return;
       final next = widget.returnTo ?? WebRoutes.home;
@@ -55,6 +60,11 @@ class _LoginContentState extends State<LoginContent> {
     setState(() => _loading = true);
     try {
       await AuthService.loginWithGoogle();
+      
+      // Clear cache để load lại thông tin user
+      UserService.clearCache();
+      await UserService.getCurrentUser(forceRefresh: true);
+      
       if (!mounted) return;
       final next = widget.returnTo ?? WebRoutes.home;
       Navigator.pushNamedAndRemoveUntil(context, next, (r) => false);
@@ -70,6 +80,11 @@ class _LoginContentState extends State<LoginContent> {
     setState(() => _loading = true);
     try {
       await AuthService.loginWithFacebook();
+      
+      // Clear cache để load lại thông tin user
+      UserService.clearCache();
+      await UserService.getCurrentUser(forceRefresh: true);
+      
       if (!mounted) return;
       final next = widget.returnTo ?? WebRoutes.home;
       Navigator.pushNamedAndRemoveUntil(context, next, (r) => false);
@@ -118,6 +133,21 @@ class _LoginContentState extends State<LoginContent> {
                     validator: (v) =>
                         (v == null || v.isEmpty) ? 'Nhập mật khẩu' : null,
                   ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, WebRoutes.forgotPassword);
+                      },
+                      child: const Text('Quên mật khẩu?'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   if (_error != null)
                     Text(_error!,
@@ -157,11 +187,18 @@ class _LoginContentState extends State<LoginContent> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  TextButton(
-                    onPressed: () {
-                      // TODO: chuyển đến màn hình đăng ký (nếu có)
-                    },
-                    child: const Text("Chưa có tài khoản? Đăng ký"),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: _loading
+                            ? null
+                            : () {
+                                Navigator.pushNamed(context, WebRoutes.register);
+                              },
+                        child: const Text("Chưa có tài khoản? Đăng ký"),
+                      ),
+                    ],
                   ),
                 ],
               ),

@@ -17,7 +17,7 @@ class AdminShellWeb extends StatelessWidget {
   void _navigate(BuildContext context, AdminMenu menu) {
     switch (menu) {
       case AdminMenu.devices:
-        Navigator.pushReplacementNamed(context, '/admin/devices');
+        Navigator.pushReplacementNamed(context, '/admin');
         break;
       case AdminMenu.notifications:
         Navigator.pushReplacementNamed(context, '/admin/notifications');

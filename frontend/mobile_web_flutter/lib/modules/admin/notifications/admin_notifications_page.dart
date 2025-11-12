@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../layout/admin_shell_web.dart';
 
 class AdminNotificationsPage extends StatelessWidget {
   const AdminNotificationsPage({super.key});
@@ -11,17 +10,13 @@ class AdminNotificationsPage extends StatelessWidget {
       {'title': 'Cảm biến ẩm đất ngắt kết nối', 'time': '2 giờ trước'},
     ];
 
-    return AdminShellWeb(
-      title: 'Thông báo',
-      current: AdminMenu.notifications,
-      body: ListView.separated(
-        itemCount: notifications.length,
-        separatorBuilder: (_, __) => const Divider(),
-        itemBuilder: (_, i) => ListTile(
-          leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-          title: Text(notifications[i]['title']!),
-          subtitle: Text(notifications[i]['time']!),
-        ),
+    return ListView.separated(
+      itemCount: notifications.length,
+      separatorBuilder: (_, __) => const Divider(),
+      itemBuilder: (_, i) => ListTile(
+        leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+        title: Text(notifications[i]['title']!),
+        subtitle: Text(notifications[i]['time']!),
       ),
     );
   }

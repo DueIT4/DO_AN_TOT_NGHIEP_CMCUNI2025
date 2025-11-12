@@ -7,7 +7,7 @@ from app.models.user import Users, UserStatus
 from app.models.auth_account import AuthAccount, Provider
 from app.services.confirm_token import make_confirm_token, parse_confirm_token
 from app.services.notifier import send_sms, send_email, send_facebook_dm
-from app.schemas.auth import LoginPhoneIn, SocialLoginIn, TokenOut
+from app.schemas.auth import LoginPhoneIn, LoginIn, SocialLoginIn, TokenOut
 from app.services.auth_jwt import make_access_token
 from app.models.role import Role, RoleType
 from app.services.identity_verify import (
@@ -210,6 +210,34 @@ def confirm(token: str = Query(...), db: Session = Depends(get_db)):
 def _hash_password_sha256(raw: str) -> str:
     import hashlib
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+# ======================
+#  ĐĂNG NHẬP BẰNG EMAIL HOẶC PHONE (tổng quát)
+# ======================
+@router.post("/login", response_model=TokenOut)
+def login(payload: LoginIn, db: Session = Depends(get_db)):
+    """Đăng nhập bằng email hoặc phone"""
+    user = None
+    
+    # Tìm user theo email hoặc phone
+    if payload.email:
+        user = db.scalar(select(Users).where(Users.email == payload.email))
+    elif payload.phone:
+        user = db.scalar(select(Users).where(Users.phone == payload.phone))
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Email/số điện thoại chưa đăng ký")
+    
+    # Kiểm tra mật khẩu
+    if user.password != _hash_password_sha256(payload.password):
+        raise HTTPException(status_code=401, detail="Mật khẩu không đúng")
+    
+    # Kiểm tra trạng thái user
+    if user.status != UserStatus.active:
+        raise HTTPException(status_code=403, detail="Tài khoản đã bị khóa")
+    
+    token = make_access_token(user.user_id)
+    return TokenOut(access_token=token, user_id=user.user_id, username=user.username)
 
 # ======================
 #  ĐĂNG NHẬP BẰNG SĐT

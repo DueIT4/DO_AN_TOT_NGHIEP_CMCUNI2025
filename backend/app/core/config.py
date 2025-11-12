@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     API_V1: str = "/api/v1"
 
     # DB
-    DATABASE_URL: str  # đọc từ .env
+    DATABASE_URL: str = "mysql+pymysql://root:password@localhost:3306/plantdb"  # đọc từ .env, có default để tránh lỗi
 
     # Auth
     JWT_SECRET: str = "change_me"

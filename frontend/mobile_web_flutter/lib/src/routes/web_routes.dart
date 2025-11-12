@@ -15,17 +15,21 @@ import '../../modules/sensors/sensors_mobile.dart';
 import '../../modules/auth/login_web.dart';
 import '../../modules/auth/login_mobile.dart';
 
-// Các trang nội dung “tĩnh” hiện có
+// Các trang nội dung "tĩnh" hiện có
 import '../../modules/misc/library_web.dart';
 import '../../modules/misc/company_web.dart';
 import '../../modules/misc/news_web.dart';
 import '../../modules/misc/app_download_web.dart';
 
 // ===== Trang mới đã bổ sung =====
-import '../../modules/landing/landing_page.dart';     // landing cho web (trang chủ)
+import '../../modules/landing_page.dart';            // landing cho web (trang chủ)
 import '../../modules/admin/admin_app.dart';          // shell + sidebar admin
 import '../../modules/auth/register_page.dart';       // đăng ký (sđt / gg / fb)
 import '../../modules/auth/confirm_page.dart';        // xác nhận /auth/confirm
+import '../../modules/auth/forgot_password_page.dart'; // quên mật khẩu
+import '../../modules/weather/weather_page.dart';     // thời tiết
+import '../../modules/weather/weather_mobile.dart';   // thời tiết mobile
+import '../../modules/weather/weather_content.dart';  // thời tiết content
 
 class WebRoutes {
   // Công khai
@@ -44,6 +48,10 @@ class WebRoutes {
   // Auth (mới)
   static const register   = '/register';
   static const confirm    = '/auth/confirm'; // nhận token qua query
+  static const forgotPassword = '/forgot-password';
+  
+  // Weather
+  static const weather    = '/weather';
 
   // Admin (mới)
   static const admin          = '/admin';              // dashboard tổng quan
@@ -64,19 +72,10 @@ class WebRoutes {
   static Route<dynamic> onGenerate(RouteSettings s) {
     final name = s.name ?? '/';
 
-    // Kiểm tra token (tương thích cả bearer và bearerToken tuỳ bạn đặt)
+    // Kiểm tra token
     final bearer = (() {
       try {
-        // tuỳ ApiBase của bạn; dùng cái nào đang có
-        // ưu tiên ApiBase.bearer nếu đã dùng trước đó
-        // ignore: unnecessary_null_comparison
-        if (ApiBase.bearer != null && (ApiBase.bearer as String).isNotEmpty) {
-          return ApiBase.bearer as String;
-        }
-      } catch (_) {}
-      try {
-        // nếu bạn có ApiBase.bearerToken thì dùng ở đây
-        // ignore: unnecessary_null_comparison
+        // ApiBase.bearer là setter, dùng bearerToken để đọc
         if (ApiBase.bearerToken != null &&
             (ApiBase.bearerToken as String).isNotEmpty) {
           return ApiBase.bearerToken as String;
@@ -103,6 +102,7 @@ class WebRoutes {
       case device:   return _p(kIsWeb ? const DeviceWebPage()   : const DeviceMobilePage());
       case sensors:  return _p(kIsWeb ? const SensorsWebPage()  : const SensorsMobilePage());
       case login:    return _p(kIsWeb ? const LoginWebPage()    : const LoginMobilePage());
+      case weather:  return _p(kIsWeb ? const WeatherPage()     : const WeatherMobilePage());
 
       // ===== Navbar hiện có =====
       case library:  return _p(const LibraryWebPage());
@@ -116,6 +116,9 @@ class WebRoutes {
       ));
       case confirm:  return _p(const Scaffold(
         body: SafeArea(child: ConfirmPage()),
+      ));
+      case forgotPassword: return _p(const Scaffold(
+        body: SafeArea(child: Center(child: ForgotPasswordPage())),
       ));
 
       // ===== Admin: dùng 1 shell, truyền route để chọn tab ban đầu =====

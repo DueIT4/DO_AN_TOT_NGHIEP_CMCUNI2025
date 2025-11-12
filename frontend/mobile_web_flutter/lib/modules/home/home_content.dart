@@ -56,21 +56,92 @@ class HomeContent extends StatelessWidget {
                     constraints: const BoxConstraints(maxWidth: 900),
                     child: AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: Image.asset(
-                        'assets/images/app_preview.png',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stack) {
-                          return Container(
-                            color: Colors.green.withOpacity(.06),
-                            alignment: Alignment.center,
-                            padding: const EdgeInsets.all(16),
-                            child: const Text(
-                              'Unable to load asset: assets/images/app_preview.png\nThe asset does not exist or has empty data.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.black54),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.green.shade50,
+                              Colors.green.shade100,
+                              Colors.lightGreen.shade50,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Stack(
+                          children: [
+                            // Background pattern
+                            Positioned.fill(
+                              child: CustomPaint(
+                                painter: _DottedPatternPainter(),
+                              ),
                             ),
-                          );
-                        },
+                            // Content
+                            Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 20,
+                                          spreadRadius: 5,
+                                        ),
+                                      ],
+                                    ),
+                                    child: Icon(
+                                      Icons.phone_android,
+                                      size: 64,
+                                      color: Colors.green.shade700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Text(
+                                    'PlantGuard App',
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Chẩn đoán bệnh cây trồng\nbằng AI thông minh',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.green.shade700,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _AppStoreBadge(
+                                        icon: Icons.android,
+                                        label: 'Android',
+                                        color: Colors.green,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      _AppStoreBadge(
+                                        icon: Icons.apple,
+                                        label: 'iOS',
+                                        color: Colors.black87,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -142,4 +213,62 @@ class _FeatureCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AppStoreBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _AppStoreBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DottedPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.green.shade200.withOpacity(0.3)
+      ..style = PaintingStyle.fill;
+
+    const spacing = 40.0;
+    const radius = 3.0;
+
+    for (double x = 0; x < size.width; x += spacing) {
+      for (double y = 0; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), radius, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

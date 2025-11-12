@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.core.config import settings
 
 # Engine kết nối MySQL
-engine = create_engine(settings.DB_URL, pool_pre_ping=True, echo=False)
+engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True, echo=False)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 class Base(DeclarativeBase):

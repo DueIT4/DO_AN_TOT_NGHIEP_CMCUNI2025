@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../layout/admin_shell_web.dart';
 
 class AdminDevicesPage extends StatelessWidget {
   const AdminDevicesPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const AdminShellWeb(
-      title: 'Quản lý thiết bị',
-      current: AdminMenu.devices,
-      body: _DeviceTable(),
-    );
+    return const _DeviceTable();
   }
 }
 
