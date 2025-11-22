@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+pydantic
 pydantic-settings
 SQLAlchemy
 alembic
@@ -7,3 +8,9 @@ python-multipart
 pymysql
 onnxruntime
 Pillow
+requests
+PyJWT
+firebase-admin
+fastapi-mail
+email-validator
+passlib[bcrypt]
