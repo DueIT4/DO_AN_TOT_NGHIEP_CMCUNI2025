@@ -1,56 +1,46 @@
+-- Đảm bảo dùng đúng DB
 USE ai_plant_db;
-select *from users;
-select *from auth_accounts;
-SHOW COLUMNS FROM auth_accounts LIKE 'provider';
-#Thêm cột role_id vào bảng users để liên kết trực tiếp với bảng role
-ALTER TABLE users
-ADD CONSTRAINT fk_users_role
-FOREIGN KEY (role_id) REFERENCES role(role_id);
-ALTER TABLE role DROP COLUMN name;
 
-select *from role;
+-- =========================
+-- 1. XÓA TOÀN BỘ CÁC BẢNG
+-- =========================
+SET FOREIGN_KEY_CHECKS = 0;
 
-ALTER TABLE auth_accounts
-  MODIFY COLUMN provider ENUM('gg','fb','sdt') NOT NULL;
+DROP TABLE IF EXISTS device_logs;
+DROP TABLE IF EXISTS chatbot_detail;
+DROP TABLE IF EXISTS chatbot;
+DROP TABLE IF EXISTS user_settings;
+DROP TABLE IF EXISTS support_messages;
+DROP TABLE IF EXISTS support_tickets;
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS detections;
+DROP TABLE IF EXISTS diseases;
+DROP TABLE IF EXISTS img;
+DROP TABLE IF EXISTS sensor_readings;
+DROP TABLE IF EXISTS devices;
+DROP TABLE IF EXISTS device_type;
+DROP TABLE IF EXISTS auth_accounts;
+DROP TABLE IF EXISTS user_role;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS role;
 
-ALTER TABLE users
-ADD COLUMN role_id BIGINT UNSIGNED;
-UPDATE users SET role_id = 4;
-SHOW COLUMNS FROM auth_accounts LIKE 'provider';
-SHOW CREATE TABLE auth_accounts;
+SET FOREIGN_KEY_CHECKS = 1;
 
-INSERT INTO role (role_type, name, description)
-VALUES 
-('admin', 'Admin', 'Quản trị toàn hệ thống'),
-('support', 'Support', 'Nhân viên hỗ trợ'),
-('support_admin', 'Support Admin', 'Quản lý trừ hỗ trợ'),
-('viewer', 'Viewer', 'Người dùng thông thường');
+-- =========================
+-- 2. TẠO LẠI TOÀN BỘ SCHEMA
+-- =========================
 
-# xoas bangr 3
-DROP TABLE user_role;
-SHOW CREATE TABLE users;
-SHOW CREATE TABLE role;
+-- 2.1 role
+CREATE TABLE role (
+  role_id     BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  role_type   ENUM('support','viewer','admin','support_admin') NOT NULL,
+  description VARCHAR(255)
+) ENGINE=InnoDB;
 
-ALTER TABLE auth_accounts
-  MODIFY COLUMN provider ENUM('gg','fb','sdt','sđt') NOT NULL;
-
-ALTER TABLE auth_accounts
-  CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-UPDATE auth_accounts SET provider='sdt' WHERE provider='sđt';
-UPDATE auth_accounts
-SET provider = 'sdt'
-WHERE provider = 'sđt' AND auth_id > 0;
-UPDATE auth_accounts
-SET provider = 'sdt'
-WHERE provider = 'sđt';
-ALTER TABLE auth_accounts
-  MODIFY COLUMN provider ENUM('gg','fb','sdt') NOT NULL;
-
-
--- 1) users
+-- 2.2 users
 CREATE TABLE users (
   user_id        BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  role_id      BIGINT UNSIGNED NOT NULL,
+  role_id        BIGINT UNSIGNED NOT NULL,
   username       VARCHAR(191) UNIQUE,
   email          VARCHAR(255) UNIQUE,
   phone          VARCHAR(30) UNIQUE,
@@ -61,18 +51,11 @@ CREATE TABLE users (
   failed_login   INT DEFAULT 0,
   locked         DATETIME NULL,
   created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_user_role_role  FOREIGN KEY (role_id) REFERENCES role(role_id)   ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 2) role
-CREATE TABLE role (
-  role_id     BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  role_type   ENUM('support','viewer','admin','support_admin') NOT NULL,
-  description VARCHAR(255)
-) ENGINE=InnoDB;
-
--- 3) user_role (n-n)
+-- 2.3 user_role (n-n) nếu sau này cần
 CREATE TABLE user_role (
   user_role_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   user_id      BIGINT UNSIGNED NOT NULL,
@@ -80,14 +63,14 @@ CREATE TABLE user_role (
   assigned_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_user_role (user_id, role_id),
   CONSTRAINT fk_user_role_user  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-  CONSTRAINT fk_user_role_role  FOREIGN KEY (role_id) REFERENCES role(role_id)   ON DELETE CASCADE
+  CONSTRAINT fk_user_role_role2 FOREIGN KEY (role_id) REFERENCES role(role_id)   ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 4) auth_accounts (liên kết gg/fb/sđt)
+-- 2.4 auth_accounts
 CREATE TABLE auth_accounts (
   auth_id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   user_id          BIGINT UNSIGNED NOT NULL,
-  provider         ENUM('gg','fb','sđt') NOT NULL,
+  provider         ENUM('gg','fb','sdt') NOT NULL,
   provider_user_id VARCHAR(255),
   phone_verified   TINYINT(1) DEFAULT 0,
   created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -95,7 +78,7 @@ CREATE TABLE auth_accounts (
   CONSTRAINT fk_auth_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 5) device_type (danh mục loại thiết bị)
+-- 2.5 device_type
 CREATE TABLE device_type (
   device_type_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   device_type_name VARCHAR(255) NOT NULL UNIQUE,
@@ -104,7 +87,7 @@ CREATE TABLE device_type (
   created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- 6) devices (thiết bị; hỗ trợ parent_device_id cho gateway)
+-- 2.6 devices
 CREATE TABLE devices (
   device_id         BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   user_id           BIGINT UNSIGNED NULL,
@@ -120,12 +103,12 @@ CREATE TABLE devices (
   KEY idx_device_user (user_id),
   KEY idx_device_type (device_type_id),
   KEY idx_device_parent (parent_device_id),
-  CONSTRAINT fk_device_user   FOREIGN KEY (user_id)        REFERENCES users(user_id)           ON DELETE SET NULL,
+  CONSTRAINT fk_device_user   FOREIGN KEY (user_id)        REFERENCES users(user_id)              ON DELETE SET NULL,
   CONSTRAINT fk_device_type   FOREIGN KEY (device_type_id) REFERENCES device_type(device_type_id) ON DELETE RESTRICT,
-  CONSTRAINT fk_device_parent FOREIGN KEY (parent_device_id) REFERENCES devices(device_id)     ON DELETE SET NULL
+  CONSTRAINT fk_device_parent FOREIGN KEY (parent_device_id) REFERENCES devices(device_id)        ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 7) sensor_readings (dữ liệu cảm biến)
+-- 2.7 sensor_readings
 CREATE TABLE sensor_readings (
   reading_id  BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   device_id   BIGINT UNSIGNED NOT NULL,
@@ -138,7 +121,7 @@ CREATE TABLE sensor_readings (
   CONSTRAINT fk_sr_device FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 8) img (ảnh từ camera hoặc upload)
+-- 2.8 img
 CREATE TABLE img (
   img_id      BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   source_type ENUM('camera','upload') NOT NULL,
@@ -152,7 +135,7 @@ CREATE TABLE img (
   CONSTRAINT fk_img_user   FOREIGN KEY (user_id)   REFERENCES users(user_id)   ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 9) diseases (danh mục bệnh)
+-- 2.9 diseases
 CREATE TABLE diseases (
   disease_id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   name                VARCHAR(255) UNIQUE,
@@ -161,7 +144,7 @@ CREATE TABLE diseases (
   created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- 10) detections (kết quả AI)
+-- 2.10 detections
 CREATE TABLE detections (
   detection_id        BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   img_id              BIGINT UNSIGNED NOT NULL,
@@ -179,7 +162,7 @@ CREATE TABLE detections (
   CONSTRAINT fk_det_dis FOREIGN KEY (disease_id) REFERENCES diseases(disease_id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 11) notifications
+-- 2.11 notifications
 CREATE TABLE notifications (
   notification_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   user_id         BIGINT UNSIGNED NOT NULL,
@@ -191,7 +174,7 @@ CREATE TABLE notifications (
   CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 12) support_tickets
+-- 2.12 support_tickets
 CREATE TABLE support_tickets (
   ticket_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   user_id     BIGINT UNSIGNED NOT NULL,
@@ -203,7 +186,7 @@ CREATE TABLE support_tickets (
   CONSTRAINT fk_ticket_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 13) support_messages
+-- 2.13 support_messages
 CREATE TABLE support_messages (
   message_id     BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   ticket_id      BIGINT UNSIGNED NOT NULL,
@@ -216,7 +199,7 @@ CREATE TABLE support_messages (
   CONSTRAINT fk_msg_sender FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 14) user_settings
+-- 2.14 user_settings
 CREATE TABLE user_settings (
   user_setting_id       BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   user_id               BIGINT UNSIGNED NOT NULL UNIQUE,
@@ -229,7 +212,7 @@ CREATE TABLE user_settings (
   CONSTRAINT fk_us_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 15) chatbot
+-- 2.15 chatbot
 CREATE TABLE chatbot (
   chatbot_id  BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   user_id     BIGINT UNSIGNED NOT NULL,
@@ -240,7 +223,7 @@ CREATE TABLE chatbot (
   CONSTRAINT fk_chatbot_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 16) chatbot_detail
+-- 2.16 chatbot_detail
 CREATE TABLE chatbot_detail (
   detail_id  BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   chatbot_id BIGINT UNSIGNED NOT NULL,
@@ -251,7 +234,7 @@ CREATE TABLE chatbot_detail (
   CONSTRAINT fk_cb_detail FOREIGN KEY (chatbot_id) REFERENCES chatbot(chatbot_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 17) device_logs
+-- 2.17 device_logs
 CREATE TABLE device_logs (
   log_id      BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   device_id   BIGINT UNSIGNED NOT NULL,
@@ -261,3 +244,29 @@ CREATE TABLE device_logs (
   KEY idx_log_device_time (device_id, created_at),
   CONSTRAINT fk_log_device FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- ==================================
+-- 3. SEED DỮ LIỆU MẶC ĐỊNH (ROLES + ADMIN)
+-- ==================================
+
+-- 3.1 Thêm 4 role chuẩn, đảm bảo admin là role_id = 1
+INSERT INTO role (role_type, description) VALUES
+('admin',         'Quản trị toàn hệ thống'),
+('support',       'Nhân viên hỗ trợ'),
+('support_admin', 'Quản lý hỗ trợ'),
+('viewer',        'Người dùng thông thường');
+
+-- 3.2 Tạo user admin (mật khẩu: admin123)
+INSERT INTO users (username, email, phone, password, role_id, status)
+VALUES (
+  'admin',
+  'admin@plantguard.com',
+  '0123456789',
+  'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3', -- SHA256('admin123')
+  1,  -- role_id = 1 (admin)
+  'active'
+);
+
+-- (tuỳ chọn) nếu sau này muốn dùng login/phone cho admin và check verified thì seed thêm:
+-- INSERT INTO auth_accounts (user_id, provider, provider_user_id, phone_verified)
+-- SELECT user_id, 'sdt', '0123456789', 1 FROM users WHERE username = 'admin';

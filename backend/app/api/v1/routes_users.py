@@ -276,19 +276,18 @@ def update_user(
     db.commit()
     db.refresh(user)
     return user
+from app.schemas.user import UserOut, UserListOut
 
-### có từ khóa, có điều chỉnh số lượng trang
-@router.get("/search", response_model=List[UserOut],
+@router.get("/search", response_model=UserListOut,
     dependencies=[Depends(require_perm("users:list"))])
 def list_users_search(
-    q: str | None = None,                  # từ khoá tìm (username/phone/email)
-    page: int = 1,                         # trang bắt đầu từ 1
-    size: int = 20,                        # số bản ghi / trang
-    order_by: str = "created_at",          # cột sắp xếp: created_at | user_id | username | phone
-    order_dir: str = "desc",               # asc | desc
+    q: str | None = None,
+    page: int = 1,
+    size: int = 20,
+    order_by: str = "created_at",
+    order_dir: str = "desc",
     db: Session = Depends(get_db),
 ):
-    # base query
     stmt = select(Users)
     if q:
         like = f"%{q}%"
@@ -296,23 +295,21 @@ def list_users_search(
             or_(Users.username.like(like), Users.phone.like(like), Users.email.like(like))
         )
 
-    # tổng số bản ghi
     total = db.scalar(select(func.count()).select_from(stmt.subquery()))
 
-    # sắp xếp an toàn
     order_col = getattr(Users, order_by, Users.user_id)
     if order_dir.lower() == "desc":
         order_col = order_col.desc()
     else:
         order_col = order_col.asc()
 
-    # phân trang
     stmt = stmt.order_by(order_col).offset(max(page-1, 0) * size).limit(size)
-
-    # items = db.scalars(stmt).all()
-    # return {"total": total or 0, "items": items}
     items = db.scalars(stmt.options(joinedload(Users.role))).all()
-    return {"total": total or 0, "items": [_to_user_out(u) for u in items]}
+
+    return UserListOut(
+        total=total or 0,
+        items=[_to_user_out(u) for u in items]
+    )
 
 #### KHông nhập số trang hay từ khóa 
 # @router.get("", response_model=List[UserOut])

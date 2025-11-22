@@ -1,12 +1,31 @@
+# app/schemas/detect.py
+from typing import List, Optional, Any
 from pydantic import BaseModel
-from typing import Optional
 
-class DetectExplainResp(BaseModel):
-    disease: str
+
+class BBox(BaseModel):
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+
+
+class DetectionItem(BaseModel):
+    class_id: int
+    class_name: str
     confidence: float
-    explanation: str
-    img_id: Optional[int] = None
-    detection_id: Optional[int] = None
+    bbox: BBox
+    model_version: str
+
+
+class DetectResponse(BaseModel):
+    file_name: str
+    img_id: int
+    file_url: str
+    num_detections: int
+    detections: List[DetectionItem]
+    disease_summary: Optional[str] = None
+    care_instructions: Optional[str] = None
 
     class Config:
         orm_mode = True

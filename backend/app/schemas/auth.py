@@ -27,6 +27,17 @@ class LoginPhoneIn(BaseModel):
     phone: str = Field(min_length=8, max_length=30)
     password: str = Field(min_length=6, max_length=255)
 
+class LoginIn(BaseModel):
+    """Đăng nhập bằng email hoặc phone"""
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    password: str = Field(min_length=6, max_length=255)
+    
+    def model_post_init(self, __context):
+        """Kiểm tra phải có ít nhất email hoặc phone"""
+        if not self.email and not self.phone:
+            raise ValueError('Phải nhập email hoặc số điện thoại')
+
 class SocialLoginIn(BaseModel):
     # google: id_token, facebook: access_token
     token: str = Field(min_length=10)

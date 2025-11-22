@@ -1,115 +1,107 @@
-# app/services/llm_service.py
-import requests
-from typing import Optional
-from app.utils.logger import logger
-from app.core.config import settings
+# backend/app/services/llm_service.py
+import os
+from collections import Counter
+from typing import List, Dict, Any, Tuple, Optional
 
-def _extract_text_from_gemini_response(data: dict) -> Optional[str]:
-    # 1) dạng Public Gemini REST
+import google.generativeai as genai
+GEMINI_API_KEY = "AIzaSyD6NteusFX-hF0KDSFwW4V5Wfg82VdZRdc"
+genai.configure(api_key=GEMINI_API_KEY)
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
+# 🔹 Bệnh thật sự
+DISEASE_CLASS_KEYS = {
+    "pomelo_leaf_miner",
+    "pomelo_leaf_yellowing",
+    "pomelo_fruit_scorch",
+}
+
+# 🔹 Healthy (không phải bệnh)
+HEALTHY_CLASS_KEYS = {
+    "pomelo_leaf_healthy",
+    "pomelo_fruit_healthy",
+}
+
+
+def _build_prompt_from_detections(detections: List[Dict[str, Any]]) -> str:
+    """Sinh prompt cho LLM dựa vào cả bệnh và vùng khỏe"""
+
+    if not detections:
+        return (
+            "Hệ thống không phát hiện ra triệu chứng bệnh rõ ràng nào trên cây bưởi. "
+            "Hãy đưa ra lời khuyên chung về chăm sóc cây khỏe mạnh: tưới nước hợp lý, "
+            "bón phân cân đối, giữ vườn thông thoáng, phòng ngừa sâu bệnh."
+        )
+
+    disease_items = []
+    healthy_items = []
+
+    for det in detections:
+        key = det["class_key"]
+        name_vi = det["class_name"]
+
+        if key in DISEASE_CLASS_KEYS:
+            disease_items.append(name_vi)
+        elif key in HEALTHY_CLASS_KEYS:
+            healthy_items.append(name_vi)
+
+    # --- Trường hợp chỉ có vùng khỏe (không có bệnh)
+    if len(disease_items) == 0:
+        return (
+            "Hệ thống AI ghi nhận rằng các vùng được phát hiện trong ảnh đều thuộc nhóm KHỎE MẠNH.\n\n"
+            "👉 Điều này cho thấy cây bưởi đang trong tình trạng tốt.\n\n"
+            "Hãy đưa ra các hướng dẫn ngắn gọn cho nông dân về chăm sóc cây khỏe mạnh:\n"
+            "• Giữ chế độ tưới nước phù hợp\n"
+            "• Bón phân cân đối, hữu cơ\n"
+            "• Giữ vườn thoáng, cắt tỉa lá già\n"
+            "• Theo dõi thường xuyên để phát hiện sớm sâu bệnh\n"
+            "• Giải thích tại sao dù cây khỏe vẫn cần chăm sóc phòng ngừa"
+        )
+
+    # --- Có bệnh thật sự → LLM giải thích chi tiết
+    disease_counts = Counter(disease_items)
+    lines = [f"- {name}: {cnt} vùng" for name, cnt in disease_counts.items()]
+
+    prompt = f"""
+Bạn là chuyên gia nông nghiệp chuyên về bệnh cây bưởi.
+
+Hệ thống AI đã phát hiện các bệnh sau:
+{chr(10).join(lines)}
+
+Yêu cầu trả lời:
+1. Mô tả triệu chứng đã thấy trong ảnh.
+2. Đánh giá mức độ nặng/nhẹ.
+3. Hướng dẫn xử lý an toàn:
+   • biện pháp sinh học  
+   • cắt tỉa, vệ sinh vườn  
+   • nhóm hoạt chất thuốc (không nêu thương hiệu)
+4. Hướng dẫn phòng ngừa cho giai đoạn sau.
+5. Văn phong dễ hiểu cho nông dân Việt Nam.
+
+Nếu ảnh có cả vùng khỏe:
+- Nhắc rằng cây vẫn có phần khỏe mạnh, giúp cây hồi phục tốt hơn nếu xử lý đúng cách.
+"""
+
+    return prompt.strip()
+
+
+def summarize_detections_with_llm(
+    detections: List[Dict[str, Any]]
+) -> Tuple[Optional[str], Optional[str]]:
+    if not GEMINI_API_KEY:
+        return None, None
+
+    prompt = _build_prompt_from_detections(detections)
+
     try:
-        cands = data.get("candidates") or []
-        if cands:
-            parts = cands[0].get("content", {}).get("parts") or []
-            if parts and isinstance(parts, list) and "text" in parts[0]:
-                return parts[0]["text"]
-    except Exception:
-        logger.debug("No text in candidates shape")
-
-    # 2) một số SDK/Vertex biến thể
-    try:
-        output = data.get("output") or []
-        if output and isinstance(output, list):
-            first = output[0]
-            if isinstance(first, dict) and "content" in first:
-                content = first.get("content") or []
-                if content and isinstance(content, list) and "text" in content[0]:
-                    return content[0]["text"]
-            if "text" in first:
-                return first["text"]
-    except Exception:
-        logger.debug("No text in output shape")
-
-    if isinstance(data.get("text"), str):
-        return data.get("text")
-    return None
-
-def explain_disease_with_llm(
-    disease_name: str,
-    confidence: float,
-    db_description: Optional[str] = None,
-    db_guideline: Optional[str] = None
-) -> str:
-    api_key = settings.GEMINI_API_KEY
-    model   = settings.GEMINI_MODEL or "gemini-1.5-flash"
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-
-    # Fallback khi chưa có key
-    if not api_key:
-        parts = [
-            f"**Bệnh:** {disease_name}",
-            f"**Độ tin cậy:** {confidence:.2%}",
-        ]
-        if db_description:
-            parts.append(f"**Mô tả:** {db_description}")
-        if db_guideline:
-            parts.append(f"**Khuyến nghị xử lý:** {db_guideline}")
-        return "\n\n".join(parts)
-
-    system_prompt = (
-        "Bạn là **chuyên gia nông nghiệp** về cây có múi (đặc biệt cây bưởi). "
-        "Hãy viết bản chẩn đoán & hướng dẫn ngắn gọn, dễ hiểu, an toàn.\n\n"
-        "Trả về **Markdown** với cấu trúc:\n"
-        "## Tóm tắt\n"
-        "- (1–2 câu)\n"
-        "## Triệu chứng\n"
-        "- ...\n"
-        "## Nguyên nhân & Điều kiện phát sinh\n"
-        "- ...\n"
-        "## Biện pháp xử lý\n"
-        "- ... (ưu tiên sinh học, thân thiện môi trường)\n"
-        "## Phòng ngừa lâu dài\n"
-        "- ...\n"
-    )
-
-    user_context = (
-        f"### Thông tin từ hệ thống AI\n"
-        f"- Bệnh phát hiện: {disease_name}\n"
-        f"- Độ tin cậy mô hình: {confidence:.2%}\n"
-        f"- Mô tả từ CSDL: {db_description or 'Không có'}\n"
-        f"- Hướng dẫn từ CSDL: {db_guideline or 'Không có'}\n"
-        "Yêu cầu: ngắn gọn, thực tế, dễ áp dụng cho nông dân trồng bưởi."
-    )
-
-    payload = {
-        "contents": [{
-            "role": "user",
-            "parts": [{"text": f"{system_prompt}\n\n{user_context}"}]
-        }],
-        "generationConfig": {
-            "response_mime_type": "text/markdown",
-            "temperature": 0.6,
-            "top_p": 0.9
-        },
-        "safetySettings": [
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
-        ]
-    }
-
-    try:
-        resp = requests.post(api_url, params={"key": api_key}, json=payload, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        txt = _extract_text_from_gemini_response(data)
-        if not txt:
-            raise RuntimeError("Không tìm thấy text trong phản hồi LLM.")
-        return txt.strip()
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        resp = model.generate_content(prompt)
+        text = (resp.text or "").strip()
+        return text, None
     except Exception as e:
-        logger.error(f"❌ LLM call/parse failed: {e}")
-        fallback = [
-            f"Bệnh: {disease_name}",
-            f"Độ tin cậy: {confidence:.2%}",
-            f"_LLM lỗi: {e}_"
-        ]
-        if db_description: fallback.append(f"Mô tả: {db_description}")
-        if db_guideline:   fallback.append(f"Khuyến nghị xử lý: {db_guideline}")
-        return "\n\n".join(fallback)
+        print("LLM ERROR:", e)
+        return None, None
