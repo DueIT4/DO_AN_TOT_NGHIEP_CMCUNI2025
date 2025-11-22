@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../core/api_base.dart';
 import '../../src/routes/web_routes.dart';
 import '../../core/user_service.dart';
-import 'auth_service.dart'; // ✅ thêm
 
 class LoginContent extends StatefulWidget {
   final String? returnTo;
@@ -13,35 +12,53 @@ class LoginContent extends StatefulWidget {
 }
 
 class _LoginContentState extends State<LoginContent> {
-  final _email = TextEditingController();
-  final _pass = TextEditingController();
+  final _accountCtrl = TextEditingController(); // email hoặc sđt
+  final _passCtrl = TextEditingController();
   final _form = GlobalKey<FormState>();
+
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
-    _email.dispose();
-    _pass.dispose();
+    _accountCtrl.dispose();
+    _passCtrl.dispose();
     super.dispose();
   }
 
-  // ===== Đăng nhập bằng email & mật khẩu =====
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
+
     setState(() {
       _loading = true;
       _error = null;
     });
-    try {
-      final res = await ApiBase.postJson(ApiBase.api('/auth/login'), {
-        'email': _email.text.trim(),
-        'password': _pass.text,
-      });
 
+    try {
+      final input = _accountCtrl.text.trim();
+
+      Map<String, dynamic> body;
+
+      // Có ký tự @ → login bằng email
+      if (input.contains('@')) {
+        body = {
+          'email': input,
+          'password': _passCtrl.text,
+        };
+      } else {
+        // Không có @ → login bằng sđt
+        body = {
+          'phone': input,
+          'password': _passCtrl.text,
+        };
+      }
+
+      final res = await ApiBase.postJson(ApiBase.api('/auth/login'), body);
+
+      // Lưu token
       ApiBase.bearer = res['access_token'] as String?;
-      
-      // Clear cache để load lại thông tin user
+
+      // Clear cache & load lại user hiện tại
       UserService.clearCache();
       await UserService.getCurrentUser(forceRefresh: true);
 
@@ -49,49 +66,15 @@ class _LoginContentState extends State<LoginContent> {
       final next = widget.returnTo ?? WebRoutes.home;
       Navigator.pushNamedAndRemoveUntil(context, next, (r) => false);
     } catch (e) {
-      setState(() => _error = '$e');
+      setState(() {
+        _error = '$e';
+      });
     } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  // ===== Đăng nhập Google =====
-  Future<void> _googleLogin() async {
-    setState(() => _loading = true);
-    try {
-      await AuthService.loginWithGoogle();
-      
-      // Clear cache để load lại thông tin user
-      UserService.clearCache();
-      await UserService.getCurrentUser(forceRefresh: true);
-      
-      if (!mounted) return;
-      final next = widget.returnTo ?? WebRoutes.home;
-      Navigator.pushNamedAndRemoveUntil(context, next, (r) => false);
-    } catch (e) {
-      setState(() => _error = 'Google login lỗi: $e');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  // ===== Đăng nhập Facebook =====
-  Future<void> _facebookLogin() async {
-    setState(() => _loading = true);
-    try {
-      await AuthService.loginWithFacebook();
-      
-      // Clear cache để load lại thông tin user
-      UserService.clearCache();
-      await UserService.getCurrentUser(forceRefresh: true);
-      
-      if (!mounted) return;
-      final next = widget.returnTo ?? WebRoutes.home;
-      Navigator.pushNamedAndRemoveUntil(context, next, (r) => false);
-    } catch (e) {
-      setState(() => _error = 'Facebook login lỗi: $e');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -112,47 +95,80 @@ class _LoginContentState extends State<LoginContent> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Đăng nhập',
-                      style: Theme.of(context).textTheme.headlineSmall),
+                  Text(
+                    'Đăng nhập',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
                   const SizedBox(height: 8),
                   if (returnTo != null)
-                    Text('Bạn cần đăng nhập để truy cập $returnTo',
-                        style: const TextStyle(color: Colors.black54)),
+                    Text(
+                      'Bạn cần đăng nhập để truy cập $returnTo',
+                      style: const TextStyle(color: Colors.black54),
+                    ),
                   const SizedBox(height: 16),
+
+                  // ===== Input email hoặc sđt =====
                   TextFormField(
-                    controller: _email,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Nhập email' : null,
+                    controller: _accountCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Email hoặc Số điện thoại',
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Vui lòng nhập email hoặc số điện thoại';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 12),
+
+                  // ===== Input mật khẩu =====
                   TextFormField(
-                    controller: _pass,
+                    controller: _passCtrl,
                     obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Mật khẩu'),
-                    validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Nhập mật khẩu' : null,
+                    decoration:
+                        const InputDecoration(labelText: 'Mật khẩu'),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) {
+                        return 'Vui lòng nhập mật khẩu';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 8),
+
+                  // ===== Quên mật khẩu =====
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, WebRoutes.forgotPassword);
+                        Navigator.pushNamed(
+                            context, WebRoutes.forgotPassword);
                       },
-                      child: const Text('Quên mật khẩu?'),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
+                      child: const Text('Quên mật khẩu?'),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (_error != null)
-                    Text(_error!,
-                        style: const TextStyle(color: Colors.red, fontSize: 13)),
-                  const SizedBox(height: 12),
+
+                  // ===== Hiển thị lỗi =====
+                  if (_error != null) ...[
+                    Text(
+                      _error!,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // ===== Nút đăng nhập =====
                   FilledButton(
                     onPressed: _loading ? null : _submit,
                     style: FilledButton.styleFrom(
@@ -163,42 +179,12 @@ class _LoginContentState extends State<LoginContent> {
                         ? const SizedBox(
                             height: 18,
                             width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2))
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : const Text('Đăng nhập'),
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(thickness: 1, height: 30),
-                  const Text('Hoặc đăng nhập bằng'),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _loading ? null : _googleLogin,
-                        icon: const Icon(Icons.g_mobiledata, size: 28),
-                        label: const Text('Google'),
-                      ),
-                      const SizedBox(width: 10),
-                      OutlinedButton.icon(
-                        onPressed: _loading ? null : _facebookLogin,
-                        icon: const Icon(Icons.facebook, size: 28),
-                        label: const Text('Facebook'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      TextButton(
-                        onPressed: _loading
-                            ? null
-                            : () {
-                                Navigator.pushNamed(context, WebRoutes.register);
-                              },
-                        child: const Text("Chưa có tài khoản? Đăng ký"),
-                      ),
-                    ],
                   ),
                 ],
               ),

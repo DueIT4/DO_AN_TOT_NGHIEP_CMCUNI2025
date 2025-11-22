@@ -1,8 +1,8 @@
 from sqlalchemy import Column, BigInteger, String, Text, Enum, ForeignKey, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from app.db.base import Base
 import enum
+from app.core.database import Base   # ✅
 
 class TicketStatus(str, enum.Enum):
     processing = "processing"

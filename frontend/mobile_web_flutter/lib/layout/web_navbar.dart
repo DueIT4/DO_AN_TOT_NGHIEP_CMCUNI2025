@@ -12,7 +12,7 @@ class WebNavbar extends StatefulWidget {
 
 class _WebNavbarState extends State<WebNavbar> {
   bool _isAdmin = false;
-  bool _isLoggedIn = false;
+  bool _isLoggedIn = false;    // giữ nhưng không dùng auth hiển thị
 
   @override
   void initState() {
@@ -22,8 +22,9 @@ class _WebNavbarState extends State<WebNavbar> {
 
   Future<void> _checkUser() async {
     if (!mounted) return;
-    
+
     final hasToken = ApiBase.bearerToken != null && ApiBase.bearerToken!.isNotEmpty;
+
     if (hasToken) {
       _isLoggedIn = true;
       try {
@@ -36,31 +37,14 @@ class _WebNavbarState extends State<WebNavbar> {
       _isLoggedIn = false;
       _isAdmin = false;
     }
+
     if (mounted) {
       setState(() {});
     }
   }
 
-  Future<void> _logout() async {
-    ApiBase.bearer = null;
-    UserService.clearCache();
-    if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, WebRoutes.home, (route) => false);
-      await _checkUser();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Kiểm tra lại user mỗi khi build (nhưng chỉ nếu có token)
-    final hasToken = ApiBase.bearerToken != null && ApiBase.bearerToken!.isNotEmpty;
-    if (hasToken && (!_isLoggedIn || _isAdmin != true)) {
-      // Chỉ check nếu chưa check hoặc cần refresh
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkUser();
-      });
-    }
-    
     final isWide = MediaQuery.of(context).size.width >= 900;
 
     return Container(
@@ -77,24 +61,24 @@ class _WebNavbarState extends State<WebNavbar> {
               children: [
                 const Icon(Icons.eco, color: Colors.green, size: 30),
                 const SizedBox(width: 8),
-                Text('PlantGuard',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.green.shade700)),
+                Text(
+                  'PlantGuard',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.green.shade700),
+                ),
               ],
             ),
           ),
+
           const Spacer(),
+
           Wrap(
             spacing: 8,
             children: [
               _navItem(context, 'Trang chủ', WebRoutes.home),
-              _navItem(context, 'Thiết bị', WebRoutes.device),
-              _navItem(context, 'Chẩn đoán', WebRoutes.detect),
               _navItem(context, 'Thời tiết', WebRoutes.weather),
-              _navItem(context, 'Thư viện', WebRoutes.library),
               _navItem(context, 'Tin tức', WebRoutes.news),
               _navItem(context, 'Liên hệ', WebRoutes.company),
-              
-              // Nút Admin (chỉ hiển thị cho admin)
+    
               if (_isAdmin)
                 FilledButton.icon(
                   onPressed: () {
@@ -106,30 +90,6 @@ class _WebNavbarState extends State<WebNavbar> {
                     backgroundColor: Colors.purple.shade700,
                   ),
                 ),
-              
-              // Nút đăng nhập/đăng ký hoặc logout
-              if (_isLoggedIn) ...[
-                  // Đã đăng nhập - hiển thị nút logout
-                  TextButton.icon(
-                    onPressed: _logout,
-                    icon: const Icon(Icons.logout, size: 18),
-                    label: const Text('Đăng xuất'),
-                  ),
-                ] else ...[
-                  // Chưa đăng nhập - hiển thị nút đăng ký và đăng nhập
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, WebRoutes.register);
-                    },
-                    child: const Text('Đăng ký'),
-                  ),
-                  FilledButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, WebRoutes.login);
-                    },
-                    child: const Text('Đăng nhập'),
-                  ),
-                ],
             ],
           ),
         ],
@@ -139,19 +99,15 @@ class _WebNavbarState extends State<WebNavbar> {
 
   Widget _navItem(BuildContext context, String title, String route) {
     return InkWell(
-      onTap: () {
-        try {
-          Navigator.pushNamed(context, route);
-        } catch (e) {
-          // Nếu có lỗi, thử dùng pushReplacementNamed
-          Navigator.pushReplacementNamed(context, route);
-        }
-      },
+      onTap: () => Navigator.pushNamed(context, route),
       mouseCursor: SystemMouseCursors.click,
       borderRadius: BorderRadius.circular(6),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
+        child: Text(
+          title,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87),
+        ),
       ),
     );
   }

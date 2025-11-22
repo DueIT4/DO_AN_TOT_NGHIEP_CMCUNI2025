@@ -1,6 +1,10 @@
 # app/main.py
 from pathlib import Path
 import logging
+from sqlalchemy.orm import configure_mappers
+from app.models import *   # đảm bảo toàn bộ bảng được đăng ký vào Base.metadata
+
+configure_mappers()
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -11,6 +15,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.staticfiles import StaticFiles
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 from sqlalchemy.orm import configure_mappers
+import app.models  # noqa: F401
 
 from app.core.config import settings
 
@@ -29,12 +34,15 @@ from app.api.v1.routes_users import router as users_router
 from app.api.v1.routes_me import router as me_router
 from app.api.v1.routes_support import router as support_router
 from app.api.v1.routes_notifications import router as notifications_router
-
 # Nếu bạn có thêm các router dưới đây thì bỏ comment import & include ở cuối:
-# from app.api.v1.routes_devices import router as devices_router
+from app.api.v1.routes_devices import router as devices_router
 # from app.api.v1.routes_diseases import router as diseases_router
-# from app.api.v1.routes_sensors import router as sensors_router
-# from app.api.v1.routes_ingest import router as ingest_router
+from app.api.v1.routes_sensors import router as sensors_router
+from app.api.v1.routes_users_devices import router as users_devices_router
+from app.api.v1.routes_device_logs import router as device_logs_router
+from app.api.v1.routes_detection_history import router as detection_history_router
+from app.api.v1.routes_dashboard import router as dashboard_router
+
 
 # Bắt buộc gọi trước khi tạo app nếu có relationships phức tạp
 configure_mappers()
@@ -47,6 +55,7 @@ tags_metadata = [
     {"name": "Support", "description": "Ticket & hội thoại hỗ trợ khách hàng."},
     {"name": "Users", "description": "Quản lý người dùng & hồ sơ cá nhân."},
     {"name": "default", "description": "Health & tiện ích."},
+    {"name": "Device", "description": "Thiết bị."},
 ]
 
 app = FastAPI(
@@ -94,12 +103,15 @@ app.include_router(users_router,         prefix=API_PREFIX)
 app.include_router(me_router,            prefix=API_PREFIX)
 app.include_router(support_router,       prefix=API_PREFIX)
 app.include_router(notifications_router, prefix=API_PREFIX)
-
+app.include_router(users_devices_router, prefix=API_PREFIX)
+app.include_router(sensors_router, prefix=API_PREFIX)
+app.include_router(device_logs_router, prefix=API_PREFIX)
 # Nếu có các router mở rộng, bỏ comment để kích hoạt:
-# app.include_router(devices_router,      prefix=API_PREFIX)
-# app.include_router(diseases_router,     prefix=API_PREFIX)
-# app.include_router(sensors_router,      prefix=API_PREFIX)
+app.include_router(devices_router,      prefix=API_PREFIX)
+app.include_router(detection_history_router,     prefix=API_PREFIX)
+app.include_router(sensors_router,      prefix=API_PREFIX)
 # app.include_router(ingest_router)  # tuỳ bạn muốn prefix hay không
+app.include_router(dashboard_router, prefix=API_PREFIX)
 
 # ==== Root & tiện ích ====
 @app.get("/")

@@ -24,13 +24,20 @@ class HomeContent extends StatelessWidget {
                   'Ứng dụng MIỄN PHÍ số 1 để\nchẩn đoán và điều trị cây trồng',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 40, fontWeight: FontWeight.w800,
-                    color: Colors.black87, height: 1.25,
+                    fontSize: 40,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black87,
+                    height: 1.25,
                   ),
                 ),
+
                 const SizedBox(height: 24),
+
+                // 👉 Nhóm nút hành động: Dùng thử chẩn đoán + Tải ngay
                 Wrap(
-                  spacing: 12, runSpacing: 12, alignment: WrapAlignment.center,
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.center,
                   children: [
                     FilledButton.icon(
                       onPressed: () => Navigator.pushNamed(context, '/detect'),
@@ -38,18 +45,18 @@ class HomeContent extends StatelessWidget {
                       label: const Text('Dùng thử chẩn đoán'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () {}, // TODO: open store
+                      onPressed: () {
+                        // TODO: mở link store / popup QR / hướng dẫn tải app
+                      },
                       icon: const Icon(Icons.android),
-                      label: const Text('Google Play'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.apple),
-                      label: const Text('App Store'),
+                      label: const Text('Tải ngay'),
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 40),
+
+                // Ảnh demo ứng dụng
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: ConstrainedBox(
@@ -71,13 +78,11 @@ class HomeContent extends StatelessWidget {
                         ),
                         child: Stack(
                           children: [
-                            // Background pattern
                             Positioned.fill(
                               child: CustomPaint(
                                 painter: _DottedPatternPainter(),
                               ),
                             ),
-                            // Content
                             Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -123,13 +128,13 @@ class HomeContent extends StatelessWidget {
                                   const SizedBox(height: 24),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
+                                    children: const [
                                       _AppStoreBadge(
                                         icon: Icons.android,
                                         label: 'Android',
                                         color: Colors.green,
                                       ),
-                                      const SizedBox(width: 16),
+                                      SizedBox(width: 16),
                                       _AppStoreBadge(
                                         icon: Icons.apple,
                                         label: 'iOS',
@@ -160,22 +165,51 @@ class HomeContent extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Text('Vì sao chọn PlantGuard?', style: Theme.of(context).textTheme.titleLarge),
+                Text(
+                  'Vì sao chọn PlantGuard?',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
                 const SizedBox(height: 20),
                 LayoutBuilder(
                   builder: (context, c) {
                     final w = c.maxWidth;
-                    final cross = w >= 1100 ? 4 : w >= 800 ? 3 : w >= 600 ? 2 : 1;
+                    final cross = w >= 1100
+                        ? 4
+                        : w >= 800
+                            ? 3
+                            : w >= 600
+                                ? 2
+                                : 1;
+
                     return GridView.count(
                       physics: const NeverScrollableScrollPhysics(),
                       shrinkWrap: true,
-                      crossAxisCount: cross, crossAxisSpacing: 16,
-                      mainAxisSpacing: 16, childAspectRatio: 4 / 3,
+                      crossAxisCount: cross,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 4 / 3,
                       children: const [
-                        _FeatureCard(icon: Icons.camera, title: 'Chẩn đoán bằng ảnh', desc: 'AI nhận diện bệnh đã huấn luyện.'),
-                        _FeatureCard(icon: Icons.science, title: 'Hướng dẫn xử lý', desc: 'Biện pháp an toàn, hiệu quả, thân thiện môi trường.'),
-                        _FeatureCard(icon: Icons.menu_book, title: 'Thư viện tri thức', desc: 'Tài liệu thực hành canh tác.'),
-                        _FeatureCard(icon: Icons.support_agent, title: 'Kết nối chuyên gia', desc: 'Tư vấn nhanh khi cần hỗ trợ.'),
+                        _FeatureCard(
+                          icon: Icons.camera,
+                          title: 'Chẩn đoán bằng ảnh',
+                          desc: 'AI nhận diện bệnh đã huấn luyện.',
+                        ),
+                        _FeatureCard(
+                          icon: Icons.science,
+                          title: 'Hướng dẫn xử lý',
+                          desc:
+                              'Biện pháp an toàn, hiệu quả, thân thiện môi trường.',
+                        ),
+                        _FeatureCard(
+                          icon: Icons.menu_book,
+                          title: 'Thư viện tri thức',
+                          desc: 'Tài liệu thực hành canh tác.',
+                        ),
+                        _FeatureCard(
+                          icon: Icons.support_agent,
+                          title: 'Kết nối chuyên gia',
+                          desc: 'Tư vấn nhanh khi cần hỗ trợ.',
+                        ),
                       ],
                     );
                   },
@@ -189,15 +223,25 @@ class HomeContent extends StatelessWidget {
   }
 }
 
+// ============================================================================
+//  FEATURE CARD
+// ============================================================================
 class _FeatureCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String desc;
-  const _FeatureCard({required this.icon, required this.title, required this.desc});
+
+  const _FeatureCard({
+    required this.icon,
+    required this.title,
+    required this.desc,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 0, clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -215,6 +259,9 @@ class _FeatureCard extends StatelessWidget {
   }
 }
 
+// ============================================================================
+//  APP BADGE
+// ============================================================================
 class _AppStoreBadge extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -252,6 +299,9 @@ class _AppStoreBadge extends StatelessWidget {
   }
 }
 
+// ============================================================================
+//  DOT PATTERN
+// ============================================================================
 class _DottedPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

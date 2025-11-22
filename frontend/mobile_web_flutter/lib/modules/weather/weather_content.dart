@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
 
 class WeatherContent extends StatefulWidget {
   const WeatherContent({super.key});
@@ -11,6 +14,9 @@ class _WeatherContentState extends State<WeatherContent> {
   bool _loading = true;
   Map<String, dynamic>? _weatherData;
   String? _error;
+
+  // TODO: Đổi thành API key thật của bạn
+  static const String _apiKey = '1d1e807aeedfd968685c10f19bcc52ff';
 
   @override
   void initState() {
@@ -25,36 +31,231 @@ class _WeatherContentState extends State<WeatherContent> {
     });
 
     try {
-      // Mock data cho thời tiết
-      await Future.delayed(const Duration(seconds: 1));
-      
+      // 1. Lấy vị trí hiện tại (GPS)
+      final position = await _determinePosition();
+
+      final lat = position.latitude;
+      final lon = position.longitude;
+
+      // 2. Gọi API current weather
+      final currentUrl = Uri.parse(
+        'https://api.openweathermap.org/data/2.5/weather'
+        '?lat=$lat&lon=$lon'
+        '&appid=$_apiKey'
+        '&units=metric'
+        '&lang=vi',
+      );
+
+      // 3. Gọi API forecast 5 ngày
+      final forecastUrl = Uri.parse(
+        'https://api.openweathermap.org/data/2.5/forecast'
+        '?lat=$lat&lon=$lon'
+        '&appid=$_apiKey'
+        '&units=metric'
+        '&lang=vi',
+      );
+
+      final currentRes = await http.get(currentUrl);
+      final forecastRes = await http.get(forecastUrl);
+
+      if (currentRes.statusCode != 200) {
+        throw Exception(
+            'Lỗi current weather: ${currentRes.statusCode} ${currentRes.body}');
+      }
+      if (forecastRes.statusCode != 200) {
+        throw Exception(
+            'Lỗi forecast: ${forecastRes.statusCode} ${forecastRes.body}');
+      }
+
+      final currentJson = jsonDecode(currentRes.body);
+      final forecastJson = jsonDecode(forecastRes.body);
+
+      final mapped = _mapWeatherFromApi(currentJson, forecastJson);
+
+      if (!mounted) return;
       setState(() {
-        _weatherData = {
-          'location': 'Hà Nội, Việt Nam',
-          'temperature': 28,
-          'feelsLike': 30,
-          'description': 'Nắng',
-          'humidity': 65,
-          'windSpeed': 12,
-          'pressure': 1013,
-          'uvIndex': 7,
-          'visibility': 10,
-          'icon': '☀️',
-          'forecast': [
-            {'day': 'Hôm nay', 'high': 32, 'low': 24, 'icon': '☀️', 'desc': 'Nắng'},
-            {'day': 'Ngày mai', 'high': 30, 'low': 23, 'icon': '⛅', 'desc': 'Nhiều mây'},
-            {'day': 'Thứ 3', 'high': 29, 'low': 22, 'icon': '🌧️', 'desc': 'Mưa nhẹ'},
-            {'day': 'Thứ 4', 'high': 31, 'low': 24, 'icon': '☀️', 'desc': 'Nắng'},
-            {'day': 'Thứ 5', 'high': 30, 'low': 23, 'icon': '⛅', 'desc': 'Nhiều mây'},
-          ],
-        };
+        _weatherData = mapped;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Không thể tải dữ liệu thời tiết: $e';
         _loading = false;
       });
+    }
+  }
+
+  /// Hàm xin quyền & lấy vị trí hiện tại (GPS)
+  Future<Position> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Kiểm tra dịch vụ định vị đã bật chưa
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('Dịch vụ định vị đang tắt. Vui lòng bật GPS.');
+    }
+
+    // Kiểm tra quyền
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception('Bạn đã từ chối quyền truy cập vị trí.');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception(
+          'Quyền vị trí bị từ chối vĩnh viễn. Vui lòng bật lại trong cài đặt.');
+    }
+
+    // Lấy vị trí hiện tại
+    return await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+  }
+
+  /// Map dữ liệu từ OpenWeatherMap về đúng format UI đang dùng
+  Map<String, dynamic> _mapWeatherFromApi(
+      Map<String, dynamic> current, Map<String, dynamic> forecast) {
+    // --- Current weather ---
+    final location =
+        '${current['name'] ?? 'Không rõ'}, ${current['sys']?['country'] ?? ''}';
+    final temp = (current['main']?['temp'] ?? 0).round();
+    final feelsLike = (current['main']?['feels_like'] ?? temp).round();
+    final description = (current['weather']?[0]?['description'] ?? '')
+        .toString()
+        .split(' ')
+        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+
+    final humidity = (current['main']?['humidity'] ?? 0).round();
+    final windSpeed = (current['wind']?['speed'] ?? 0).toDouble();
+    final pressure = (current['main']?['pressure'] ?? 0).round();
+    final uvIndex = 7; // Free API không có UV -> mock nhẹ
+    final visibility = ((current['visibility'] ?? 0) / 1000).toStringAsFixed(1);
+
+    final weatherMain = (current['weather']?[0]?['main'] ?? '').toString();
+    final icon = _mapIcon(weatherMain);
+
+    // --- Forecast 5 ngày đơn giản ---
+    final List<dynamic> list = forecast['list'] ?? [];
+    final Map<String, Map<String, dynamic>> daily = {};
+
+    for (final item in list) {
+      final dtTxt = item['dt_txt']?.toString() ?? '';
+      if (dtTxt.isEmpty) continue;
+
+      final date = dtTxt.split(' ').first; // yyyy-mm-dd
+      final tempMax = (item['main']?['temp_max'] ?? 0).toDouble();
+      final tempMin = (item['main']?['temp_min'] ?? 0).toDouble();
+      final main = (item['weather']?[0]?['main'] ?? '').toString();
+      final desc = (item['weather']?[0]?['description'] ?? '').toString();
+
+      if (!daily.containsKey(date)) {
+        daily[date] = {
+          'high': tempMax,
+          'low': tempMin,
+          'main': main,
+          'desc': desc,
+        };
+      } else {
+        if (tempMax > daily[date]!['high']) {
+          daily[date]!['high'] = tempMax;
+        }
+        if (tempMin < daily[date]!['low']) {
+          daily[date]!['low'] = tempMin;
+        }
+      }
+    }
+
+    final now = DateTime.now();
+    final days = <Map<String, dynamic>>[];
+
+    // Ngày 0: Hôm nay (dùng current)
+    days.add({
+      'day': 'Hôm nay',
+      'high': temp,
+      'low': temp,
+      'icon': icon,
+      'desc': description,
+    });
+
+    // Các ngày tiếp theo
+    final weekdayNames = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+
+    final sortedDates = daily.keys.toList()..sort();
+    for (final date in sortedDates) {
+      final dt = DateTime.tryParse(date);
+      if (dt == null) continue;
+      if (dt.day == now.day &&
+          dt.month == now.month &&
+          dt.year == now.year) {
+        // đã có "Hôm nay"
+        continue;
+      }
+
+      final diff = dt.difference(now).inDays;
+      if (diff == 1) {
+        final d = daily[date]!;
+        days.add({
+          'day': 'Ngày mai',
+          'high': (d['high'] as double).round(),
+          'low': (d['low'] as double).round(),
+          'icon': _mapIcon(d['main']),
+          'desc': d['desc'],
+        });
+      } else if (diff > 1 && days.length < 5) {
+        final d = daily[date]!;
+        final wName = weekdayNames[dt.weekday % 7];
+        days.add({
+          'day': wName,
+          'high': (d['high'] as double).round(),
+          'low': (d['low'] as double).round(),
+          'icon': _mapIcon(d['main']),
+          'desc': d['desc'],
+        });
+      }
+
+      if (days.length >= 5) break;
+    }
+
+    return {
+      'location': location,
+      'temperature': temp,
+      'feelsLike': feelsLike,
+      'description': description,
+      'humidity': humidity,
+      'windSpeed': windSpeed.toStringAsFixed(1),
+      'pressure': pressure,
+      'uvIndex': uvIndex,
+      'visibility': visibility,
+      'icon': icon,
+      'forecast': days,
+    };
+  }
+
+  String _mapIcon(String main) {
+    switch (main.toLowerCase()) {
+      case 'clear':
+        return '☀️';
+      case 'clouds':
+        return '⛅';
+      case 'rain':
+      case 'drizzle':
+        return '🌧️';
+      case 'thunderstorm':
+        return '⛈️';
+      case 'snow':
+        return '❄️';
+      case 'mist':
+      case 'fog':
+      case 'haze':
+        return '🌫️';
+      default:
+        return '☁️';
     }
   }
 
@@ -99,9 +300,14 @@ class _WeatherContentState extends State<WeatherContent> {
                   padding: const EdgeInsets.all(48.0),
                   child: Column(
                     children: [
-                      Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+                      Icon(Icons.error_outline,
+                          size: 64, color: Colors.red.shade300),
                       const SizedBox(height: 16),
-                      Text(_error!, style: TextStyle(color: Colors.red.shade700)),
+                      Text(
+                        _error!,
+                        style: TextStyle(color: Colors.red.shade700),
+                        textAlign: TextAlign.center,
+                      ),
                       const SizedBox(height: 16),
                       FilledButton.icon(
                         onPressed: _loadWeather,
@@ -253,7 +459,8 @@ class _WeatherContentState extends State<WeatherContent> {
                         children: [
                           ...(_weatherData!['forecast'] as List).map((day) {
                             return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8),
                               child: Row(
                                 children: [
                                   SizedBox(
@@ -332,7 +539,7 @@ class _WeatherContentState extends State<WeatherContent> {
                           _buildTip('Nhiệt độ hiện tại phù hợp cho cây trồng'),
                           _buildTip('Độ ẩm ở mức tốt, không cần tưới nhiều'),
                           _buildTip('Thời tiết nắng, phù hợp để phơi nắng cây'),
-                          _buildTip('Dự báo có mưa vào Thứ 3, chuẩn bị che chắn'),
+                          _buildTip('Nếu dự báo có mưa, chuẩn bị che chắn kịp thời'),
                         ],
                       ),
                     ),
@@ -410,4 +617,3 @@ class _WeatherDetailCard extends StatelessWidget {
     );
   }
 }
-

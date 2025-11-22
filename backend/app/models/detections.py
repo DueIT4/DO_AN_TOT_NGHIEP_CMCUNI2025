@@ -1,27 +1,42 @@
-from sqlalchemy import (
-    Column, BigInteger, DECIMAL, ForeignKey, Enum, JSON, String, Text, TIMESTAMP
-)
-from sqlalchemy.sql import func
-from app.core.db import Base
-import enum
+# from sqlalchemy import (
+#     Column, BigInteger, String, Text, DateTime, ForeignKey,
+#     Numeric, JSON, Enum
+# )
+# from sqlalchemy.orm import relationship
+# from sqlalchemy.sql import func
+
+# from app.core.database import Base
 
 
-class ReviewStatus(str, enum.Enum):
-    pending = "pending"
-    approved = "approved"
-    rejected = "rejected"
+# class Diseases(Base):
+#     __tablename__ = "diseases"
 
+#     disease_id = Column(BigInteger, primary_key=True, autoincrement=True)
+#     name = Column(String(255), unique=True)
+#     description = Column(Text)
+#     treatment_guideline = Column(Text)
+#     created_at = Column(DateTime, server_default=func.now())
 
-class Detection(Base):
-    __tablename__ = "detections"
+#     detections = relationship("Detection", back_populates="disease")
+    
 
-    detection_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    img_id = Column(BigInteger, ForeignKey("img.img_id", ondelete="CASCADE"), nullable=False)
-    disease_id = Column(BigInteger, ForeignKey("diseases.disease_id", ondelete="SET NULL"))
-    confidence = Column(DECIMAL(5, 2))
-    description = Column(Text)
-    treatment_guideline = Column(Text)
-    bbox = Column(JSON)
-    review_status = Column(Enum(ReviewStatus), default=ReviewStatus.pending)
-    model_version = Column(String(255))
-    created_at = Column(TIMESTAMP, server_default=func.now())
+# class Detection(Base):
+#     __tablename__ = "detections"
+
+#     detection_id = Column(BigInteger, primary_key=True, autoincrement=True)
+#     img_id = Column(BigInteger, ForeignKey("img.img_id"), nullable=False)
+#     disease_id = Column(BigInteger, ForeignKey("diseases.disease_id"), nullable=True)
+#     confidence = Column(Numeric(5, 2))
+#     description = Column(Text)
+#     treatment_guideline = Column(Text)
+#     created_at = Column(DateTime, server_default=func.now())
+#     bbox = Column(JSON)
+#     review_status = Column(
+#         Enum("pending", "approved", "rejected", name="review_status"),
+#         nullable=False,
+#         default="pending"
+#     )
+#     model_version = Column(String(255))
+
+#     img = relationship("Img", back_populates="detections")
+#     disease = relationship("Diseases", back_populates="detections")

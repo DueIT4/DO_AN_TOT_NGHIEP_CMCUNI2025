@@ -1,9 +1,10 @@
+# app/models/notification.py
 from sqlalchemy import Column, BigInteger, String, Text, ForeignKey, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from app.db.base import Base
+from app.core.database import Base
 
-class Notification(Base):
+class Notifications(Base):
     __tablename__ = "notifications"
 
     notification_id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -13,8 +14,18 @@ class Notification(Base):
     created_at      = Column(DateTime, server_default=func.now(), nullable=False)
     read_at         = Column(DateTime, nullable=True)
 
-    # (khuyến nghị) lưu người gửi để audit
     sender_id       = Column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
 
-    user    = relationship("Users", foreign_keys=[user_id])     # người nhận
-    sender  = relationship("Users", foreign_keys=[sender_id])   # người gửi
+    # User là NGƯỜI NHẬN
+    user = relationship(
+        "Users",
+        foreign_keys=[user_id],
+        back_populates="notifications"
+    )
+
+    # User là NGƯỜI GỬI
+    sender = relationship(
+        "Users",
+        foreign_keys=[sender_id],
+        back_populates="notifications_sent"
+    )

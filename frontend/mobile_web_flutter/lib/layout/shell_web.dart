@@ -14,7 +14,6 @@ class ShellWeb extends StatelessWidget {
         children: [
           const WebNavbar(),
           Expanded(child: body),
-          const WebFooter(),
         ],
       ),
     );

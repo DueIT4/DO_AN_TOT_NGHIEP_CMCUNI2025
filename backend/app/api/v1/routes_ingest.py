@@ -5,11 +5,11 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 from app.core.db import get_db
-from app.models.devices import Devices
+from app.models.devices import Device
 from app.models.device_logs import DeviceLogs, EventType
 from app.models.sensor_readings import SensorReadings  # bạn đã có model này
 
-router = APIRouter(prefix="/ingest", tags=["Ingest"])
+router = APIRouter(tags=["Ingest"])
 
 # ====== Schemas ======
 class ReadingIn(BaseModel):
@@ -26,14 +26,14 @@ class IngestPayload(BaseModel):
     # Có thể bổ sung trường metadata khác nếu cần
 
 # ====== Helpers ======
-def _find_device(db: Session, device_id: Optional[int], serial_no: str) -> Optional[Devices]:
+def _find_device(db: Session, device_id: Optional[int], serial_no: str) -> Optional[Device]:
     if device_id:
-        dev = db.get(Devices, device_id)
+        dev = db.get(Device, device_id)
         if dev:
             return dev
-    return db.query(Devices).filter(Devices.serial_no == serial_no).first()
+    return db.query(Device).filter(Device.serial_no == serial_no).first()
 
-def _verify_device_token(device: Devices, token: Optional[str]) -> bool:
+def _verify_device_token(device: Device, token: Optional[str]) -> bool:
     """
     TODO: thêm cột device_token vào bảng devices và so sánh:
       return token is not None and token == device.device_token

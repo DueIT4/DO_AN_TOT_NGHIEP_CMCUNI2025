@@ -1,8 +1,10 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
-import 'src/routes/web_routes.dart'; // đảm bảo file này có WebRoutes.home và WebRoutes.onGenerate
+import 'src/routes/web_routes.dart';
+import 'modules/auth/auth_service.dart'; // 👈 thêm import
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,6 +13,9 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // 👇 Khôi phục bearer đã lưu (nếu có) để F5 không bị mất đăng nhập
+  await AuthService.restoreBearer();
 
   runApp(const App());
 }

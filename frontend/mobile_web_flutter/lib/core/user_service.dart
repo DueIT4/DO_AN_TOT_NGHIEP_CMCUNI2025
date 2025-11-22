@@ -62,5 +62,16 @@ class UserService {
     _currentUser = null;
     _lastFetch = null;
   }
+
+   /// Lấy danh sách tất cả user (cho trang admin)
+  static Future<List<Map<String, dynamic>>> listUsers() async {
+    // Nếu backend bạn là /admin/users thì để như dưới,
+    // nếu là route khác thì đổi path cho đúng.
+    final res = await ApiBase.getJson(ApiBase.api('/users'));
+
+    return (res as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
 }
 
