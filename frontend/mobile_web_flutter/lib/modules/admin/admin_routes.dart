@@ -56,8 +56,7 @@ class DetectionHistoryRoute extends StatelessWidget {
   Widget build(BuildContext context) {
     return AdminShellWeb(
       title: 'Lịch sử dự đoán',
-      // nếu bạn có AdminMenu.detectionHistory thì đổi thành cái đó
-      current: AdminMenu.notifications,
+      current: AdminMenu.detectionHistory,
       body: DetectionHistoryPage(
         service: DetectionHistoryService(), // dùng service ở core
       ),

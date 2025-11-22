@@ -12,7 +12,8 @@ enum AdminMenu {
 }
 
 /// Khung layout admin dùng cho web
-class AdminShellWeb extends StatelessWidget {
+/// Tối ưu để tránh rebuild không cần thiết
+class AdminShellWeb extends StatefulWidget {
   final String title;
   final AdminMenu current;
   final Widget body;
@@ -24,17 +25,33 @@ class AdminShellWeb extends StatelessWidget {
     required this.body,
   });
 
+  @override
+  State<AdminShellWeb> createState() => _AdminShellWebState();
+}
+
+class _AdminShellWebState extends State<AdminShellWeb> {
   static const Color _green = Color(0xFF3D7A3B);
 
-  // service gọi /me
-  AdminMeService get _meService => AdminMeService();
+  // Service được khởi tạo một lần, không rebuild
+  late final AdminMeService _meService = AdminMeService();
+  
+  // Cache sidebar để tránh rebuild khi chỉ title/body thay đổi
+  Widget? _cachedSidebar;
+  AdminMenu? _lastMenu;
 
   @override
   Widget build(BuildContext context) {
+    // Chỉ rebuild sidebar nếu menu thay đổi
+    if (_cachedSidebar == null || _lastMenu != widget.current) {
+      _cachedSidebar = _buildSidebar(context);
+      _lastMenu = widget.current;
+    }
+
     return Scaffold(
       body: Row(
         children: [
-          _buildSidebar(context),
+          // Sidebar được cache, không rebuild
+          _cachedSidebar!,
           Expanded(
             child: Column(
               children: [
@@ -48,7 +65,7 @@ class AdminShellWeb extends StatelessWidget {
                       child: Material(
                         elevation: 0,
                         color: Colors.white,
-                        child: body,
+                        child: widget.body, // Chỉ body thay đổi
                       ),
                     ),
                   ),
@@ -202,7 +219,7 @@ class AdminShellWeb extends StatelessWidget {
     required String label,
     required String routeName,
   }) {
-    final bool isActive = current == menu;
+    final bool isActive = widget.current == menu;
     const green = _green;
 
     return Padding(
