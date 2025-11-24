@@ -1,3 +1,4 @@
+// lib/src/routes/web_routes.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -6,14 +7,12 @@ import '../../core/api_base.dart';
 // ===== Trang hiện có =====
 import '../../modules/home/home_web.dart';
 import '../../modules/detect/detect_web.dart';
-// import '../../modules/devices/device_web.dart';
 import '../../modules/auth/login_web.dart';
 
 import '../../modules/misc/library_web.dart';
 import '../../modules/misc/company_web.dart';
 import '../../modules/misc/news_web.dart';
 import '../../modules/misc/app_download_web.dart';
-
 
 // ✅ THAY AdminApp bằng các route admin mới
 import '../../modules/admin/admin_routes.dart';
@@ -28,48 +27,38 @@ import '../../modules/weather/weather_content.dart';
 
 class WebRoutes {
   // Công khai
-  static const home       = '/';
-  static const detect     = '/detect';
-  static const device     = '/device';
-  static const sensors    = '/sensors';
-  static const login      = '/login';
+  static const home = '/';
+  static const detect = '/detect';
+  static const device = '/device';
+  static const sensors = '/sensors';
+  static const login = '/login';
 
   // Navbar (public)
-  static const library    = '/library';
-  static const news       = '/news';
-  static const company    = '/company';
-  static const app        = '/app';
-  static const weather    = '/weather';
+  static const library = '/library';
+  static const news = '/news';
+  static const company = '/company';
+  static const app = '/app';
+  static const weather = '/weather';
 
   // Auth
-  static const confirm    = '/auth/confirm';         // nhận token qua query
+  static const confirm = '/auth/confirm'; // nhận token qua query
   static const forgotPassword = '/forgot-password';
 
-  // Weather
-
   // Admin
-  static const admin          = '/admin';            // có thể map về dashboard / devices
-  static const adminDevices   = '/admin/devices';    // ✅ thêm hằng số này
-  static const adminUsers     = '/admin/users';
-  static const adminPredict   = '/admin/predictions';
-  static const adminHis     = '/admin/history';
-  static const adminSensors   = '/admin/sensors';
-static const adminDashboard = '/admin/dashboard';
-  static const adminSupport   = '/admin/support';
-  static const adminNoti      = '/admin/notifications';
+  static const admin = '/admin';
+  static const adminDevices = '/admin/devices';
+  static const adminUsers = '/admin/users';
+  static const adminPredict = '/admin/predictions';
+  static const adminHis = '/admin/history';
+  static const adminSensors = '/admin/sensors';
+  static const adminDashboard = '/admin/dashboard';
+  static const adminSupport = '/admin/support';
+  static const adminNoti = '/admin/notifications';
 
-  // Nếu sau này muốn protect các route admin bằng token thì mở lại:
-  // static const _protected = {
-  //   admin,
-  //   adminDevices,
-  //   adminUsers,
-  //   adminPredict,
-  //   adminNoti,
-  //   adminSensors,
-  // };
+  // static const _protected = {...} // nếu sau này muốn bảo vệ route admin
 
   static Route<dynamic> onGenerate(RouteSettings s) {
-    final name = s.name ?? '/';
+    final name = s.name ?? home;
 
     // Đọc bearer (nếu sau này muốn chặn chưa login)
     final bearer = (() {
@@ -82,76 +71,83 @@ static const adminDashboard = '/admin/dashboard';
       return '';
     })();
 
-    // Nếu muốn bật bảo vệ route admin thì bỏ comment đoạn này:
-    //
+    // Nếu muốn bật bảo vệ route admin thì mở lại:
     // if (_protected.contains(name) && bearer.isEmpty) {
     //   return _p(
     //     kIsWeb ? const LoginWebPage() : const LoginMobilePage(),
-    //     arguments: name, // để Login biết quay lại route này sau khi đăng nhập
+    //     s,
     //   );
     // }
 
- switch (name) {
-  // ===== Trang chủ =====
-  case home:
-    return _p(const HomeWebPage());
+    switch (name) {
+      // ===== Trang chủ =====
+      case home:
+        return _p(const HomeWebPage(), s);
 
-  // ===== Detect =====
-  case detect:
-    return _p(const DetectWebPage());
+      // ===== Detect =====
+      case detect:
+        return _p(const DetectWebPage(), s);
 
-  // ✅ THÊM LẠI LOGIN Ở ĐÂY
-  case login:
-    return _p(const LoginWebPage(), arguments: s.arguments);
+      // LOGIN
+      case login:
+        return _p(const LoginWebPage(), s);
 
-  // ===== Navbar hiện có =====
-  case weather:
-    return _p(const WeatherPage());
-  case library:
-    return _p(const LibraryWebPage());
-  case news:
-    return _p(const NewsWeb());
-  case app:
-    return _p(const AppDownloadWebPage());
+      // ===== Navbar hiện có =====
+      case weather:
+        return _p(const WeatherPage(), s);
+
+      case library:
+        return _p(const LibraryWebPage(), s);
+
+      case news:
+        return _p(const NewsWeb(), s);
+
+      case app:
+        return _p(const AppDownloadWebPage(), s);
+
       // ===== Auth =====
-    
-
       case confirm:
-        return _p(const Scaffold(
-          body: SafeArea(child: ConfirmPage()),
-        ));
+        return _p(
+          const Scaffold(
+            body: SafeArea(child: ConfirmPage()),
+          ),
+          s,
+        );
 
       case forgotPassword:
-        return _p(const Scaffold(
-          body: SafeArea(
-            child: Center(child: ForgotPasswordPage()),
+        return _p(
+          const Scaffold(
+            body: SafeArea(
+              child: Center(child: ForgotPasswordPage()),
+            ),
           ),
-        ));
+          s,
+        );
 
       // ===== ADMIN: mỗi route là 1 Shell riêng =====
-      case admin:                 // /admin: tạm cho về trang thiết bị
-      case adminDevices:          // /admin/devices
-        return _p(const AdminDevicesRoute());
-      case adminSupport:               // 👈 THÊM
-        return _p(const AdminSupportRoute());
+      case admin: // /admin: tạm cho về trang thiết bị
+      case adminDevices: // /admin/devices
+        return _p(const AdminDevicesRoute(), s);
 
-      case adminNoti:                  // /admin/notifications → trang thông báo
-        return _p(const AdminNotificationsRoute());
-      case adminNoti:             // /admin/notifications
-        return _p(const AdminNotificationsRoute());      
-      case adminHis:             // '/admin/history'
-        return _p(const AdminDetectionHistoryRoute());
+      case adminSupport:
+        return _p(const AdminSupportRoute(), s);
 
-case adminDashboard:
-  return _p(const AdminDashboardRoute());
+      case adminNoti: // /admin/notifications
+        return _p(const AdminNotificationsRoute(), s);
 
-      case adminUsers:            // /admin/users
-        return _p(const AdminUsersRoute());
+      case adminHis: // /admin/history
+        return _p(const AdminDetectionHistoryRoute(), s);
+
+      case adminDashboard:
+        return _p(const AdminDashboardRoute(), s);
+
+      case adminUsers: // /admin/users
+        return _p(const AdminUsersRoute(), s);
 
       // Chưa làm 2 trang này nên tạm reuse Devices (hoặc bạn tạo route riêng)
       case adminPredict:
       case adminSensors:
-        return _p(const AdminDevicesRoute());
+        return _p(const AdminDevicesRoute(), s);
 
       // ===== 404 =====
       default:
@@ -159,13 +155,15 @@ case adminDashboard:
           builder: (_) => Scaffold(
             body: Center(child: Text('404: $name')),
           ),
+          settings: s, // giữ settings (name) -> URL đúng khi 404
         );
     }
   }
 
-  static MaterialPageRoute _p(Widget w, {Object? arguments}) =>
+  // 🔑 Quan trọng: giữ nguyên RouteSettings (name + arguments)
+  static MaterialPageRoute _p(Widget w, RouteSettings settings) =>
       MaterialPageRoute(
         builder: (_) => w,
-        settings: RouteSettings(arguments: arguments),
+        settings: settings,
       );
 }

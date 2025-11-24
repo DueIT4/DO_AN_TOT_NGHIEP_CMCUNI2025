@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_base.dart';
 import '../../src/routes/web_routes.dart';
 import '../../core/user_service.dart';
+import '../auth/auth_service.dart'; // 👈 import AuthService
 
 class LoginContent extends StatefulWidget {
   final String? returnTo;
@@ -18,6 +19,8 @@ class _LoginContentState extends State<LoginContent> {
 
   bool _loading = false;
   String? _error;
+
+  bool _obscurePassword = true; // 👈 trạng thái ẩn/hiện mật khẩu
 
   @override
   void dispose() {
@@ -37,35 +40,24 @@ class _LoginContentState extends State<LoginContent> {
     try {
       final input = _accountCtrl.text.trim();
 
-      Map<String, dynamic> body;
+      // ✅ Dùng AuthService để login + lưu token luôn
+      await AuthService.loginWithCredentials(
+        identifier: input,
+        password: _passCtrl.text,
+      );
 
-      // Có ký tự @ → login bằng email
-      if (input.contains('@')) {
-        body = {
-          'email': input,
-          'password': _passCtrl.text,
-        };
-      } else {
-        // Không có @ → login bằng sđt
-        body = {
-          'phone': input,
-          'password': _passCtrl.text,
-        };
-      }
-
-      final res = await ApiBase.postJson(ApiBase.api('/auth/login'), body);
-
-      // Lưu token
-      ApiBase.bearer = res['access_token'] as String?;
-
-      // Clear cache & load lại user hiện tại
+      // Sau khi login xong, clear cache & load lại user hiện tại (nếu cần)
       UserService.clearCache();
       await UserService.getCurrentUser(forceRefresh: true);
 
       if (!mounted) return;
-      final next = widget.returnTo ?? WebRoutes.home;
+      final routeArg = ModalRoute.of(context)?.settings.arguments;
+      final returnTo = widget.returnTo ?? (routeArg is String ? routeArg : null);
+      final next = returnTo ?? WebRoutes.home;
+
       Navigator.pushNamedAndRemoveUntil(context, next, (r) => false);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = '$e';
       });
@@ -122,12 +114,25 @@ class _LoginContentState extends State<LoginContent> {
                   ),
                   const SizedBox(height: 12),
 
-                  // ===== Input mật khẩu =====
+                  // ===== Input mật khẩu + nút hiện/ẩn =====
                   TextFormField(
                     controller: _passCtrl,
-                    obscureText: true,
-                    decoration:
-                        const InputDecoration(labelText: 'Mật khẩu'),
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Mật khẩu',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
+                    ),
                     validator: (v) {
                       if (v == null || v.isEmpty) {
                         return 'Vui lòng nhập mật khẩu';
@@ -146,8 +151,7 @@ class _LoginContentState extends State<LoginContent> {
                             context, WebRoutes.forgotPassword);
                       },
                       style: TextButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),

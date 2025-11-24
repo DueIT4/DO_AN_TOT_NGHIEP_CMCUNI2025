@@ -1,6 +1,7 @@
 // lib/core/api_base.dart
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:http/http.dart' as http;
 
 class ApiBase {
@@ -14,7 +15,7 @@ class ApiBase {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:8000'; // Android emulator -> host
     }
-    return 'http://127.0.0.1:8000';  // iOS / desktop
+    return 'http://127.0.0.1:8000'; // iOS / desktop
   }
 
   // Prefix API dùng chung
@@ -29,11 +30,10 @@ class ApiBase {
   // ========================
   // 🔐 Bearer token
   // ========================
-static String? _bearer;
-static set bearer(String? t) => _bearer = t;
-static String? get bearer => _bearer;        // 👈 THÊM DÒNG NÀY
-static String? get bearerToken => _bearer;
-
+  static String? _bearer;
+  static set bearer(String? t) => _bearer = t;
+  static String? get bearer => _bearer;
+  static String? get bearerToken => _bearer;
 
   static Map<String, String> _headers() => {
         'Content-Type': 'application/json',
@@ -55,7 +55,8 @@ static String? get bearerToken => _bearer;
   // ========================
   // 📡 POST JSON
   // ========================
-  static Future<dynamic> postJson(String path, Map<String, dynamic> body) async {
+  static Future<dynamic> postJson(
+      String path, Map<String, dynamic> body) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.post(
       url,
@@ -70,9 +71,10 @@ static String? get bearerToken => _bearer;
   }
 
   // ========================
-  // ✏️ PUT JSON  (dùng cho update)
+  // ✏️ PUT JSON
   // ========================
-  static Future<dynamic> putJson(String path, Map<String, dynamic> body) async {
+  static Future<dynamic> putJson(
+      String path, Map<String, dynamic> body) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.put(
       url,

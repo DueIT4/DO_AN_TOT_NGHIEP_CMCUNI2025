@@ -8,6 +8,7 @@ from app.models.devices import Device
 from app.models.user import Users
 from app.models.image_detection import Img, Detection, Disease
 from app.models.support import SupportTicket  # model mapping bảng support_tickets
+from datetime import datetime
 
 from app.schemas.dashboard import (
     DashboardSummary,
@@ -23,7 +24,7 @@ def _get_range_dates(range_str: str) -> tuple[datetime, datetime]:
     """
     range_str: '7d' | '30d' | '90d'
     """
-    now = datetime.utcnow()
+    now = datetime.now()  # dùng giờ local của server
     if range_str == "30d":
         start = now - timedelta(days=30)
     elif range_str == "90d":
@@ -164,7 +165,6 @@ def build_dashboard_summary(db: Session, range_str: str = "7d") -> DashboardSumm
             )
         )
 
-    # ============= RECENT TICKETS (10 GẦN NHẤT) =============
     recent_tickets_rows = (
         db.query(SupportTicket, Users)
         .outerjoin(Users, SupportTicket.user_id == Users.user_id)
@@ -186,7 +186,6 @@ def build_dashboard_summary(db: Session, range_str: str = "7d") -> DashboardSumm
             )
         )
 
-    # ====================== KẾT QUẢ ======================
     return DashboardSummary(
         total_devices=total_devices,
         active_devices=active_devices,

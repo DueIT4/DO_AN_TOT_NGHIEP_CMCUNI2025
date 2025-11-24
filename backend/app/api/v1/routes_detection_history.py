@@ -1,5 +1,7 @@
 # app/api/v1/routes_detection_history.py
 from typing import Optional
+from app.services.export_dataset_service import export_detection_to_dataset, ExportError
+from app.models.image_detection import Img, Detection, Disease
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -147,3 +149,40 @@ def delete_detection_admin(
         raise HTTPException(status_code=404, detail="Detection không tồn tại")
 
     return
+@router.post("/{detection_id}/export-train")
+def export_detection_train(
+    detection_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Từ lịch sử dự đoán, bấm 'Lưu làm data train' cho 1 detection.
+    - Admin/support_admin: export được mọi lịch sử.
+    - User thường: chỉ export được lịch sử của chính mình.
+    """
+    det = db.get(Detection, detection_id)
+    if not det:
+        raise HTTPException(status_code=404, detail="Detection không tồn tại")
+
+    img = db.get(Img, det.img_id)
+    if not img:
+        raise HTTPException(status_code=404, detail="Ảnh không tồn tại")
+
+    # Quyền
+    if current_user.role_type not in (RoleType.admin, RoleType.support_admin):
+        if img.user_id != current_user.user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Bạn không có quyền export detection của người khác",
+            )
+
+    try:
+        saved_files = export_detection_to_dataset(
+            db=db,
+            detection_id=detection_id,
+            split="train",
+        )
+    except ExportError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"success": True, "saved_files": saved_files}

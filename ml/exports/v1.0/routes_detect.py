@@ -11,7 +11,7 @@ router = APIRouter()
 # parents[0]=.../v1 , [1]=.../api , [2]=.../app , [3]=.../backend , [4]=<REPO_ROOT>
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
-MODEL_PATH  = REPO_ROOT / "ml" / "exports" / "v1.0" / "best.onnx"    # hoặc "model.onnx" nếu bạn đổi tên
+MODEL_PATH  = REPO_ROOT / "ml" / "exports" / "v1.0" / "best.pt"    # hoặc "model.onnx" nếu bạn đổi tên
 LABELS_PATH = REPO_ROOT / "ml" / "exports" / "v1.0" / "labels.txt"
 
 # (tuỳ chọn) log để debug

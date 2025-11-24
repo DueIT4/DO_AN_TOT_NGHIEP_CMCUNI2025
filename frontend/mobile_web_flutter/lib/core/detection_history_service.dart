@@ -2,6 +2,8 @@
 import 'package:http/http.dart' as http;
 
 import 'api_base.dart';
+import 'package:http/http.dart' as http;
+import 'package:mobile_web_flutter/core/api_base.dart';
 
 /// Số bản ghi mỗi trang (dùng chung cho FE)
 const int PAGE_SIZE = 20;
@@ -129,4 +131,34 @@ class DetectionHistoryService {
       );
     }
   }
+    /// ⭐ Gọi API: POST /detection-history/{detection_id}/export-train
+ Future<void> exportToTrainData(int detectionId) async {
+  // Tạo URL
+  final url = '${ApiBase.baseURL}'
+      '${ApiBase.api('/detection-history/$detectionId/export-train')}';
+
+  // Lấy token
+  final token = ApiBase.bearer;
+
+  // Headers cho request
+  final headers = <String, String>{
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+  };
+
+  // Gửi request POST
+  final resp = await http.post(
+    Uri.parse(url),
+    headers: headers,
+  );
+
+  // Kiểm tra response
+  if (resp.statusCode != 200) {
+    throw Exception('Lỗi export train: ${resp.statusCode} ${resp.body}');
+  }
+}
+
+
+
 }

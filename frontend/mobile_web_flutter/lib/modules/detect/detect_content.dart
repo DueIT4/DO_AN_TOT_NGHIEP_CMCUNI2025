@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' as http_parser;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_base.dart';
 
@@ -137,11 +138,33 @@ class _DetectContentState extends State<DetectContent> {
               ),
               const SizedBox(height: 40),
 
-              ElevatedButton.icon(
-                onPressed: _pickImage,
-                icon: const Icon(Icons.photo_library),
-                label: const Text("Chọn ảnh từ thư viện"),
-              ),
+              Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _pickImage,
+                  icon: const Icon(Icons.photo_library),
+                  label: const Text("Chọn ảnh từ thư viện"),
+                ),
+
+                const SizedBox(width: 16),
+
+                FilledButton.icon(
+                  onPressed: () {
+                    // Điều hướng link tải app
+                    const url = "https://your-download-link.com/app.apk"; // đổi link tại đây
+                    launchUrl(Uri.parse(url));
+                  },
+                  icon: const Icon(Icons.download),
+                  label: const Text("Tải App Ngay"),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                  ),
+                ),
+              ],
+            ),
+
 
               const SizedBox(height: 30),
 
@@ -188,43 +211,22 @@ class _DetectContentState extends State<DetectContent> {
 
   /// Hiển thị kết quả: chỉ bệnh chính + độ tin cậy
   Widget _buildResultCard(ThemeData theme) {
-    final root = Map<String, dynamic>.from(_apiJson ?? const {});
+  final root = Map<String, dynamic>.from(_apiJson ?? const {});
 
-    final detectionsRaw = root['detections'] ?? [];
-    final List<Map<String, dynamic>> detections = [
-      for (final d in (detectionsRaw as List))
-        Map<String, dynamic>.from(d as Map),
-    ];
+  final detectionsRaw = root['detections'] ?? [];
+  final List<Map<String, dynamic>> detections = [
+    for (final d in (detectionsRaw as List))
+      Map<String, dynamic>.from(d as Map),
+  ];
 
-    if (detections.isEmpty) {
-      return Container(
-        width: 760,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.green.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.shade200),
-        ),
-        child: const Text("Không phát hiện bệnh trên ảnh này."),
-      );
-    }
+  // ✅ Lấy phần giải thích từ YOLO & LLM
+  final explanation = root['explanation']?.toString();
+  final llm = root['llm'] as Map<String, dynamic>?;
 
-    // chọn detection có confidence cao nhất
-    detections.sort((a, b) {
-      final ca =
-          ((a['confidence'] ?? a['conf']) as num?)?.toDouble() ?? 0.0;
-      final cb =
-          ((b['confidence'] ?? b['conf']) as num?)?.toDouble() ?? 0.0;
-      return cb.compareTo(ca);
-    });
+  final diseaseSummary = llm?['disease_summary']?.toString();
+  final careInstructions = llm?['care_instructions']?.toString();
 
-    final best = detections.first;
-    final mainDisease =
-        (best['class_name'] ?? 'Không xác định').toString();
-    final rawConf =
-        ((best['confidence'] ?? best['conf']) as num?)?.toDouble() ?? 0.0;
-    final confPercent = (rawConf * 100).toStringAsFixed(2);
-
+  if (detections.isEmpty) {
     return Container(
       width: 760,
       padding: const EdgeInsets.all(20),
@@ -233,18 +235,91 @@ class _DetectContentState extends State<DetectContent> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.green.shade200),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("🔎 Kết quả chẩn đoán", style: theme.textTheme.titleLarge),
-          const Divider(),
-          Text(
-            "🌿 Bệnh chẩn đoán: $mainDisease",
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          Text("📈 Độ tin cậy: $confPercent%"),
-        ],
-      ),
+      child: const Text("Không phát hiện bệnh trên ảnh này."),
     );
   }
+
+  // chọn detection có confidence cao nhất
+  detections.sort((a, b) {
+    final ca = ((a['confidence'] ?? a['conf']) as num?)?.toDouble() ?? 0.0;
+    final cb = ((b['confidence'] ?? b['conf']) as num?)?.toDouble() ?? 0.0;
+    return cb.compareTo(ca);
+  });
+
+  final best = detections.first;
+  final mainDisease = (best['class_name'] ?? 'Không xác định').toString();
+  final rawConf =
+      ((best['confidence'] ?? best['conf']) as num?)?.toDouble() ?? 0.0;
+  final confPercent = (rawConf * 100).toStringAsFixed(2);
+
+  return Container(
+    width: 760,
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.green.shade50,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.green.shade200),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("🔎 Kết quả chẩn đoán", style: theme.textTheme.titleLarge),
+        const Divider(),
+
+        // ✅ Thông tin bệnh & độ tin cậy
+        Text(
+          "🌿 Bệnh chẩn đoán: $mainDisease",
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        Text("📈 Độ tin cậy: $confPercent%"),
+        const SizedBox(height: 16),
+
+        // ✅ Giải thích từ LLM: TÓM TẮT BỆNH
+        if (diseaseSummary != null && diseaseSummary.isNotEmpty) ...[
+          Text(
+            "🧠 Tình trạng:",
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            diseaseSummary,
+            style: const TextStyle(height: 1.4),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // ✅ Hướng dẫn xử lý từ LLM
+        if (careInstructions != null && careInstructions.isNotEmpty) ...[
+          Text(
+            "💊 Hướng dẫn chăm sóc:",
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            careInstructions,
+            style: const TextStyle(height: 1.4),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // (Tuỳ chọn) Giải thích kỹ thuật từ YOLO (nếu muốn show)
+        if (explanation != null && explanation.isNotEmpty) ...[
+          Text(
+            "📌 Ghi chú kỹ thuật:",
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            explanation,
+            style: const TextStyle(fontSize: 13, color: Colors.black54),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
 }

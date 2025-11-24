@@ -2,8 +2,8 @@
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.models.image_detection import Img, Detection, Disease
 
@@ -15,7 +15,8 @@ def save_image_to_disk(raw: bytes, original_filename: str) -> str:
     Lưu ảnh vào media/detections/YYYY/MM/DD/...
     Trả về file_url BẮT ĐẦU BẰNG /media/... để FE dùng trực tiếp.
     """
-    now = datetime.utcnow()
+
+    now = datetime.now()  # dùng giờ local của server
     subdir = MEDIA_ROOT / str(now.year) / f"{now.month:02d}" / f"{now.day:02d}"
     subdir.mkdir(parents=True, exist_ok=True)
 

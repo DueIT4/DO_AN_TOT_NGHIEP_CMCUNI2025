@@ -1,6 +1,5 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
@@ -18,6 +17,7 @@ Future<void> main() async {
 
   runApp(const App());
 }
+
 class App extends StatelessWidget {
   const App({super.key});
 
@@ -43,10 +43,13 @@ class App extends StatelessWidget {
           ),
         ),
       ),
-      // ❌ Đừng set initialRoute ở đây nữa
+
+      // ❌ KHÔNG set home / initialRoute,
+      // Flutter web sẽ tự lấy route từ URL khi load trang.
+      // home: HomeWebPage(),
       // initialRoute: WebRoutes.home,
 
-      // 👇 Chỉ giữ onGenerateRoute
+      // ✅ Tất cả điều hướng dùng named routes qua onGenerateRoute
       onGenerateRoute: WebRoutes.onGenerate,
     );
   }

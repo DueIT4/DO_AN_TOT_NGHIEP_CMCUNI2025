@@ -11,10 +11,10 @@ import 'package:mobile_web_flutter/modules/admin/notifications/admin_notificatio
 import 'package:mobile_web_flutter/modules/admin/support/admin_support_page.dart';
 import 'package:mobile_web_flutter/modules/admin/history/detection_history_page.dart';
 
-// Service cho lịch sử dự đoán
+// Service cho lịch sử dự đoán (hiện chưa dùng trực tiếp ở đây, giữ lại)
 import 'package:mobile_web_flutter/core/detection_history_service.dart';
 
-/// /admin hoặc /admin/dashboard
+/// /admin/dashboard
 class AdminDashboardRoute extends StatelessWidget {
   const AdminDashboardRoute({super.key});
 
@@ -56,7 +56,6 @@ class AdminUsersRoute extends StatelessWidget {
   }
 }
 
-
 /// /admin/support  → TRANG CHÍNH HỖ TRỢ NGƯỜI DÙNG (ticket + chat)
 class AdminSupportRoute extends StatelessWidget {
   const AdminSupportRoute({super.key});
@@ -85,6 +84,7 @@ class AdminNotificationsRoute extends StatelessWidget {
   }
 }
 
+/// /admin/history → Lịch sử dự đoán
 class AdminDetectionHistoryRoute extends StatelessWidget {
   const AdminDetectionHistoryRoute({super.key});
 

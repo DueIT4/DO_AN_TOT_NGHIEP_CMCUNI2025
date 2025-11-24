@@ -288,39 +288,54 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                             ].where((x) => x != null && x!.isNotEmpty).join(' • ');
 
                             return ListTile(
-                              leading: _buildThumb(it),
-                              title: Text(
-                                it.diseaseName ?? 'Không xác định',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            leading: _buildThumb(it),
+                            title: Text(
+                              it.diseaseName ?? 'Không xác định',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
                               ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (userLabel.isNotEmpty)
-                                    Text(
-                                      userLabel,
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (userLabel.isNotEmpty)
                                   Text(
-                                    'Thời gian: ${it.createdAt.toLocal()}',
+                                    userLabel,
                                     style: const TextStyle(fontSize: 12),
                                   ),
-                                  const SizedBox(height: 4),
-                                  _buildStatusTag(it),
-                                ],
-                              ),
-                              trailing: IconButton(
-                                tooltip: 'Xoá',
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
-                                  size: 18,
+                                Text(
+                                  'Thời gian: ${it.createdAt.toLocal()}',
+                                  style: const TextStyle(fontSize: 12),
                                 ),
-                                onPressed: () => _onDelete(it),
-                              ),
-                            );
+                                const SizedBox(height: 4),
+                                _buildStatusTag(it),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Lưu làm data train',
+                                  icon: const Icon(
+                                    Icons.download_for_offline,
+                                    color: Colors.green,
+                                    size: 20,
+                                  ),
+                                  onPressed: () => _onExportTrain(it),
+                                ),
+                                IconButton(
+                                  tooltip: 'Xoá',
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                    size: 18,
+                                  ),
+                                  onPressed: () => _onDelete(it),
+                                ),
+                              ],
+                            ),
+                          );
+
                           },
                         ),
                         const SizedBox(height: 12),
@@ -360,4 +375,29 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
       ),
     );
   }
+    Future<void> _onExportTrain(DetectionHistoryItem item) async {
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      await _svc.exportToTrainData(item.detectionId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã lưu ảnh vào dataset train.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi export: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
 }

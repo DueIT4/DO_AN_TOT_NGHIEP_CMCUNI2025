@@ -9,6 +9,7 @@ from app.api.v1.deps import get_current_user
 from app.services.permissions import require_perm
 from app.models.user import Users
 from app.schemas.user import UserOut
+from datetime import datetime
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -86,7 +87,8 @@ async def update_avatar(
 
     # 2. Lưu file vào media/avatars/YYYY/MM/DD
     MEDIA_ROOT = Path("media") / "avatars"
-    now = datetime.utcnow()
+
+    now = datetime.now()  # dùng giờ local của server
     subdir = MEDIA_ROOT / str(now.year) / f"{now.month:02d}" / f"{now.day:02d}"
     subdir.mkdir(parents=True, exist_ok=True)
 

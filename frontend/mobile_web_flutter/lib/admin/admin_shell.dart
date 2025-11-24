@@ -1,5 +1,10 @@
+// lib/admin/admin_shell.dart
+
 import 'package:flutter/material.dart';
 import 'package:mobile_web_flutter/core/admin_me_service.dart';
+import 'package:mobile_web_flutter/core/user_service.dart';
+import 'package:mobile_web_flutter/src/routes/web_routes.dart';
+import 'package:mobile_web_flutter/modules/auth/auth_service.dart';
 
 /// Các menu chính của admin
 enum AdminMenu {
@@ -7,7 +12,7 @@ enum AdminMenu {
   devices,
   users,
   notifications,
-  detectionHistory, // <--- THÊM MỚI
+  detectionHistory,
   settings,
 }
 
@@ -48,7 +53,7 @@ class AdminShellWeb extends StatelessWidget {
                       child: Material(
                         elevation: 0,
                         color: Colors.white,
-                        child: body,
+                        child: body, // 👈 chỉ body thay đổi theo route
                       ),
                     ),
                   ),
@@ -115,7 +120,7 @@ class AdminShellWeb extends StatelessWidget {
             menu: AdminMenu.dashboard,
             icon: Icons.dashboard_customize_outlined,
             label: 'Dashboard',
-            routeName: '/admin/dashboard',
+            routeName: WebRoutes.adminDashboard,
           ),
 
           const SizedBox(height: 20),
@@ -135,30 +140,29 @@ class AdminShellWeb extends StatelessWidget {
             menu: AdminMenu.devices,
             icon: Icons.sensors,
             label: 'Quản lý thiết bị',
-            routeName: '/admin/devices',
+            routeName: WebRoutes.adminDevices,
           ),
           _sidebarItem(
             context: context,
             menu: AdminMenu.users,
             icon: Icons.group_outlined,
             label: 'Quản lý người dùng',
-            routeName: '/admin/users',
+            routeName: WebRoutes.adminUsers,
           ),
           _sidebarItem(
             context: context,
             menu: AdminMenu.notifications,
             icon: Icons.support_agent_outlined,
             label: 'Hỗ trợ người dùng',
-            routeName: '/admin/support',
+            routeName: WebRoutes.adminSupport,
           ),
           _sidebarItem(
             context: context,
-            menu: AdminMenu.detectionHistory, // <--- menu mới
+            menu: AdminMenu.detectionHistory,
             icon: Icons.history,
             label: 'Lịch sử dự đoán',
-            routeName: '/admin/history',
+            routeName: WebRoutes.adminHis,
           ),
-
 
           const SizedBox(height: 20),
 
@@ -177,7 +181,7 @@ class AdminShellWeb extends StatelessWidget {
             menu: AdminMenu.settings,
             icon: Icons.settings_outlined,
             label: 'Cài đặt hệ thống',
-            routeName: '/admin/settings',
+            routeName: '/admin/settings', // TODO: tạo route sau
           ),
 
           const Spacer(),
@@ -211,6 +215,7 @@ class AdminShellWeb extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         onTap: () {
           if (!isActive) {
+            // 👇 chỉ thay route admin, menu/khung vẫn là AdminShellWeb
             Navigator.of(context).pushReplacementNamed(routeName);
           }
         },
@@ -346,13 +351,21 @@ class AdminShellWeb extends StatelessWidget {
     );
   }
 
-  void _handleLogout(BuildContext context) {
-    // Route màn login tuỳ app của bạn
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+  void _handleLogout(BuildContext context) async {
+    // Xoá token + signOut Firebase + dọn cache user
+    await AuthService.logout();
+    UserService.clearCache();
+
+    // Điều hướng về trang login, xoá toàn bộ stack
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      WebRoutes.login,
+      (route) => false,
+    );
   }
 }
 
-/// Dialog xem + cập nhật thông tin cá nhân admin
+/// ===== Dialog xem + cập nhật thông tin cá nhân admin =====
+
 class AdminProfileDialog extends StatefulWidget {
   const AdminProfileDialog({super.key, required this.service});
 
@@ -421,10 +434,18 @@ class _AdminProfileDialogState extends State<AdminProfileDialog> {
 
     try {
       final updated = await widget.service.updateMe(
-        username: _usernameCtrl.text.trim().isEmpty ? null : _usernameCtrl.text.trim(),
-        phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-        email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-        address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+        username: _usernameCtrl.text.trim().isEmpty
+            ? null
+            : _usernameCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim().isEmpty
+            ? null
+            : _phoneCtrl.text.trim(),
+        email: _emailCtrl.text.trim().isEmpty
+            ? null
+            : _emailCtrl.text.trim(),
+        address: _addressCtrl.text.trim().isEmpty
+            ? null
+            : _addressCtrl.text.trim(),
       );
       if (!mounted) return;
 
@@ -509,12 +530,14 @@ class _AdminProfileDialogState extends State<AdminProfileDialog> {
                   if (_user?.roleType != null)
                     Text(
                       'Vai trò: ${_user!.roleType}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   if (_user?.status != null)
                     Text(
                       'Trạng thái: ${_user!.status}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                 ],
               ),
