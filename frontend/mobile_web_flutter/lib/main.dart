@@ -1,26 +1,23 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'src/routes/web_routes.dart';
-import 'modules/auth/auth_service.dart'; // 👈 thêm import
+import 'modules/auth/auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Khởi tạo Firebase (web/android) bằng file firebase_options.dart đã tạo
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // 👇 Khôi phục bearer đã lưu (nếu có) để F5 không bị mất đăng nhập
   await AuthService.restoreBearer();
 
   runApp(const App());
 }
-
-/// 🌿 App gốc
 class App extends StatelessWidget {
   const App({super.key});
 
@@ -46,7 +43,10 @@ class App extends StatelessWidget {
           ),
         ),
       ),
-      initialRoute: WebRoutes.home,
+      // ❌ Đừng set initialRoute ở đây nữa
+      // initialRoute: WebRoutes.home,
+
+      // 👇 Chỉ giữ onGenerateRoute
       onGenerateRoute: WebRoutes.onGenerate,
     );
   }

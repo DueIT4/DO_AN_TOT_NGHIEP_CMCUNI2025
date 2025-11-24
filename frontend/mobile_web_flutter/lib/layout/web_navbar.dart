@@ -77,7 +77,6 @@ class _WebNavbarState extends State<WebNavbar> {
               _navItem(context, 'Trang chủ', WebRoutes.home),
               _navItem(context, 'Thời tiết', WebRoutes.weather),
               _navItem(context, 'Tin tức', WebRoutes.news),
-              _navItem(context, 'Liên hệ', WebRoutes.company),
     
               if (_isAdmin)
                 FilledButton.icon(

@@ -42,6 +42,8 @@ from app.api.v1.routes_users_devices import router as users_devices_router
 from app.api.v1.routes_device_logs import router as device_logs_router
 from app.api.v1.routes_detection_history import router as detection_history_router
 from app.api.v1.routes_dashboard import router as dashboard_router
+from app.api.v1.routes_support_admin import router as support_admin_router
+from app.api.v1.routes_device_types import router as routes_device_types  # 👈 thêm
 
 
 # Bắt buộc gọi trước khi tạo app nếu có relationships phức tạp
@@ -112,6 +114,8 @@ app.include_router(detection_history_router,     prefix=API_PREFIX)
 app.include_router(sensors_router,      prefix=API_PREFIX)
 # app.include_router(ingest_router)  # tuỳ bạn muốn prefix hay không
 app.include_router(dashboard_router, prefix=API_PREFIX)
+app.include_router(support_admin_router, prefix=API_PREFIX)
+app.include_router(routes_device_types,prefix=API_PREFIX)  # 👈 thêm dòng này
 
 # ==== Root & tiện ích ====
 @app.get("/")

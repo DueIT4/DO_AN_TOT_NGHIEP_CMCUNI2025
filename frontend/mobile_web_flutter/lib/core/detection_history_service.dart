@@ -1,5 +1,4 @@
 // lib/core/detection_history_service.dart
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'api_base.dart';
@@ -7,7 +6,7 @@ import 'api_base.dart';
 /// Số bản ghi mỗi trang (dùng chung cho FE)
 const int PAGE_SIZE = 20;
 
-/// 1 item trong lịch sử dự đoán
+/// 1 item trong lịch sử dự đoán (admin thấy được cả thông tin user)
 class DetectionHistoryItem {
   final int detectionId;
   final int imgId;
@@ -16,6 +15,12 @@ class DetectionHistoryItem {
   final double? confidence;
   final DateTime createdAt;
 
+  // Thông tin user – chỉ có trong API admin
+  final int? userId;
+  final String? username;
+  final String? email;
+  final String? phone;
+
   DetectionHistoryItem({
     required this.detectionId,
     required this.imgId,
@@ -23,18 +28,26 @@ class DetectionHistoryItem {
     this.diseaseName,
     this.confidence,
     required this.createdAt,
+    this.userId,
+    this.username,
+    this.email,
+    this.phone,
   });
 
   factory DetectionHistoryItem.fromJson(Map<String, dynamic> json) {
     return DetectionHistoryItem(
       detectionId: json['detection_id'] as int,
       imgId: json['img_id'] as int,
-      fileUrl: json['file_url'] as String,
+      fileUrl: (json['file_url'] ?? '') as String,
       diseaseName: json['disease_name'] as String?,
       confidence: json['confidence'] == null
           ? null
           : (json['confidence'] as num).toDouble(),
       createdAt: DateTime.parse(json['created_at'] as String),
+      userId: json['user_id'] as int?,
+      username: json['username'] as String?,
+      email: json['email'] as String?,
+      phone: json['phone'] as String?,
     );
   }
 }
@@ -62,15 +75,15 @@ class DetectionHistoryList {
   }
 }
 
-/// Service gọi API lịch sử dự đoán – dạng instance, giống DeviceService/AdminUserService
+/// Service chỉ dùng cho ADMIN
 class DetectionHistoryService {
   final http.Client _client;
 
   DetectionHistoryService({http.Client? client})
       : _client = client ?? http.Client();
 
-  /// GET /api/v1/detection-history/me?skip=&limit=&search=
-  Future<DetectionHistoryList> getMyHistory({
+  /// ADMIN: GET /api/v1/detection-history/admin?skip=&limit=&search=
+  Future<DetectionHistoryList> getAllHistoryAdmin({
     required int page,
     String? search,
     int pageSize = PAGE_SIZE,
@@ -87,23 +100,21 @@ class DetectionHistoryService {
 
     final query = Uri(queryParameters: params).query;
 
-    // Giống AdminUserService: dùng ApiBase.api + ApiBase.getJson
     final res = await ApiBase.getJson(
-      ApiBase.api('/detection-history/me?$query'),
+      ApiBase.api('/detection-history/admin?$query'),
     );
 
     final map = Map<String, dynamic>.from(res as Map);
     return DetectionHistoryList.fromJson(map);
   }
 
-  /// DELETE /api/v1/detection-history/{detection_id}
-  Future<void> deleteDetection(int detectionId) async {
-    // URL đầy đủ: baseURL + apiPrefix + path
+  /// ADMIN: DELETE /api/v1/detection-history/admin/{detection_id}
+  Future<void> deleteDetectionAdmin(int detectionId) async {
     final uri = Uri.parse(
-      '${ApiBase.baseURL}${ApiBase.api('/detection-history/$detectionId')}',
+      // 👇 SỬA 'admi' → 'admin'
+      '${ApiBase.baseURL}${ApiBase.api('/detection-history/admin/$detectionId')}',
     );
 
-    // Header: giống AdminUserService.deleteUser – kèm Bearer nếu có
     final token = ApiBase.bearer;
     final headers = <String, String>{
       'Accept': 'application/json',
@@ -114,7 +125,7 @@ class DetectionHistoryService {
 
     if (resp.statusCode != 204 && (resp.statusCode ~/ 100) != 2) {
       throw Exception(
-        'Xoá lịch sử thất bại (${resp.statusCode}): ${resp.body}',
+        'Xoá lịch sử (admin) thất bại (${resp.statusCode}): ${resp.body}',
       );
     }
   }

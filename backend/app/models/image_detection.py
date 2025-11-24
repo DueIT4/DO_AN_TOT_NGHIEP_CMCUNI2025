@@ -35,16 +35,6 @@ class ReviewStatus(str, enum.Enum):
 
 # =========================
 # 2) BẢNG img
-#   Khớp với:
-#   CREATE TABLE img (
-#     img_id      BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-#     source_type ENUM('camera','upload') NOT NULL,
-#     device_id   BIGINT UNSIGNED NULL,
-#     user_id     BIGINT UNSIGNED NULL,
-#     file_url    VARCHAR(700) NOT NULL,
-#     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-#     ...
-#   )
 # =========================
 
 class Img(Base):
@@ -71,14 +61,6 @@ class Img(Base):
 
 # =========================
 # 3) BẢNG diseases
-#   Khớp với:
-#   CREATE TABLE diseases (
-#     disease_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-#     name VARCHAR(255) UNIQUE,
-#     description TEXT,
-#     treatment_guideline TEXT,
-#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-#   )
 # =========================
 
 class Disease(Base):
@@ -99,20 +81,6 @@ class Disease(Base):
 
 # =========================
 # 4) BẢNG detections
-#   Khớp với:
-#   CREATE TABLE detections (
-#     detection_id        BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-#     img_id              BIGINT UNSIGNED NOT NULL,
-#     disease_id          BIGINT UNSIGNED NULL,
-#     confidence          DECIMAL(5,2),
-#     description         TEXT,
-#     treatment_guideline TEXT,
-#     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-#     bbox                JSON,
-#     review_status       ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-#     model_version       VARCHAR(255),
-#     ...
-#   )
 # =========================
 
 class Detection(Base):

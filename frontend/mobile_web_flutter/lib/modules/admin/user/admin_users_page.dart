@@ -38,7 +38,6 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   Future<void> _search() async {
     final keyword = _searchCtrl.text.trim();
     if (keyword.isEmpty) {
-      // Nếu ô tìm trống → quay lại danh sách gốc
       setState(() {
         _isSearching = false;
         _searchResult = [];
@@ -65,35 +64,6 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     }
   }
 
-  Future<void> _deleteUser(int id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Xoá người dùng'),
-        content: const Text(
-            'Bạn chắc chắn muốn xoá người dùng này khỏi hệ thống?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Xoá'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      await AdminUserService.deleteUser(id);
-      _reload();
-    }
-  }
-
   void _showInfo(Map<String, dynamic> u) {
     showDialog(
       context: context,
@@ -104,9 +74,11 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (u['email'] != null)
-              Text('Email: ${u['email']}', style: const TextStyle(fontSize: 13)),
+              Text('Email: ${u['email']}',
+                  style: const TextStyle(fontSize: 13)),
             if (u['phone'] != null)
-              Text('SĐT: ${u['phone']}', style: const TextStyle(fontSize: 13)),
+              Text('SĐT: ${u['phone']}',
+                  style: const TextStyle(fontSize: 13)),
             if (u['address'] != null &&
                 (u['address'] as String).isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -129,53 +101,62 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   }
 
   Future<void> _openCreateUserDialog() async {
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (_) => _UserFormDialog(
-      title: 'Tạo người dùng mới',
-      onSubmit: (data) async {
-        await AdminUserService.createUser(
-          username: data['username'] as String,
-          phone: data['phone'] as String,
-          password: data['password'] as String,
-          email: data['email'] as String?,
-          address: data['address'] as String?,
-          roleId: data['roleId'] as int?,   // 👈 thêm roleId
-        );
-      },
-    ),
-  );
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => _UserFormDialog(
+        title: 'Tạo người dùng mới',
+        onSubmit: (data) async {
+          await AdminUserService.createUser(
+            username: data['username'] as String,
+            phone: data['phone'] as String,
+            password: data['password'] as String,
+            email: data['email'] as String?,
+            address: data['address'] as String?,
+            roleId: data['roleId'] as int?,
+            status: data['status'] as String?,
+          );
+        },
+      ),
+    );
 
-  if (ok == true) {
+    if (ok == true) {
+      _reload();
+    }
+  }
+
+  Future<void> _openEditUserDialog(Map<String, dynamic> user) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => _UserFormDialog(
+        title: 'Cập nhật người dùng',
+        initialUser: user,
+        onSubmit: (data) async {
+          await AdminUserService.updateUser(
+            userId: user['user_id'] as int,
+            username: data['username'] as String?,
+            phone: data['phone'] as String?,
+            password: data['password'] as String?,
+            email: data['email'] as String?,
+            address: data['address'] as String?,
+            roleId: data['roleId'] as int?,
+            status: data['status'] as String?,
+          );
+        },
+      ),
+    );
+
+    if (ok == true) {
+      _reload();
+    }
+  }
+
+  Future<void> _setStatus(int userId, String status) async {
+    await AdminUserService.updateUser(
+      userId: userId,
+      status: status,
+    );
     _reload();
   }
-}
-
-Future<void> _openEditUserDialog(Map<String, dynamic> user) async {
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (_) => _UserFormDialog(
-      title: 'Cập nhật người dùng',
-      initialUser: user,
-      onSubmit: (data) async {
-        await AdminUserService.updateUser(
-          userId: user['user_id'] as int,
-          username: data['username'] as String?,
-          phone: data['phone'] as String?,
-          password: data['password'] as String?,  // có thể null
-          email: data['email'] as String?,
-          address: data['address'] as String?,
-          roleId: data['roleId'] as int?,         // 👈 thêm roleId
-        );
-      },
-    ),
-  );
-
-  if (ok == true) {
-    _reload();
-  }
-}
-
 
   Widget _buildStatusChip(String? status) {
     final s = (status ?? '').toLowerCase();
@@ -224,6 +205,10 @@ Future<void> _openEditUserDialog(Map<String, dynamic> user) async {
         bg = Colors.blue.shade50;
         fg = Colors.blue.shade700;
         break;
+      case 'support':
+        bg = Colors.teal.shade50;
+        fg = Colors.teal.shade700;
+        break;
       case 'viewer':
       default:
         bg = Colors.grey.shade100;
@@ -250,7 +235,6 @@ Future<void> _openEditUserDialog(Map<String, dynamic> user) async {
 
   @override
   Widget build(BuildContext context) {
-    // Không dùng Scaffold, AdminShell sẽ bao bên ngoài
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Center(
@@ -267,8 +251,8 @@ Future<void> _openEditUserDialog(Map<String, dynamic> user) async {
               children: [
                 // Header card
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 16),
                   color: Theme.of(context)
                       .colorScheme
                       .surfaceVariant
@@ -305,8 +289,8 @@ Future<void> _openEditUserDialog(Map<String, dynamic> user) async {
                             onPressed: _search,
                             style: FilledButton.styleFrom(
                               backgroundColor: Colors.blue,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12),
                             ),
                             child: const Icon(Icons.search, size: 20),
                           ),
@@ -416,36 +400,48 @@ Future<void> _openEditUserDialog(Map<String, dynamic> user) async {
                                   DataCell(_buildRoleChip(role)),
                                   DataCell(_buildStatusChip(status)),
                                   DataCell(
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          tooltip: 'Xem chi tiết',
-                                          icon: const Icon(
-                                            Icons.info_outline,
-                                            size: 18,
-                                            color: Colors.blue,
+                                    PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        if (value == 'view') {
+                                          _showInfo(u);
+                                        } else if (value == 'edit') {
+                                          _openEditUserDialog(u);
+                                        } else if (value == 'active') {
+                                          _setStatus(id, 'active');
+                                        } else if (value == 'inactive') {
+                                          _setStatus(id, 'inactive');
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        const PopupMenuItem(
+                                          value: 'view',
+                                          child: ListTile(
+                                            leading: Icon(Icons.info_outline),
+                                            title: Text('Xem chi tiết'),
                                           ),
-                                          onPressed: () => _showInfo(u),
                                         ),
-                                        IconButton(
-                                          tooltip: 'Sửa',
-                                          icon: const Icon(
-                                            Icons.edit,
-                                            size: 18,
-                                            color: Colors.orange,
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: ListTile(
+                                            leading: Icon(Icons.edit),
+                                            title: Text('Sửa'),
                                           ),
-                                          onPressed: () =>
-                                              _openEditUserDialog(u),
                                         ),
-                                        IconButton(
-                                          tooltip: 'Xoá',
-                                          icon: const Icon(
-                                            Icons.delete,
-                                            size: 18,
-                                            color: Colors.red,
+                                        const PopupMenuDivider(),
+                                        const PopupMenuItem(
+                                          value: 'active',
+                                          child: ListTile(
+                                            leading:
+                                                Icon(Icons.check_circle_outline),
+                                            title: Text('Kích hoạt'),
                                           ),
-                                          onPressed: () => _deleteUser(id),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'inactive',
+                                          child: ListTile(
+                                            leading: Icon(Icons.block),
+                                            title: Text('Ngưng hoạt động'),
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -498,48 +494,73 @@ class _UserFormDialogState extends State<_UserFormDialog> {
 
   bool get _isEdit => widget.initialUser != null;
 
-  // 👉 giá trị role đang chọn: 'viewer' | 'support_admin' | 'admin'
+  // role (khớp DB: admin, support, support_admin, viewer)
   late String _roleValue;
 
-  // ⚠️ MAP ROLE → ID: bạn sửa số này cho đúng với DB của bạn
   static const Map<String, int> _roleIdMap = {
-    'support_admin': 3,
-    'support': 2,
     'admin': 1,
-      'viewwer': 4,
-
+    'support': 2,
+    'support_admin': 3,
+    'viewer': 4,
   };
 
-  // Danh sách option hiển thị trong dropdown
   static const List<Map<String, String>> _roleOptions = [
     {'value': 'viewer', 'label': 'Viewer'},
+    {'value': 'support', 'label': 'Support'},
     {'value': 'support_admin', 'label': 'Support Admin'},
     {'value': 'admin', 'label': 'Admin'},
+  ];
+
+  // status
+  late String _statusValue;
+  static const List<Map<String, String>> _statusOptions = [
+    {'value': 'active', 'label': 'Hoạt động'},
+    {'value': 'inactive', 'label': 'Không hoạt động'},
   ];
 
   @override
   void initState() {
     super.initState();
     _usernameCtrl = TextEditingController(
-        text: widget.initialUser != null ? widget.initialUser!['username'] : '');
+        text: widget.initialUser != null
+            ? widget.initialUser!['username']
+            : '');
     _phoneCtrl = TextEditingController(
-        text: widget.initialUser != null ? widget.initialUser!['phone'] : '');
+        text: widget.initialUser != null
+            ? widget.initialUser!['phone']
+            : '');
     _emailCtrl = TextEditingController(
-        text: widget.initialUser != null ? widget.initialUser!['email'] ?? '' : '');
+        text: widget.initialUser != null
+            ? widget.initialUser!['email'] ?? ''
+            : '');
     _addressCtrl = TextEditingController(
-        text: widget.initialUser != null ? widget.initialUser!['address'] ?? '' : '');
+        text: widget.initialUser != null
+            ? widget.initialUser!['address'] ?? ''
+            : '');
     _passwordCtrl = TextEditingController();
 
-    // set role mặc định
+    // role mặc định
     if (widget.initialUser != null &&
         widget.initialUser!['role_type'] != null) {
-      _roleValue = (widget.initialUser!['role_type'] as String).toLowerCase();
+      _roleValue =
+          (widget.initialUser!['role_type'] as String).toLowerCase();
     } else {
-      _roleValue = 'viewer'; // default
+      _roleValue = 'viewer';
     }
-
     if (!_roleIdMap.containsKey(_roleValue)) {
       _roleValue = 'viewer';
+    }
+
+    // status mặc định
+    if (widget.initialUser != null &&
+        widget.initialUser!['status'] != null) {
+      _statusValue =
+          (widget.initialUser!['status'] as String).toLowerCase();
+    } else {
+      _statusValue = 'active';
+    }
+    if (!_statusOptions.any((o) => o['value'] == _statusValue)) {
+      _statusValue = 'active';
     }
   }
 
@@ -572,7 +593,6 @@ class _UserFormDialogState extends State<_UserFormDialog> {
     final String? password =
         _passwordCtrl.text.isEmpty ? null : _passwordCtrl.text;
 
-    // map role string → role_id
     final int? roleId = _roleIdMap[_roleValue];
 
     final data = <String, dynamic>{
@@ -582,6 +602,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
       'address': address,
       'password': password,
       'roleId': roleId,
+      'status': _statusValue,
     };
 
     try {
@@ -653,7 +674,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                 ),
                 const SizedBox(height: 12),
 
-                // 🔽 Dropdown chọn vai trò
+                // Vai trò
                 DropdownButtonFormField<String>(
                   value: _roleValue,
                   items: _roleOptions
@@ -672,6 +693,29 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   },
                   decoration: const InputDecoration(
                     labelText: 'Vai trò',
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Trạng thái
+                DropdownButtonFormField<String>(
+                  value: _statusValue,
+                  items: _statusOptions
+                      .map(
+                        (opt) => DropdownMenuItem<String>(
+                          value: opt['value'],
+                          child: Text(opt['label']!),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (val) {
+                    if (val == null) return;
+                    setState(() {
+                      _statusValue = val;
+                    });
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Trạng thái',
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -697,7 +741,8 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   const SizedBox(height: 8),
                   Text(
                     _error!,
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                    style:
+                        const TextStyle(color: Colors.red, fontSize: 12),
                   ),
                 ],
               ],
@@ -724,4 +769,3 @@ class _UserFormDialogState extends State<_UserFormDialog> {
     );
   }
 }
-

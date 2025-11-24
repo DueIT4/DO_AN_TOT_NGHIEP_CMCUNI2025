@@ -2,7 +2,10 @@
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel
+from datetime import datetime
+from typing import List, Optional
 
+from pydantic import BaseModel, EmailStr
 from app.models.user import UserStatus
 
 
@@ -67,12 +70,15 @@ class DetectionHistoryItem(BaseModel):
     detection_id: int
     img_id: int
     file_url: str
-    disease_name: Optional[str]
-    confidence: Optional[float]
+    disease_name: Optional[str] = None
+    confidence: Optional[float] = None
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    # 👇 thêm thông tin user để admin xem tổng hợp
+    user_id: Optional[int] = None
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
 
 
 class DetectionHistoryList(BaseModel):

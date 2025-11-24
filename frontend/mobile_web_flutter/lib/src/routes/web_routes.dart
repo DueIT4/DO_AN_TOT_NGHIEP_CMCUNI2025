@@ -7,7 +7,6 @@ import '../../core/api_base.dart';
 import '../../modules/home/home_web.dart';
 import '../../modules/detect/detect_web.dart';
 // import '../../modules/devices/device_web.dart';
-import '../../modules/sensors/sensors_web.dart';
 import '../../modules/auth/login_web.dart';
 
 import '../../modules/misc/library_web.dart';
@@ -21,7 +20,7 @@ import '../../modules/admin/admin_routes.dart';
 
 // Auth
 import '../../modules/auth/confirm_page.dart';
-import '../../modules/auth/forgot_password_page.dart';
+import '../../modules/auth/forgot_password.dart';
 
 // Weather
 import '../../modules/weather/weather_page.dart';
@@ -40,23 +39,24 @@ class WebRoutes {
   static const news       = '/news';
   static const company    = '/company';
   static const app        = '/app';
+  static const weather    = '/weather';
 
   // Auth
   static const confirm    = '/auth/confirm';         // nhận token qua query
   static const forgotPassword = '/forgot-password';
 
   // Weather
-  static const weather    = '/weather';
 
   // Admin
   static const admin          = '/admin';            // có thể map về dashboard / devices
   static const adminDevices   = '/admin/devices';    // ✅ thêm hằng số này
   static const adminUsers     = '/admin/users';
   static const adminPredict   = '/admin/predictions';
-  static const adminNoti      = '/admin/notifications';
   static const adminHis     = '/admin/history';
   static const adminSensors   = '/admin/sensors';
 static const adminDashboard = '/admin/dashboard';
+  static const adminSupport   = '/admin/support';
+  static const adminNoti      = '/admin/notifications';
 
   // Nếu sau này muốn protect các route admin bằng token thì mở lại:
   // static const _protected = {
@@ -105,6 +105,8 @@ static const adminDashboard = '/admin/dashboard';
     return _p(const LoginWebPage(), arguments: s.arguments);
 
   // ===== Navbar hiện có =====
+  case weather:
+    return _p(const WeatherPage());
   case library:
     return _p(const LibraryWebPage());
   case news:
@@ -130,11 +132,16 @@ static const adminDashboard = '/admin/dashboard';
       case admin:                 // /admin: tạm cho về trang thiết bị
       case adminDevices:          // /admin/devices
         return _p(const AdminDevicesRoute());
+      case adminSupport:               // 👈 THÊM
+        return _p(const AdminSupportRoute());
 
+      case adminNoti:                  // /admin/notifications → trang thông báo
+        return _p(const AdminNotificationsRoute());
       case adminNoti:             // /admin/notifications
         return _p(const AdminNotificationsRoute());      
-      case adminHis:             // /admin/
-        return _p(const DetectionHistoryRoute());
+      case adminHis:             // '/admin/history'
+        return _p(const AdminDetectionHistoryRoute());
+
 case adminDashboard:
   return _p(const AdminDashboardRoute());
 

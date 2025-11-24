@@ -149,7 +149,7 @@ class AdminShellWeb extends StatelessWidget {
             menu: AdminMenu.notifications,
             icon: Icons.support_agent_outlined,
             label: 'Hỗ trợ người dùng',
-            routeName: '/admin/notifications',
+            routeName: '/admin/support',
           ),
           _sidebarItem(
             context: context,

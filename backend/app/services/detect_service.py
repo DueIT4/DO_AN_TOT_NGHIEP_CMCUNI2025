@@ -10,11 +10,10 @@ from app.models.image_detection import Img, Detection, Disease
 MEDIA_ROOT = Path("media") / "detections"
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
-
 def save_image_to_disk(raw: bytes, original_filename: str) -> str:
     """
     Lưu ảnh vào media/detections/YYYY/MM/DD/...
-    Trả về file_url tương đối để FE truy cập qua /media/<file_url>.
+    Trả về file_url BẮT ĐẦU BẰNG /media/... để FE dùng trực tiếp.
     """
     now = datetime.utcnow()
     subdir = MEDIA_ROOT / str(now.year) / f"{now.month:02d}" / f"{now.day:02d}"
@@ -27,10 +26,12 @@ def save_image_to_disk(raw: bytes, original_filename: str) -> str:
     with open(full_path, "wb") as f:
         f.write(raw)
 
-    # file_url: phần tương đối dưới thư mục media/
+    # ví dụ: rel_path = "detections/2025/11/16/xxx.gif"
     rel_path = full_path.relative_to(Path("media"))
-    return str(rel_path).replace("\\", "/")
+    rel_str = str(rel_path).replace("\\", "/")
 
+    # ✅ Trả về: "/media/detections/2025/11/16/xxx.gif"
+    return f"/media/{rel_str}"
 
 def ensure_disease(db: Session, class_name_vi: str) -> Optional[Disease]:
     """

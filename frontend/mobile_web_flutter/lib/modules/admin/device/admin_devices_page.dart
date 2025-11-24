@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_web_flutter/core/device_service.dart';
 import 'package:mobile_web_flutter/core/user_service.dart';
+import 'package:mobile_web_flutter/core/device_type_service.dart';
 
 class AdminDevicesPage extends StatefulWidget {
   const AdminDevicesPage({super.key});
@@ -15,10 +16,14 @@ class _AdminDevicesPageState extends State<AdminDevicesPage> {
 
   Future<List<Map<String, dynamic>>>? _devicesFuture;
 
+  // Danh sách loại thiết bị (id + name) cho dropdown
+  late Future<List<Map<String, dynamic>>> _deviceTypesFuture;
+
   @override
   void initState() {
     super.initState();
     _usersFuture = UserService.listUsers();
+    _deviceTypesFuture = DeviceTypeService.listDeviceTypes();
   }
 
   void _reloadUsers() {
@@ -52,19 +57,29 @@ class _AdminDevicesPageState extends State<AdminDevicesPage> {
       );
       return;
     }
+
+    // Lấy loại thiết bị (đã cache qua Future)
+    final deviceTypes = await _deviceTypesFuture;
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => _DeviceDialog(
         ownerUserId: _selectedUser!['user_id'] as int,
+        deviceTypes: deviceTypes,
       ),
     );
     if (ok == true) _reloadDevicesForSelectedUser();
   }
 
   Future<void> _openEditDialog(Map<String, dynamic> device) async {
+    final deviceTypes = await _deviceTypesFuture;
+
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => _DeviceDialog(device: device),
+      builder: (_) => _DeviceDialog(
+        device: device,
+        deviceTypes: deviceTypes,
+      ),
     );
     if (ok == true) _reloadDevicesForSelectedUser();
   }
@@ -226,7 +241,7 @@ class _AdminDevicesPageState extends State<AdminDevicesPage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: SizedBox(
-                    height: 600, // để 2 bảng cùng cao
+                    height: 600,
                     child: Row(
                       children: [
                         // ================= CỘT TRÁI: DANH SÁCH USER =================
@@ -264,8 +279,7 @@ class _AdminDevicesPageState extends State<AdminDevicesPage> {
                                     final users = snap.data ?? [];
                                     if (users.isEmpty) {
                                       return const Center(
-                                        child:
-                                            Text('Chưa có người dùng nào.'),
+                                        child: Text('Chưa có người dùng nào.'),
                                       );
                                     }
 
@@ -634,7 +648,7 @@ class _DeviceLogsDialogState extends State<_DeviceLogsDialog> {
                   final description =
                       (log['description'] ?? '').toString();
                   final createdAt =
-                      (log['created_at'] ?? '').toString(); // ISO string
+                      (log['created_at'] ?? '').toString();
 
                   IconData icon;
                   Color color;
@@ -701,9 +715,13 @@ class _DeviceDialog extends StatefulWidget {
   final Map<String, dynamic>? device;
   final int? ownerUserId; // user_id của chủ thiết bị (khi tạo mới)
 
+  // danh sách loại thiết bị: [{ device_type_id, device_type_name, ... }, ...]
+  final List<Map<String, dynamic>> deviceTypes;
+
   const _DeviceDialog({
     this.device,
     this.ownerUserId,
+    required this.deviceTypes,
   });
 
   @override
@@ -716,10 +734,11 @@ class _DeviceDialogState extends State<_DeviceDialog> {
   late TextEditingController _name;
   late TextEditingController _serial;
   late TextEditingController _location;
-  late TextEditingController _type;
 
   bool _saving = false;
   late String _statusValue;
+
+  int? _selectedDeviceTypeId;
 
   static const List<Map<String, String>> _statusOptions = [
     {'value': 'active', 'label': 'Đang hoạt động'},
@@ -733,8 +752,10 @@ class _DeviceDialogState extends State<_DeviceDialog> {
     _name = TextEditingController(text: d?['name'] ?? '');
     _serial = TextEditingController(text: d?['serial_no'] ?? '');
     _location = TextEditingController(text: d?['location'] ?? '');
-    _type =
-        TextEditingController(text: d?['device_type_id']?.toString() ?? '');
+
+    if (d != null && d['device_type_id'] != null) {
+      _selectedDeviceTypeId = d['device_type_id'] as int;
+    }
 
     final rawStatus = (d?['status'] ?? 'active').toString().toLowerCase();
     if (_statusOptions.any((o) => o['value'] == rawStatus)) {
@@ -749,7 +770,6 @@ class _DeviceDialogState extends State<_DeviceDialog> {
     _name.dispose();
     _serial.dispose();
     _location.dispose();
-    _type.dispose();
     super.dispose();
   }
 
@@ -761,11 +781,10 @@ class _DeviceDialogState extends State<_DeviceDialog> {
       "name": _name.text.trim(),
       "serial_no": _serial.text.trim(),
       "location": _location.text.trim(),
-      "device_type_id": int.tryParse(_type.text) ?? 0,
+      "device_type_id": _selectedDeviceTypeId ?? 0,
       "status": _statusValue,
     };
 
-    // gán user_id khi tạo mới
     if (widget.device == null && widget.ownerUserId != null) {
       body["user_id"] = widget.ownerUserId!;
     }
@@ -805,29 +824,55 @@ class _DeviceDialogState extends State<_DeviceDialog> {
             children: [
               TextFormField(
                 controller: _name,
-                decoration: const InputDecoration(labelText: 'Tên thiết bị'),
+                decoration: const InputDecoration(
+                  labelText: 'Tên thiết bị',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty)
                         ? 'Không được để trống'
                         : null,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _serial,
-                decoration: const InputDecoration(labelText: 'Serial'),
+                decoration: const InputDecoration(
+                  labelText: 'Serial',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty)
                         ? 'Không được để trống'
                         : null,
               ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _type,
-                decoration:
-                    const InputDecoration(labelText: 'Loại thiết bị (ID)'),
-                keyboardType: TextInputType.number,
+              const SizedBox(height: 10),
+
+              // Dropdown loại thiết bị (tên), gửi ID lên BE
+              DropdownButtonFormField<int>(
+                value: _selectedDeviceTypeId,
+                items: widget.deviceTypes.map((dt) {
+                  final id = dt['device_type_id'] as int;
+                  final name =
+                      (dt['device_type_name'] ?? 'Loại #$id').toString();
+                  return DropdownMenuItem<int>(
+                    value: id,
+                    child: Text(name),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  setState(() => _selectedDeviceTypeId = val);
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Loại thiết bị',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) =>
+                    (val == null || val == 0)
+                        ? 'Vui lòng chọn loại thiết bị'
+                        : null,
               ),
-              const SizedBox(height: 8),
+
+              const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 value: _statusValue,
                 items: _statusOptions
@@ -842,13 +887,18 @@ class _DeviceDialogState extends State<_DeviceDialog> {
                   if (val == null) return;
                   setState(() => _statusValue = val);
                 },
-                decoration: const InputDecoration(labelText: 'Trạng thái'),
+                decoration: const InputDecoration(
+                  labelText: 'Trạng thái',
+                  border: OutlineInputBorder(),
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _location,
-                decoration:
-                    const InputDecoration(labelText: 'Vị trí lắp đặt'),
+                decoration: const InputDecoration(
+                  labelText: 'Vị trí lắp đặt',
+                  border: OutlineInputBorder(),
+                ),
               ),
             ],
           ),

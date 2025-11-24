@@ -35,8 +35,10 @@ class DeviceService {
   /// Lấy log của 1 thiết bị (device_logs)
   static Future<List<Map<String, dynamic>>> getDeviceLogs(
       int deviceId) async {
-    final res =
-        await ApiBase.getJson(ApiBase.api('/$deviceId/logs'));
+    // ⚠️ Nhớ tạo BE route khớp path này, hoặc chỉnh lại path cho phù hợp
+    final res = await ApiBase.getJson(
+      ApiBase.api('/$deviceId/logs'),
+    );
 
     if (res is List) {
       return res
@@ -50,7 +52,6 @@ class DeviceService {
   /// (tuỳ chọn) Lấy danh sách thiết bị theo user
   static Future<List<Map<String, dynamic>>> listDevicesByUser(
       int userId) async {
-    // Nếu backend bạn đang dùng route khác thì sửa path lại cho đúng
     final res = await ApiBase.getJson(
       ApiBase.api('/users/$userId/devices'),
     );
@@ -58,7 +59,4 @@ class DeviceService {
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
   }
-
-
-  
 }

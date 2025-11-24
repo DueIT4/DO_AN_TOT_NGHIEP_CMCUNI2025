@@ -14,6 +14,19 @@ from app.services.identity_verify import (
     phone_exists_really, verify_google_id_token, verify_facebook_access_token
 )
 import hashlib
+from app.schemas.auth import (
+    RegisterPhoneIn,
+    RegisterGoogleIn,
+    RegisterFacebookIn,
+    RegisterOut,
+    LoginPhoneIn,
+    LoginIn,
+    SocialLoginIn,
+    TokenOut,
+    ForgotPasswordIn,    # 👈 thêm
+    ResetPasswordIn,     # 👈 thêm
+)
+
 
 def _hash_password_sha256(raw: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -31,7 +44,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def register_phone(payload: RegisterPhoneIn, db: Session = Depends(get_db)):
     # A. KIỂM TRA "CÓ THỰC"
     if not phone_exists_really(payload.phone):
-        # bạn thay hàm phone_exists_really bằng HLR/OTP thực để chuẩn xác
         raise HTTPException(status_code=400, detail="Vui lòng nhập đúng")
 
     # B. KIỂM TRA "CHƯA TỪNG ĐĂNG KÝ"
@@ -39,8 +51,10 @@ def register_phone(payload: RegisterPhoneIn, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Số điện thoại đã tồn tại")
     if db.scalar(select(Users).where(Users.username == payload.username)):
         raise HTTPException(status_code=409, detail="Username đã tồn tại")
+
     viewer_role_id = get_default_viewer_role_id(db)
-    # C. TẠO USER + AUTH_ACCOUNT (chưa verified)
+
+    # C. TẠO USER + AUTH_ACCOUNT (CHƯA VERIFIED)
     user = Users(
         username=payload.username,
         phone=payload.phone,
@@ -53,16 +67,18 @@ def register_phone(payload: RegisterPhoneIn, db: Session = Depends(get_db)):
 
     acc = AuthAccount(
         user_id=user.user_id,
-        provider=Provider.sdt,           # 'sđt'
-        provider_user_id=payload.phone,  # số điện thoại
-        phone_verified=True
+        provider=Provider.sdt,
+        provider_user_id=payload.phone,
+        phone_verified=False,              # 👈 CHỈNH: ban đầu CHƯA verified
     )
     db.add(acc)
     db.commit()
 
-    # D. GỬI THÔNG BÁO XÁC NHẬN QUA SĐT (link bấm OK)
-    token = make_confirm_token(user.user_id, "sđt", payload.phone, minutes=30)
+    # D. GỬI THÔNG BÁO XÁC NHẬN QUA SĐT
+    # 👇 CHỈNH: dùng "sdt" (không dấu) để khớp với /auth/confirm
+    token = make_confirm_token(user.user_id, "sdt", payload.phone, minutes=30)
     confirm_url = f"/api/v1/auth/confirm?token={token}"
+
     send_sms(payload.phone, f"Xac nhan so dien thoai: {confirm_url}")
 
     return RegisterOut(
@@ -306,3 +322,144 @@ def login_facebook(payload: SocialLoginIn, db: Session = Depends(get_db)):
     user = db.get(Users, acc.user_id)
     token = make_access_token(user.user_id)
     return TokenOut(access_token=token, user_id=user.user_id, username=user.username)
+
+# ======================
+#  QUÊN MẬT KHẨU (FORGOT PASSWORD)
+# ======================
+@router.post("/forgot-password", status_code=200)
+def forgot_password(payload: ForgotPasswordIn, db: Session = Depends(get_db)):
+    if not payload.email and not payload.phone:
+        raise HTTPException(
+            status_code=400,
+            detail="Phải nhập email hoặc số điện thoại"
+        )
+
+    user = None
+    contact = None
+    channel = None
+
+    if payload.email:
+        user = db.scalar(select(Users).where(Users.email == payload.email))
+        contact = payload.email
+        channel = "email"
+    elif payload.phone:
+        user = db.scalar(select(Users).where(Users.phone == payload.phone))
+        contact = payload.phone
+        channel = "sdt"
+
+    # 🔧 CHỈNH: nếu là PHONE mà không tìm thấy user → BÁO LỖI
+    if channel == "sdt" and not user:
+        raise HTTPException(
+            status_code=404,
+            detail="Số điện thoại này chưa được đăng ký."
+        )
+
+    # Nếu là email, bạn vẫn có thể giữ mập mờ:
+    if channel == "email" and (not user or not contact):
+        return {
+            "ok": True,
+            "message": "Nếu tài khoản tồn tại, hệ thống đã gửi hướng dẫn đặt lại mật khẩu."
+        }
+
+    # ... phần còn lại giữ nguyên như bạn đã viết:
+    token = make_confirm_token(
+        user.user_id,
+        "reset",
+        contact,
+        minutes=30
+    )
+    reset_url = f"/reset-password?token={token}"
+
+    if channel == "email":
+        send_email(
+            contact,
+            "Đặt lại mật khẩu PlantGuard",
+            f"Bạn đã yêu cầu đặt lại mật khẩu. Bấm link: {reset_url}"
+        )
+    elif channel == "sdt":
+        send_sms(
+            contact,
+            f"Dat lai mat khau: {reset_url}"
+        )
+
+    return {
+        "ok": True,
+        "message": "Đã gửi hướng dẫn đặt lại mật khẩu."
+    }
+
+# ======================
+#  ĐẶT LẠI MẬT KHẨU (RESET PASSWORD)
+# ======================
+@router.post("/reset-password", status_code=200)
+def reset_password(payload: ResetPasswordIn, db: Session = Depends(get_db)):
+    """
+    Nhận token reset + mật khẩu mới, đổi mật khẩu cho user tương ứng.
+    """
+    try:
+        data = parse_confirm_token(payload.token)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Token không hợp lệ hoặc đã hết hạn: {e}"
+        )
+
+    uid = int(data["uid"])
+    channel = data["ch"]
+    # val = data["val"]  # hiện tại không cần dùng
+
+    if channel != "reset":
+        raise HTTPException(status_code=400, detail="Token không phải token đặt lại mật khẩu")
+
+    user = db.get(Users, uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="Tài khoản không tồn tại")
+
+    # Đổi mật khẩu (hash SHA256 giống đăng ký)
+    user.password = _hash_password_sha256(payload.new_password)
+    # Reset các thông số khoá tài khoản nếu có
+    user.failed_login = 0
+    user.locked = None
+
+    db.add(user)
+    db.commit()
+
+    return {"ok": True, "message": "Đặt lại mật khẩu thành công, hãy đăng nhập lại."}
+@router.post("/send-phone-confirm", status_code=200)
+def send_phone_confirm(phone: str = Query(...), db: Session = Depends(get_db)):
+    """
+    Gửi lại link xác nhận tới số điện thoại.
+    - Nếu SĐT chưa đăng ký -> BÁO LỖI (404)
+    - Nếu đã đăng ký -> gửi SMS thật.
+    """
+    # Tìm user theo SĐT
+    user = db.scalar(select(Users).where(Users.phone == phone))
+    if not user:
+        # 👈 ĐÚNG Ý BẠN: báo rõ là chưa đăng ký
+        raise HTTPException(
+            status_code=404,
+            detail="Số điện thoại này chưa được đăng ký tài khoản."
+        )
+
+    # Tìm AuthAccount SĐT
+    acc = db.scalar(select(AuthAccount).where(
+        AuthAccount.user_id == user.user_id,
+        AuthAccount.provider == Provider.sdt,
+        AuthAccount.provider_user_id == phone
+    ))
+    if not acc:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy tài khoản SĐT để xác nhận."
+        )
+
+    # Tạo lại token confirm
+    token = make_confirm_token(user.user_id, "sdt", phone, minutes=30)
+    confirm_url = f"/api/v1/auth/confirm?token={token}"
+
+    # Gửi SMS
+    send_sms(phone, f"Xac nhan so dien thoai: {confirm_url}")
+
+    return {
+        "ok": True,
+        "message": "Đã gửi lại link xác nhận số điện thoại."
+    }
