@@ -1,37 +1,76 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from io import BytesIO
-from PIL import Image, UnidentifiedImageError
-from app.services.inference_service import OnnxDetector
-import os
-from pathlib import Path
+# app/api/v1/routes_detect.py
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
-router = APIRouter()
+from app.core.database import get_db
+from app.services.inference_service import detector
+from app.services.llm_service import summarize_detections_with_llm
+from app.services.detect_service import save_detection_result
+from app.api.v1.deps import get_optional_user
 
-# Resolve repo root from this file location to be robust to CWD
-THIS_DIR = Path(__file__).resolve().parent  # .../backend/app/api/v1
-REPO_ROOT = THIS_DIR.parents[3]             # go up to repo root
+router = APIRouter(tags=["Detection"])
 
-# Defaults relative to repo root; allow env overrides
-MODEL_PATH = os.getenv("MODEL_PATH", str(REPO_ROOT / "ml/exports/v1.0/best.onnx"))
-LABELS_PATH = os.getenv("LABELS_PATH", str(REPO_ROOT / "ml/exports/v1.0/labels.txt"))
-
-try:
-    detector = OnnxDetector(model_path=MODEL_PATH, labels_path=LABELS_PATH)
-except FileNotFoundError:
-    detector = None
 
 @router.post("/detect")
-async def detect(image: UploadFile = File(...)):
+async def detect_image(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_optional_user),
+):
     if detector is None:
-        raise HTTPException(status_code=500, detail=f"Model not available: {MODEL_PATH}")
+        raise HTTPException(status_code=500, detail="Model not loaded on server")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Không đọc được nội dung file")
+
     try:
-        data = await image.read()
-        img = Image.open(BytesIO(data))
-    except UnidentifiedImageError:
-        raise HTTPException(status_code=400, detail="Invalid image file")
-    try:
-        result = detector.infer_top1(img)
-        return result
+        yolo_result = detector.predict_bytes(raw_bytes=raw, conf=0.5, iou=0.5)
     except Exception as e:
-        # Surface inference issues clearly to client for debugging
-        raise HTTPException(status_code=500, detail=f"Inference error: {e}")
+        raise HTTPException(status_code=400, detail=f"Cannot process image: {e}")
+
+    detections_list = yolo_result.get("detections", [])
+    num_detections = yolo_result.get("num_detections", 0)
+    explanation = yolo_result.get("explanation")
+
+    disease_summary, care_instructions = summarize_detections_with_llm(detections_list)
+
+    # ✅ Chưa đăng nhập → KHÔNG lưu DB
+    if current_user is None:
+        return JSONResponse({
+            "file_name": file.filename,
+            "saved_to_db": False,
+            "img": None,
+            "num_detections": num_detections,
+            "detections": detections_list,
+            "explanation": explanation,
+            "llm": {
+                "disease_summary": disease_summary,
+                "care_instructions": care_instructions,
+            },
+        })
+
+    # ✅ Đã đăng nhập → LƯU vào DB
+    saved = save_detection_result(
+        db=db,
+        raw=raw,
+        filename=file.filename,
+        yolo_result=yolo_result,
+        user_id=current_user.user_id,
+        device_id=None,              # nếu gắn theo device thì truyền device_id
+        model_version="v1.0",
+    )
+
+    return JSONResponse({
+        "file_name": file.filename,
+        "saved_to_db": True,
+        "img": saved,   # chứa img_id + file_url
+        "num_detections": num_detections,
+        "detections": detections_list,
+        "explanation": explanation,
+        "llm": {
+            "disease_summary": disease_summary,
+            "care_instructions": care_instructions,
+        },
+    })

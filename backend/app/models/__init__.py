@@ -1,4 +1,14 @@
-from app.models.user import Users, UserStatus  # noqa
-from app.models.auth_account import AuthAccount, Provider  # noqa
-from app.models.role import Role, RoleType  # noqa
+# app/models/__init__.py
 
+from .role import Role, RoleType
+from .user import Users, UserStatus
+from .auth_account import AuthAccount, Provider
+from .device_type import DeviceType
+from .devices import Device
+from .sensor_readings import SensorReadings
+from .image_detection import Img
+from .notification import Notifications
+from .support import SupportTicket, SupportMessage
+from .user_settings import UserSettings
+from .chatbot import Chatbot, ChatbotDetail
+from .device_logs import DeviceLogs

@@ -6,10 +6,10 @@ from typing import List
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.models.user import Users
-from app.models.notification import Notification
+from app.models.notification import Notifications
 from app.schemas.notification import NotificationCreate, NotificationOut, NotificationWithUser
 from app.services.permissions import require_perm
-
+from sqlalchemy import desc
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 # ========== CREATE (admin, support_admin) ==========
@@ -39,7 +39,7 @@ def create_notifications(payload: NotificationCreate,
     # Tạo thông báo: 1 row / 1 người nhận
     rows = []
     for u in recipients:
-        rows.append(Notification(
+        rows.append(Notifications(
             user_id=u.user_id,
             title=payload.title,
             description=payload.description,
@@ -61,7 +61,7 @@ def create_notifications(payload: NotificationCreate,
 def list_sent(db: Session = Depends(get_db)):
     # Liệt kê tất cả thông báo đã gửi, kèm tên/email người nhận
     result = []
-    stmt = select(Notification, Users.username, Users.email).join(Users, Notification.user_id == Users.user_id)
+    stmt = select(Notifications, Users.username, Users.email).join(Users, Notifications.user_id == Users.user_id)
     for n, username, email in db.execute(stmt).all():
         result.append(NotificationWithUser(
             notification_id=n.notification_id,
@@ -79,14 +79,14 @@ def list_sent(db: Session = Depends(get_db)):
 @router.get("/my", response_model=List[NotificationOut])
 def list_my_notifications(db: Session = Depends(get_db), user: Users = Depends(get_current_user)):
     rows = db.scalars(
-        select(Notification).where(Notification.user_id == user.user_id).order_by(Notification.created_at.desc())
+        select(Notifications).where(Notifications.user_id == user.user_id).order_by(Notifications.created_at.desc())
     ).all()
     return rows
 
 # ========== MARK READ (user) ==========
 @router.patch("/{notification_id}/read", response_model=NotificationOut)
 def mark_read(notification_id: int, db: Session = Depends(get_db), user: Users = Depends(get_current_user)):
-    n = db.get(Notification, notification_id)
+    n = db.get(Notifications, notification_id)
     if not n or n.user_id != user.user_id:
         raise HTTPException(status_code=404, detail="Không tìm thấy thông báo")
     if n.read_at is None:
@@ -100,9 +100,35 @@ def mark_read(notification_id: int, db: Session = Depends(get_db), user: Users =
 @router.delete("/{notification_id}/delete", status_code=status.HTTP_204_NO_CONTENT,
                dependencies=[Depends(require_perm("noti:delete"))])
 def delete_notification(notification_id: int, db: Session = Depends(get_db)):
-    n = db.get(Notification, notification_id)
+    n = db.get(Notifications, notification_id)
     if not n:
         raise HTTPException(status_code=404, detail="Không tìm thấy thông báo")
     db.delete(n)
     db.commit()
     return {"ok": True}
+@router.get("/me", response_model=list[NotificationOut])
+def my_notifications(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    rows = (
+        db.query(Notifications)
+        .filter(Notifications.user_id == current_user.user_id)
+        .order_by(desc(Notifications.created_at))
+        .all()
+    )
+
+    result: list[NotificationOut] = []
+    for n in rows:
+        result.append(
+            NotificationOut(
+                notification_id=n.notification_id,
+                title=n.title,
+                description=n.description,
+                created_at=n.created_at,
+                read_at=n.read_at,
+                sender_id=n.sender_id,
+                sender_name=n.sender.username if n.sender else None,
+            )
+        )
+    return result

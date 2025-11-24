@@ -1,30 +1,41 @@
-// =============================
-// pubspec.yaml (thêm các dependencies)
-// =============================
-// Copy các dòng dưới vào phần dependencies của pubspec.yaml rồi chạy `flutter pub get`
-
-
-// =============================
 // lib/main.dart
-// =============================
 import 'package:flutter/material.dart';
+//<<<<<<< HEAD
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'l10n/app_localizations.dart';
 import 'l10n/language_service.dart';
 import 'ui/home_user.dart';
 import 'ui/login_page.dart';
+// =======
+//import 'package:firebase_core/firebase_core.dart';
+// >>>>>>> chi
 
-void main() {
+import 'firebase_options.dart';
+import 'src/routes/web_routes.dart';
+import 'modules/auth/auth_service.dart'; // 👈 thêm import
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ZestGuardApp());
+
+  // Khởi tạo Firebase (web/android) bằng file firebase_options.dart đã tạo
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // 👇 Khôi phục bearer đã lưu (nếu có) để F5 không bị mất đăng nhập
+  await AuthService.restoreBearer();
+
+  runApp(const App());
 }
 
-class ZestGuardApp extends StatelessWidget {
-  const ZestGuardApp({super.key});
+/// 🌿 App gốc
+class App extends StatelessWidget {
+  const App({super.key});
 
   @override
   Widget build(BuildContext context) {
+//<<<<<<< HEAD
     return AnimatedBuilder(
       animation: LanguageService.instance,
       builder: (context, _) {
@@ -66,6 +77,30 @@ class ZestGuardApp extends StatelessWidget {
           },
         );
       },
+// =======
+//     return MaterialApp(
+//       title: 'PlantGuard',
+//       debugShowCheckedModeBanner: false,
+//       theme: ThemeData(
+//         useMaterial3: true,
+//         colorSchemeSeed: const Color(0xFF2F6D3A),
+//         scaffoldBackgroundColor: const Color(0xFFF8FAF8),
+//         fontFamily: 'Roboto',
+//         appBarTheme: const AppBarTheme(
+//           elevation: 0,
+//           backgroundColor: Colors.white,
+//           foregroundColor: Colors.black87,
+//           centerTitle: false,
+//           titleTextStyle: TextStyle(
+//             fontWeight: FontWeight.w600,
+//             fontSize: 18,
+//             color: Colors.black87,
+//           ),
+//         ),
+//       ),
+//       initialRoute: WebRoutes.home,
+//       onGenerateRoute: WebRoutes.onGenerate,
+// >>>>>>> chi
     );
   }
 }

@@ -1,0 +1,7 @@
+# Flutter setup
+flutter clean
+flutter pub get
+flutterfire configure
+
+# Cài thư viện cơ bản
+flutter pub add url_launcher firebase_core firebase_auth google_sign_in flutter_facebook_auth

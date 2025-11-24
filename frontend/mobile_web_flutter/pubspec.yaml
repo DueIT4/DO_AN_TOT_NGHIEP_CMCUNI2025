@@ -15,7 +15,7 @@ dependencies:
 
   # Gói cơ bản
   cupertino_icons: ^1.0.8
-
+  
   # Gọi API backend
   http: ^1.2.2
   google_sign_in: ^6.2.1
@@ -26,7 +26,10 @@ dependencies:
 
   # Chọn ảnh (gallery/camera)
   image_picker: ^1.1.2
-
+  url_launcher: ^6.3.1
+  firebase_core: ^4.2.1
+  firebase_auth: ^6.1.2
+  intl: ^0.19.0   # 👈 THÊM DÒNG NÀY
 dev_dependencies:
   flutter_test:
     sdk: flutter
