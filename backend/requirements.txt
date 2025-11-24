@@ -7,3 +7,4 @@ python-multipart
 pymysql
 onnxruntime
 Pillow
+requests>=2.31.0

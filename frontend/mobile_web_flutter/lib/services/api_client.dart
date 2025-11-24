@@ -1,283 +1,176 @@
-
-// // =============================
-// // lib/services/api_client.dart
-// // =============================
-// import 'dart:convert';
-// import 'package:http/http.dart' as http;
-
-// class ApiClient {
-//   // ⚠️ Android emulator dùng 10.0.2.2, iOS simulator dùng localhost, thiết bị thật dùng IP LAN của PC
-//   static const String baseUrl = String.fromEnvironment(
-//     'API_BASE',
-//     defaultValue: 'http://10.0.2.2:8000',
-//   );
-
-//   static Future<(bool, String)> login({required String identity, required String password}) async {
-//     try {
-//       final uri = Uri.parse('$baseUrl/api/v1/auth/login');
-//       final res = await http.post(
-//         uri,
-//         headers: {'Content-Type': 'application/json'},
-//         body: jsonEncode({'identity': identity, 'password': password}),
-//       );
-//       if (res.statusCode == 200) {
-//         final data = jsonDecode(res.body);
-//         final token = data['access_token'] ?? '';
-//         return (true, token);
-//       }
-//       return (false, 'Đăng nhập thất bại (${res.statusCode})');
-//     } catch (e) {
-//       return (false, 'Lỗi mạng: $e');
-//     }
-//   }
-
-//   static Future<(bool, String)> register({
-//     required String name,
-//     required String identity, // phone hoặc email
-//     required String password,
-//   }) async {
-//     try {
-//       final uri = Uri.parse('$baseUrl/api/v1/auth/register');
-//       final res = await http.post(
-//         uri,
-//         headers: {'Content-Type': 'application/json'},
-//         body: jsonEncode({'full_name': name, 'identity': identity, 'password': password}),
-//       );
-//       if (res.statusCode == 201 || res.statusCode == 200) {
-//         return (true, 'Tạo tài khoản thành công');
-//       }
-//       return (false, 'Đăng ký thất bại (${res.statusCode})');
-//     } catch (e) {
-//       return (false, 'Lỗi mạng: $e');
-//     }
-//   }
-
-//   static Future<(bool, String)> loginWithGoogle(String idToken) async {
-//     try {
-//       final uri = Uri.parse('$baseUrl/api/v1/auth/google');
-//       final res = await http.post(
-//         uri,
-//         headers: {'Content-Type': 'application/json'},
-//         body: jsonEncode({'id_token': idToken}),
-//       );
-//       if (res.statusCode == 200) {
-//         final data = jsonDecode(res.body);
-//         return (true, data['access_token'] ?? '');
-//       }
-//       return (false, 'Google login thất bại (${res.statusCode})');
-//     } catch (e) {
-//       return (false, 'Lỗi mạng: $e');
-//     }
-//   }
-
-//   static Future<(bool, String)> loginWithFacebook(String accessToken) async {
-//     try {
-//       final uri = Uri.parse('$baseUrl/api/v1/auth/facebook');
-//       final res = await http.post(
-//         uri,
-//         headers: {'Content-Type': 'application/json'},
-//         body: jsonEncode({'access_token': accessToken}),
-//       );
-//       if (res.statusCode == 200) {
-//         final data = jsonDecode(res.body);
-//         return (true, data['access_token'] ?? '');
-//       }
-//       return (false, 'Facebook login thất bại (${res.statusCode})');
-//     } catch (e) {
-//       return (false, 'Lỗi mạng: $e');
-//     }
-//   }
-// }
-// =============================
 // lib/services/api_client.dart
-// =============================
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../core/api_base.dart'; // baseUrl = http://10.2.11.228:8000
+
 class ApiClient {
-  // 💡 Thiết bị thật: đổi IP này thành IP LAN của PC (ví dụ 172.17.160.87)
-  // Android emulator: 10.0.2.2
-  // iOS simulator: localhost
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE',
-    // ĐỔI defaultValue bên dưới nếu bạn đang test trên điện thoại thật
-    //defaultValue: 'http://10.0.2.2:8000',
-    defaultValue: 'http://10.235.71.146:8000',
+  static String? authToken;
 
-  );
+  static void setAuthToken(String? token) {
+    authToken = token;
+  }
 
+  static void clearAuth() {
+    authToken = null;
+  }
 
-  static Map<String, String> get _jsonHeaders => {
-        'Content-Type': 'application/json',
-      };
+  static Map<String, String> authHeaders({
+    bool json = true,
+    Map<String, String>? extra,
+  }) {
+    final headers = <String, String>{};
+    if (json) headers['Content-Type'] = 'application/json';
+    if (authToken != null && authToken!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer ${authToken!}';
+    }
+    if (extra != null) headers.addAll(extra);
+    return headers;
+  }
 
-  // ======================
-  // ĐĂNG KÝ SỐ ĐIỆN THOẠI
-  // ======================
-  static Future<(bool, String)> registerPhone({
-    required String username,
-    required String phone,
+  // =========================
+  // ĐĂNG KÝ (FE đang truyền identity)
+  // identity ở đây CHỈ chấp nhận SĐT để khớp backend /register/phone
+  // =========================
+  static Future<(bool, String)> register({
+    required String name,
+    required String identity, // FE đang dùng tên này
     required String password,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/auth/register/phone');
+    final phone = identity.trim();
+    if (phone.isEmpty || !RegExp(r'^\d{6,}$').hasMatch(phone)) {
+      return (false, 'Vui lòng nhập SĐT hợp lệ để đăng ký');
+    }
+
+    final uri = Uri.parse(ApiBase.api('/auth/register/phone'));
     try {
-      final res = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: jsonEncode({
-          'username': username,
-          'phone': phone,
-          'password': password,
-        }),
-      );
-      if (res.statusCode == 201 || res.statusCode == 200) {
-        return (true, 'Đăng ký thành công. Vui lòng xác nhận theo hướng dẫn.');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'username': name.trim(),
+              'phone': phone,
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = _safeJson(resp.body);
+        final msg = (data?['message'] ?? 'Đăng ký thành công').toString();
+        return (true, msg);
+      } else {
+        final data = _safeJson(resp.body);
+        final err = (data?['detail'] ?? data?['message'] ?? 'Đăng ký thất bại (${resp.statusCode})').toString();
+        return (false, err);
       }
-      return (false, _errMsg(res));
+    } on TimeoutException {
+      return (false, 'Hết thời gian kết nối máy chủ');
     } catch (e) {
-      return (false, 'Lỗi mạng: $e');
+      return (false, 'Lỗi kết nối: $e');
     }
   }
 
-  // ================
-  // ĐĂNG NHẬP SỐ ĐT
-  // ================
-  static Future<(bool, String)> loginPhone({
-    required String phone,
+  // =========================
+  // ĐĂNG NHẬP (FE đang truyền identity)
+  // identity ở đây dùng như SĐT để khớp backend /login/phone
+  // =========================
+  static Future<(bool, String)> login({
+    required String identity, // phone
     required String password,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/auth/login/phone');
+    final phone = identity.trim();
+    final uri = Uri.parse(ApiBase.api('/auth/login/phone'));
     try {
-      final res = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: jsonEncode({
-          'phone': phone,
-          'password': password,
-        }),
-      );
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final token = (data is Map && data['access_token'] is String)
-            ? data['access_token'] as String
-            : '';
-        if (token.isEmpty) return (false, 'Thiếu access_token từ server');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'phone': phone, 'password': password}),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = _safeJson(resp.body);
+        final token = (data?['access_token'] ?? data?['token'] ?? '').toString();
+        if (token.isEmpty) return (false, 'Đăng nhập thành công nhưng không nhận token');
+        setAuthToken(token);
         return (true, token);
+      } else {
+        final data = _safeJson(resp.body);
+        final err = (data?['detail'] ?? data?['message'] ?? 'Đăng nhập thất bại (${resp.statusCode})').toString();
+        return (false, err);
       }
-      return (false, _errMsg(res));
+    } on TimeoutException {
+      return (false, 'Hết thời gian kết nối máy chủ');
     } catch (e) {
-      return (false, 'Lỗi mạng: $e');
+      return (false, 'Lỗi kết nối: $e');
     }
   }
 
-  // ===================
-  // ĐĂNG NHẬP GOOGLE
-  // ===================
-  // FE nhận idToken từ google_sign_in → gọi BE /login/google { token: <idToken> }
+  // =========================
+  // GOOGLE LOGIN (id_token)
   static Future<(bool, String)> loginWithGoogle(String idToken) async {
-    final uri = Uri.parse('$baseUrl/api/v1/auth/login/google');
     try {
       final res = await http.post(
-        uri,
-        headers: _jsonHeaders,
+        Uri.parse(ApiBase.api('/auth/login/google')),
+        headers: {'Content-Type': 'application/json'},
+        // ⚠️ BACKEND ĐANG ĐÒI "token" => gửi đúng key này
         body: jsonEncode({'token': idToken}),
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        final token = (data is Map && data['access_token'] is String)
-            ? data['access_token'] as String
-            : '';
-        if (token.isEmpty) return (false, 'Thiếu access_token từ server');
+        final token = (data['access_token'] ?? data['token'] ?? '').toString();
+        setAuthToken(token);
         return (true, token);
-      } else if (res.statusCode == 404) {
-        return (false, 'Tài khoản Google chưa đăng ký');
       }
-      return (false, _errMsg(res));
+      return (false, res.body);
     } catch (e) {
-      return (false, 'Lỗi mạng: $e');
+      return (false, 'Network error: $e');
     }
   }
 
-  // (Tuỳ chọn) ĐĂNG KÝ GOOGLE khi chưa có tài khoản
-  static Future<(bool, String)> registerGoogle({
-    required String idToken,
-    required String username,
-  }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/auth/register/google');
-    try {
-      final res = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: jsonEncode({'id_token': idToken, 'username': username}),
-      );
-      if (res.statusCode == 201 || res.statusCode == 200) {
-        return (true, 'Đăng ký Google thành công. Kiểm tra email nếu có xác nhận.');
-      }
-      return (false, _errMsg(res));
-    } catch (e) {
-      return (false, 'Lỗi mạng: $e');
-    }
-  }
 
-  // =====================
-  // ĐĂNG NHẬP FACEBOOK
-  // =====================
-  // FE nhận accessToken từ flutter_facebook_auth → gọi BE /login/facebook { token: <accessToken> }
+  // =========================
+  // FACEBOOK LOGIN (access_token)
+  // =========================
   static Future<(bool, String)> loginWithFacebook(String accessToken) async {
-    final uri = Uri.parse('$baseUrl/api/v1/auth/login/facebook');
+    final uri = Uri.parse(ApiBase.api('/auth/login/facebook'));
     try {
-      final res = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: jsonEncode({'token': accessToken}),
-      );
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final token = (data is Map && data['access_token'] is String)
-            ? data['access_token'] as String
-            : '';
-        if (token.isEmpty) return (false, 'Thiếu access_token từ server');
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'token': accessToken}),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = _safeJson(resp.body);
+        final token = (data?['access_token'] ?? data?['token'] ?? '').toString();
+        if (token.isEmpty) return (false, 'Facebook login OK nhưng không có token');
+        setAuthToken(token);
         return (true, token);
-      } else if (res.statusCode == 404) {
-        return (false, 'Tài khoản Facebook chưa đăng ký');
+      } else {
+        final data = _safeJson(resp.body);
+        final err = (data?['detail'] ?? data?['message'] ?? 'Facebook login thất bại (${resp.statusCode})').toString();
+        return (false, err);
       }
-      return (false, _errMsg(res));
+    } on TimeoutException {
+      return (false, 'Hết thời gian kết nối máy chủ');
     } catch (e) {
-      return (false, 'Lỗi mạng: $e');
+      return (false, 'Lỗi kết nối: $e');
     }
   }
 
-  // (Tuỳ chọn) ĐĂNG KÝ FACEBOOK khi chưa có tài khoản
-  static Future<(bool, String)> registerFacebook({
-    required String accessToken,
-    required String username,
-  }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/auth/register/facebook');
+  // ---- helpers ----
+  static Map<String, dynamic>? _safeJson(String body) {
     try {
-      final res = await http.post(
-        uri,
-        headers: _jsonHeaders,
-        body: jsonEncode({'access_token': accessToken, 'username': username}),
-      );
-      if (res.statusCode == 201 || res.statusCode == 200) {
-        return (true, 'Đăng ký Facebook thành công. Vui lòng xác nhận nếu có.');
-      }
-      return (false, _errMsg(res));
-    } catch (e) {
-      return (false, 'Lỗi mạng: $e');
+      return jsonDecode(body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
     }
-  }
-
-  // =====================
-  // Helper parse lỗi server
-  // =====================
-  static String _errMsg(http.Response res) {
-    try {
-      final data = jsonDecode(res.body);
-      if (data is Map && data['detail'] != null) {
-        return '${res.statusCode}: ${data['detail']}';
-      }
-    } catch (_) {}
-    return 'Lỗi (${res.statusCode})';
   }
 }

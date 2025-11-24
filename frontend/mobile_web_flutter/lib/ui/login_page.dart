@@ -3,6 +3,7 @@
 // lib/ui/login_page.dart
 // =============================
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../services/api_client.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
@@ -42,8 +43,9 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
+    final l10n = AppLocalizations.of(context);
     if (_isRegister && !_agree) {
-      _showSnack('Bạn cần đồng ý Điều khoản & Chính sách.');
+      _showSnack(l10n.translate('agree_terms_message'));
       return;
     }
     setState(() => _loading = true);
@@ -56,8 +58,10 @@ class _LoginPageState extends State<LoginPage> {
       );
       setState(() => _loading = false);
       if (ok) {
-        _showSnack('Đăng ký thành công! Hãy đăng nhập.');
-        setState(() => _isRegister = false);
+        _showSnack(l10n.translate('register_success'));
+        // 👉 Sau khi đăng ký thành công, chuyển luôn sang home_user
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/home_user');
       } else {
         _showSnack(msg);
       }
@@ -68,33 +72,49 @@ class _LoginPageState extends State<LoginPage> {
       );
       setState(() => _loading = false);
       if (ok) {
-        _showSnack('Đăng nhập OK, token: ${token.substring(0, token.length > 12 ? 12 : token.length)}...');
-        // TODO: chuyển sang HomePage
+        _showSnack(
+            'Đăng nhập OK, token: ${token.substring(0, token.length > 12 ? 12 : token.length)}...');
+        // 👉 Sau khi đăng nhập thành công, chuyển sang home_user
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/home_user');
       } else {
         _showSnack(token);
       }
     }
   }
-
   Future<void> _handleGoogle() async {
     try {
-      final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+      final googleSignIn = GoogleSignIn(scopes: ['email', 'profile', 'openid']);
       final account = await googleSignIn.signIn();
       if (account == null) return; // user cancel
+
       final auth = await account.authentication;
-      final idToken = auth.idToken;
+      final idToken = auth.idToken;                        // 🔁 dùng idToken
       if (idToken == null) {
         _showSnack('Không lấy được idToken từ Google');
         return;
       }
+
       setState(() => _loading = true);
-      final (ok, token) = await ApiClient.loginWithGoogle(idToken);
+      final res = await ApiClient.loginWithGoogle(idToken); // 🔁 truyền idToken
       setState(() => _loading = false);
-      _showSnack(ok ? 'Google OK: ${token.substring(0, 12)}...' : token);
+
+      final bool ok = res.$1;
+      final String tokenOrMsg = res.$2;
+
+      if (ok) {
+        _showSnack(
+            'Google OK: ${tokenOrMsg.substring(0, tokenOrMsg.length > 12 ? 12 : tokenOrMsg.length)}...');
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/home_user'); // 👈
+      } else {
+        _showSnack(tokenOrMsg);
+      }
     } catch (e) {
       _showSnack('Google lỗi: $e');
     }
   }
+
 
   Future<void> _handleFacebook() async {
     try {
@@ -111,7 +131,13 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _loading = true);
       final (ok, jwt) = await ApiClient.loginWithFacebook(token);
       setState(() => _loading = false);
-      _showSnack(ok ? 'Facebook OK: ${jwt.substring(0, 12)}...' : jwt);
+      if (ok) {
+        _showSnack('Facebook OK: ${jwt.substring(0, 12)}...');
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/home_user'); // 👈
+      } else {
+        _showSnack(jwt);
+      }
     } catch (e) {
       _showSnack('Facebook lỗi: $e');
     }
@@ -119,8 +145,16 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final title = _isRegister ? 'Đăng ký tài khoản' : 'Đăng nhập';
-    final actionText = _isRegister ? 'Đăng ký' : 'Đăng nhập';
+    final l10n = AppLocalizations.of(context);
+    final title = _isRegister
+        ? l10n.translate('register_title')
+        : l10n.translate('login_title');
+    final actionText = _isRegister
+        ? l10n.translate('submit_register')
+        : l10n.translate('submit_login');
+    final subtitle = _isRegister
+        ? l10n.translate('register_subtitle')
+        : l10n.translate('login_subtitle');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F9E9),
@@ -160,7 +194,7 @@ class _LoginPageState extends State<LoginPage> {
                     Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 6),
                     Text(
-                      _isRegister ? 'Vui lòng điền thông tin tài khoản' : 'Chào mừng bạn quay lại',
+                      subtitle,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54),
                     ),
@@ -173,23 +207,23 @@ class _LoginPageState extends State<LoginPage> {
                           if (_isRegister) ...[
                             TextFormField(
                               controller: _nameCtrl,
-                              decoration: const InputDecoration(hintText: 'Họ và tên', prefixIcon: Icon(Icons.person_outline)),
-                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Họ tên không được trống' : null,
+                              decoration: InputDecoration(hintText: l10n.translate('name'), prefixIcon: const Icon(Icons.person_outline)),
+                              validator: (v) => (v == null || v.trim().isEmpty) ? l10n.translate('field_required') : null,
                             ),
                             const SizedBox(height: 12),
                           ],
                           TextFormField(
                             controller: _identityCtrl,
                             keyboardType: TextInputType.emailAddress,
-                            decoration: const InputDecoration(hintText: 'Số điện thoại hoặc email', prefixIcon: Icon(Icons.call_outlined)),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập email/điện thoại' : null,
+                            decoration: InputDecoration(hintText: l10n.translate('phone_email'), prefixIcon: const Icon(Icons.call_outlined)),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? l10n.translate('field_required') : null,
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: _passCtrl,
                             obscureText: _secure1,
                             decoration: InputDecoration(
-                              hintText: 'Mật khẩu',
+                              hintText: l10n.translate('password'),
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 icon: Icon(_secure1 ? Icons.visibility_off : Icons.visibility),
@@ -204,14 +238,16 @@ class _LoginPageState extends State<LoginPage> {
                               controller: _repassCtrl,
                               obscureText: _secure2,
                               decoration: InputDecoration(
-                                hintText: 'Nhập lại mật khẩu',
+                                hintText: l10n.translate('confirm_password'),
                                 prefixIcon: const Icon(Icons.lock_outline),
                                 suffixIcon: IconButton(
                                   icon: Icon(_secure2 ? Icons.visibility_off : Icons.visibility),
                                   onPressed: () => setState(() => _secure2 = !_secure2),
                                 ),
                               ),
-                              validator: (v) => (_isRegister && v != _passCtrl.text) ? 'Mật khẩu không khớp' : null,
+                              validator: (v) => (_isRegister && v != _passCtrl.text)
+                                  ? l10n.translate('password_mismatch')
+                                  : null,
                             ),
                           ],
                           const SizedBox(height: 12),
@@ -223,10 +259,10 @@ class _LoginPageState extends State<LoginPage> {
                               controlAffinity: ListTileControlAffinity.leading,
                               title: Wrap(
                                 children: [
-                                  const Text('Tôi đồng ý với '),
-                                  Text('Điều khoản sử dụng', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
-                                  const Text(' và '),
-                                  Text('Chính sách bảo mật', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                                  Text('${l10n.translate('agree_prefix')} '),
+                                  Text(l10n.translate('terms'), style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                                  Text(' ${l10n.translate('and')} '),
+                                  Text(l10n.translate('privacy'), style: TextStyle(color: Theme.of(context).colorScheme.primary)),
                                 ],
                               ),
                             ),
@@ -244,7 +280,13 @@ class _LoginPageState extends State<LoginPage> {
                     ),
 
                     const SizedBox(height: 18),
-                    Row(children: const [Expanded(child: Divider()), SizedBox(width: 8), Text('Hoặc đăng nhập bằng'), SizedBox(width: 8), Expanded(child: Divider())]),
+                    Row(children: [
+                      const Expanded(child: Divider()),
+                      const SizedBox(width: 8),
+                      Text(l10n.translate('login_with')),
+                      const SizedBox(width: 8),
+                      const Expanded(child: Divider()),
+                    ]),
                     const SizedBox(height: 12),
 
                     Row(
@@ -253,7 +295,7 @@ class _LoginPageState extends State<LoginPage> {
                           child: OutlinedButton(
                             onPressed: _loading ? null : _handleGoogle,
                             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                            child: const Text('Google'),
+                            child: Text(l10n.translate('google')),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -261,7 +303,7 @@ class _LoginPageState extends State<LoginPage> {
                           child: OutlinedButton(
                             onPressed: _loading ? null : _handleFacebook,
                             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                            child: const Text('Facebook'),
+                            child: Text(l10n.translate('facebook')),
                           ),
                         ),
                       ],
@@ -270,7 +312,7 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 16),
                     TextButton(
                       onPressed: () => setState(() => _isRegister = !_isRegister),
-                      child: Text(_isRegister ? 'Đã có tài khoản? Đăng nhập ngay' : 'Chưa có tài khoản? Đăng ký ngay'),
+                      child: Text(_isRegister ? l10n.translate('toggle_to_login') : l10n.translate('toggle_to_register')),
                     ),
                   ],
                 ),
