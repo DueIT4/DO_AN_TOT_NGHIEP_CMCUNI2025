@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../models/notification.dart' as models;
+import '../services/api_client.dart';
 import 'ai_chat_page.dart';
+import 'camera_detection_page.dart';
+import 'devices_page.dart';
+import 'notifications_list_page.dart';
 import 'user_settings_page.dart';
 
 class HomeUserPage extends StatefulWidget {
@@ -17,11 +22,52 @@ class _HomeUserPageState extends State<HomeUserPage> {
   String? _droicamUrl; // lưu địa chỉ Droicam đã nhập
   final TextEditingController _droicamCtrl = TextEditingController();
 
+  // Thông báo
+  List<models.AppNotification> _notifications = [];
+  bool _notificationsLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
   @override
   void dispose() {
     _droicamCtrl.dispose();
     super.dispose();
   }
+
+  Future<void> _loadNotifications() async {
+    setState(() {
+      _notificationsLoading = true;
+    });
+
+    final (success, data, _) = await ApiClient.getMyNotifications();
+
+    if (success) {
+      try {
+        final notifications = (data as List)
+            .map((json) => models.AppNotification.fromJson(json as Map<String, dynamic>))
+            .toList();
+        setState(() {
+          _notifications = notifications;
+          _notificationsLoading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _notificationsLoading = false;
+        });
+      }
+    } else {
+      setState(() {
+        _notificationsLoading = false;
+      });
+    }
+  }
+
+  int get _unreadCount => _notifications.where((n) => !n.isRead).length;
+  bool get _hasUnread => _unreadCount > 0;
 
   Future<void> _showDroicamDialog() async {
     // gợi ý lại url cũ nếu đã có
@@ -258,12 +304,21 @@ class _HomeUserPageState extends State<HomeUserPage> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _SmallCard(
-                      icon: Icons.notifications_active_outlined,
-                      title: l10n.translate('alerts'),
-                      subtitle: l10n.translate('alerts_count'),
+                    child: _NotificationCard(
+                      notifications: _notifications,
+                      unreadCount: _unreadCount,
+                      hasUnread: _hasUnread,
+                      isLoading: _notificationsLoading,
                       onTap: () {
-                        // TODO: điều hướng sang trang cảnh báo
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationsListPage(),
+                          ),
+                        ).then((_) {
+                          // Reload notifications khi quay lại
+                          _loadNotifications();
+                        });
                       },
                     ),
                   ),
@@ -279,6 +334,20 @@ class _HomeUserPageState extends State<HomeUserPage> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
+          if (index == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CameraDetectionPage()),
+            );
+            return;
+          }
+          if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DevicesPage()),
+            );
+            return;
+          }
           if (index == 3) {
             Navigator.push(
               context,
@@ -417,6 +486,81 @@ class _SmallCard extends StatelessWidget {
             Text(
               subtitle,
               style: const TextStyle(color: Colors.black54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationCard extends StatelessWidget {
+  final List<models.AppNotification> notifications;
+  final int unreadCount;
+  final bool hasUnread;
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  const _NotificationCard({
+    required this.notifications,
+    required this.unreadCount,
+    required this.hasUnread,
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final totalCount = notifications.length;
+    final subtitle = isLoading
+        ? 'Đang tải...'
+        : totalCount == 0
+            ? 'Chưa có thông báo'
+            : '$totalCount thông báo';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8F4D9),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.notifications_active_outlined,
+                        color: Color(0xFF7CCD2B)),
+                    if (hasUnread) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.translate('alerts'),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: Colors.black54),
+                ),
+              ],
             ),
           ],
         ),

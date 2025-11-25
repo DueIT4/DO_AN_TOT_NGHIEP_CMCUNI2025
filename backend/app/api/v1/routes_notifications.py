@@ -43,7 +43,7 @@ def create_notifications(payload: NotificationCreate,
             user_id=u.user_id,
             title=payload.title,
             description=payload.description,
-            sender_id=sender.user_id
+            #sender_id=sender.user_id
         ))
     db.add_all(rows)
     db.commit()
@@ -78,10 +78,13 @@ def list_sent(db: Session = Depends(get_db)):
 # ========== LIST MY (user) ==========
 @router.get("/my", response_model=List[NotificationOut])
 def list_my_notifications(db: Session = Depends(get_db), user: Users = Depends(get_current_user)):
-    rows = db.scalars(
-        select(Notification).where(Notification.user_id == user.user_id).order_by(Notification.created_at.desc())
-    ).all()
-    return rows
+    try:
+        rows = db.scalars(
+            select(Notification).where(Notification.user_id == user.user_id).order_by(Notification.created_at.desc())
+        ).all()
+        return rows
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy thông báo: {str(e)}")
 
 # ========== MARK READ (user) ==========
 @router.patch("/{notification_id}/read", response_model=NotificationOut)

@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.models import user, role, auth_account 
+from app.models import user, role, auth_account, notification 
 from app.api.v1.routes_health import router as health_router
 from app.api.v1.routes_detect import router as detect_router
 from app.api.v1.routes_auth import router as auth_router
@@ -25,14 +25,28 @@ app = FastAPI(
     openapi_url="/openapi.json" # schema
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS configuration
+# Khi CORS_ORIGINS là ["*"], không thể dùng allow_credentials=True
+# Nên dùng regex để match localhost ports và vẫn giữ credentials
+cors_origins = settings.CORS_ORIGINS
+if cors_origins == ["*"]:
+    # Dùng regex để match localhost ports, cho phép credentials
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=settings.CORS_ORIGIN_REGEX,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_origin_regex=settings.CORS_ORIGIN_REGEX,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(health_router, prefix=settings.API_V1)
 app.include_router(detect_router, prefix=settings.API_V1)

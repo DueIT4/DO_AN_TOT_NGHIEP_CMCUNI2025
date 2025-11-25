@@ -165,6 +165,60 @@ class ApiClient {
     }
   }
 
+  // =========================
+  // NOTIFICATIONS
+  // =========================
+  static Future<(bool, List<dynamic>, String)> getMyNotifications() async {
+    final uri = Uri.parse(ApiBase.api('/notifications/my'));
+    try {
+      final resp = await http
+          .get(uri, headers: authHeaders())
+          .timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        try {
+          final data = jsonDecode(resp.body);
+          if (data is List) {
+            return (true, data, '');
+          }
+          return (false, [], 'Dữ liệu không hợp lệ');
+        } catch (e) {
+          return (false, [], 'Lỗi phân tích dữ liệu: $e');
+        }
+      } else {
+        final data = _safeJson(resp.body);
+        final err = (data?['detail'] ?? data?['message'] ?? 'Lỗi lấy thông báo (${resp.statusCode})').toString();
+        return (false, [], err);
+      }
+    } on TimeoutException {
+      return (false, [], 'Hết thời gian kết nối máy chủ');
+    } catch (e) {
+      return (false, [], 'Lỗi kết nối: $e');
+    }
+  }
+
+  static Future<(bool, dynamic, String)> markNotificationAsRead(int notificationId) async {
+    final uri = Uri.parse(ApiBase.api('/notifications/$notificationId/read'));
+    try {
+      final resp = await http
+          .patch(uri, headers: authHeaders())
+          .timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = _safeJson(resp.body);
+        return (true, data, '');
+      } else {
+        final data = _safeJson(resp.body);
+        final err = (data?['detail'] ?? data?['message'] ?? 'Lỗi đánh dấu đã đọc (${resp.statusCode})').toString();
+        return (false, null, err);
+      }
+    } on TimeoutException {
+      return (false, null, 'Hết thời gian kết nối máy chủ');
+    } catch (e) {
+      return (false, null, 'Lỗi kết nối: $e');
+    }
+  }
+
   // ---- helpers ----
   static Map<String, dynamic>? _safeJson(String body) {
     try {

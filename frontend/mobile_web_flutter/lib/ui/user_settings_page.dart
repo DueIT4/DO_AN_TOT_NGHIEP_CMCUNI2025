@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../l10n/app_localizations.dart';
 import '../l10n/language_service.dart';
 import '../models/user_profile.dart';
 import '../services/api_client.dart';
 import '../services/user_service.dart';
+import 'camera_detection_page.dart';
+import 'devices_page.dart';
 import 'login_page.dart';
 
 class UserSettingsPage extends StatefulWidget {
@@ -19,6 +22,8 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
   bool _notificationsEnabled = true;
   String _currentLanguageCode =
       LanguageService.instance.locale.languageCode;
+  final ImagePicker _avatarPicker = ImagePicker();
+  bool _avatarUploading = false;
 
   @override
   void initState() {
@@ -206,6 +211,67 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
     );
   }
 
+  void _showAvatarActions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Chụp ảnh'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAvatar(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Chọn từ thư viện'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAvatar(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAvatar(ImageSource source) async {
+    final l10n = AppLocalizations.of(context);
+    final file = await _avatarPicker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1024,
+    );
+    if (file == null) return;
+    setState(() => _avatarUploading = true);
+    try {
+      final updated = await UserService.uploadAvatar(file);
+      if (!mounted) return;
+      setState(() {
+        _profileFuture = Future.value(updated);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.translate('info_updated'))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể cập nhật avatar: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _avatarUploading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -260,16 +326,66 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                           ),
                           child: Column(
                             children: [
-                              CircleAvatar(
-                                radius: 48,
-                                backgroundImage: profile.avatarUrl.isNotEmpty
-                                    ? NetworkImage(profile.avatarUrl)
-                                    : null,
-                                child: profile.avatarUrl.isEmpty
-                                    ? const Icon(Icons.person,
-                                        size: 48, color: Colors.white)
-                                    : null,
-                                backgroundColor: const Color(0xFF7CCD2B),
+                              GestureDetector(
+                                onTap:
+                                    _avatarUploading ? null : _showAvatarActions,
+                                child: SizedBox(
+                                  width: 120,
+                                  height: 120,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 56,
+                                        backgroundImage:
+                                            profile.avatarUrl.isNotEmpty
+                                                ? NetworkImage(
+                                                    profile.avatarUrl)
+                                                : null,
+                                        child: profile.avatarUrl.isEmpty
+                                            ? const Icon(Icons.person,
+                                                size: 48, color: Colors.white)
+                                            : null,
+                                        backgroundColor:
+                                            const Color(0xFF7CCD2B),
+                                      ),
+                                      Positioned(
+                                        bottom: 8,
+                                        right: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: const Icon(
+                                            Icons.camera_alt_outlined,
+                                            size: 18,
+                                            color: Color(0xFF7CCD2B),
+                                          ),
+                                        ),
+                                      ),
+                                      if (_avatarUploading)
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color:
+                                                Colors.black.withOpacity(0.4),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          width: 112,
+                                          height: 112,
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(20),
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 3,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 16),
                               Text(
@@ -356,7 +472,23 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
         unselectedItemColor: Colors.grey,
         onTap: (index) {
           if (index == 3) return;
-          Navigator.pop(context);
+          if (index == 0) {
+            Navigator.pop(context);
+            return;
+          }
+          if (index == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CameraDetectionPage()),
+            );
+            return;
+          }
+          if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DevicesPage()),
+            );
+          }
         },
         items: [
           BottomNavigationBarItem(

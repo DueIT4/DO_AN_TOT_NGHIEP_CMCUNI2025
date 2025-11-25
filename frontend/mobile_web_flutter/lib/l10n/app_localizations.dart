@@ -31,9 +31,9 @@ class AppLocalizations {
       'ai_send': 'Gửi',
       'ai_missing_key': 'Chưa cấu hình GEMINI_API_KEY.',
       'ai_error': 'AI gặp lỗi, vui lòng thử lại.',
-      'report': 'Báo cáo',
+      'report': 'Cảnh báo',
       'view_analytics': 'Xem phân tích',
-      'alerts': 'Cảnh báo',
+      'alerts': 'Thông báo',
       'alerts_count': '2 thông báo',
       'home_tab': 'Home',
       'camera_tab': 'Camera',
@@ -53,8 +53,7 @@ class AppLocalizations {
       'address': 'Địa chỉ',
       'save_changes': 'Lưu thay đổi',
       'and': 'và',
-      'agree_terms_message':
-          'Bạn cần đồng ý Điều khoản & Chính sách.',
+      'agree_terms_message': 'Bạn cần đồng ý Điều khoản & Chính sách.',
       'register_success': 'Đăng ký thành công!',
       'password_mismatch': 'Mật khẩu không khớp',
       'login_title': 'Đăng nhập',
@@ -75,8 +74,7 @@ class AppLocalizations {
       'toggle_to_register': 'Chưa có tài khoản? Đăng ký ngay',
       'toggle_to_login': 'Đã có tài khoản? Đăng nhập ngay',
       'droicam_configured': 'Đã cấu hình Droicam:',
-      'droicam_desc':
-          'Hiển thị stream trực tiếp sẽ được tích hợp sau.',
+      'droicam_desc': 'Hiển thị stream trực tiếp sẽ được tích hợp sau.',
     },
     'en': {
       'app_title': 'ZestGuard',
@@ -277,15 +275,13 @@ class AppLocalizations {
   }
 }
 
-class AppLocalizationsDelegate
-    extends LocalizationsDelegate<AppLocalizations> {
+class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const AppLocalizationsDelegate();
 
   @override
-  bool isSupported(Locale locale) =>
-      AppLocalizations.supportedLocales
-          .map((e) => e.languageCode)
-          .contains(locale.languageCode);
+  bool isSupported(Locale locale) => AppLocalizations.supportedLocales
+      .map((e) => e.languageCode)
+      .contains(locale.languageCode);
 
   @override
   Future<AppLocalizations> load(Locale locale) =>
@@ -295,4 +291,3 @@ class AppLocalizationsDelegate
   bool shouldReload(covariant LocalizationsDelegate<AppLocalizations> old) =>
       false;
 }
-
