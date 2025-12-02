@@ -219,6 +219,152 @@ class ApiClient {
     }
   }
 
+  // =========================
+  // CHATBOT
+  // =========================
+  /// Lấy danh sách tất cả sessions chatbot
+  static Future<(bool, List<dynamic>, String)> listChatbotSessions() async {
+    final uri = Uri.parse(ApiBase.api('/chatbot/sessions'));
+    try {
+      final resp = await http
+          .get(uri, headers: authHeaders())
+          .timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        try {
+          final data = jsonDecode(resp.body);
+          if (data is List) {
+            return (true, data, '');
+          }
+          return (false, [], 'Dữ liệu không hợp lệ');
+        } catch (e) {
+          return (false, [], 'Lỗi phân tích dữ liệu: $e');
+        }
+      } else {
+        final data = _safeJson(resp.body);
+        final err = (data?['detail'] ?? data?['message'] ?? 'Lỗi lấy danh sách sessions (${resp.statusCode})').toString();
+        return (false, [], err);
+      }
+    } on TimeoutException {
+      return (false, [], 'Hết thời gian kết nối máy chủ');
+    } catch (e) {
+      return (false, [], 'Lỗi kết nối: $e');
+    }
+  }
+
+  /// Lấy thông tin session kèm messages
+  static Future<(bool, dynamic, String)> getChatbotSession(int chatbotId) async {
+    final uri = Uri.parse(ApiBase.api('/chatbot/sessions/$chatbotId'));
+    try {
+      final resp = await http
+          .get(uri, headers: authHeaders())
+          .timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = _safeJson(resp.body);
+        return (true, data, '');
+      } else {
+        final data = _safeJson(resp.body);
+        final err = (data?['detail'] ?? data?['message'] ?? 'Lỗi lấy session (${resp.statusCode})').toString();
+        return (false, null, err);
+      }
+    } on TimeoutException {
+      return (false, null, 'Hết thời gian kết nối máy chủ');
+    } catch (e) {
+      return (false, null, 'Lỗi kết nối: $e');
+    }
+  }
+
+  /// Tạo session chatbot mới
+  static Future<(bool, dynamic, String)> createChatbotSession() async {
+    final uri = Uri.parse(ApiBase.api('/chatbot/sessions'));
+    try {
+      final resp = await http
+          .post(uri, headers: authHeaders())
+          .timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = _safeJson(resp.body);
+        return (true, data, '');
+      } else {
+        final data = _safeJson(resp.body);
+        final err = (data?['detail'] ?? data?['message'] ?? 'Lỗi tạo session (${resp.statusCode})').toString();
+        return (false, null, err);
+      }
+    } on TimeoutException {
+      return (false, null, 'Hết thời gian kết nối máy chủ');
+    } catch (e) {
+      return (false, null, 'Lỗi kết nối: $e');
+    }
+  }
+
+  /// Gửi câu hỏi đến chatbot
+  static Future<(bool, dynamic, String)> sendChatbotMessage({
+    required String question,
+    int? chatbotId,
+  }) async {
+    final uri = Uri.parse(ApiBase.api('/chatbot/messages'));
+    try {
+      final body = <String, dynamic>{
+        'question': question,
+      };
+      if (chatbotId != null) {
+        body['chatbot_id'] = chatbotId;
+      }
+
+      final resp = await http
+          .post(
+            uri,
+            headers: authHeaders(),
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = _safeJson(resp.body);
+        return (true, data, '');
+      } else {
+        final data = _safeJson(resp.body);
+        final err = (data?['detail'] ?? data?['message'] ?? 'Lỗi gửi tin nhắn (${resp.statusCode})').toString();
+        return (false, null, err);
+      }
+    } on TimeoutException {
+      return (false, null, 'Hết thời gian kết nối máy chủ');
+    } catch (e) {
+      return (false, null, 'Lỗi kết nối: $e');
+    }
+  }
+
+  /// Lấy lịch sử chat của một session
+  static Future<(bool, List<dynamic>, String)> getChatbotMessages(int chatbotId) async {
+    final uri = Uri.parse(ApiBase.api('/chatbot/sessions/$chatbotId/messages'));
+    try {
+      final resp = await http
+          .get(uri, headers: authHeaders())
+          .timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        try {
+          final data = jsonDecode(resp.body);
+          if (data is List) {
+            return (true, data, '');
+          }
+          return (false, [], 'Dữ liệu không hợp lệ');
+        } catch (e) {
+          return (false, [], 'Lỗi phân tích dữ liệu: $e');
+        }
+      } else {
+        final data = _safeJson(resp.body);
+        final err = (data?['detail'] ?? data?['message'] ?? 'Lỗi lấy lịch sử (${resp.statusCode})').toString();
+        return (false, [], err);
+      }
+    } on TimeoutException {
+      return (false, [], 'Hết thời gian kết nối máy chủ');
+    } catch (e) {
+      return (false, [], 'Lỗi kết nối: $e');
+    }
+  }
+
   // ---- helpers ----
   static Map<String, dynamic>? _safeJson(String body) {
     try {

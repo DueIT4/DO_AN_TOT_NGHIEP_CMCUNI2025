@@ -46,6 +46,10 @@ class Settings(BaseSettings):
         # Facebook OAuth
     FB_APP_ID: str = ""
     FB_APP_SECRET: str = ""
+    
+    # Gemini AI - đọc từ .env (bắt buộc)
+    GEMINI_API_KEY: str  # phải có trong .env
+    GEMINI_MODEL: str = "gemini-pro"  # hoặc "gemini-1.5-pro" nếu có
 
 
     # CORS: để dạng CHUỖI raw để tránh pydantic parse list trước

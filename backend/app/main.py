@@ -13,8 +13,15 @@ from app.core.config import settings
 from app.api.v1.routes_me import router as me_router
 from app.api.v1.routes_support import router as support_router
 from app.api.v1.routes_notifications import router as notifications_router
+from app.api.v1.routes_chatbot import router as chatbot_router
+
+from app.api.v1.routes_detect import router as detect_router
+
 from sqlalchemy.orm import configure_mappers
 from fastapi.middleware.cors import CORSMiddleware
+
+import app.models
+
 configure_mappers()
 from pathlib import Path
 
@@ -55,6 +62,7 @@ app.include_router(users_router, prefix=settings.API_V1)
 app.include_router(me_router, prefix=settings.API_V1)
 app.include_router(support_router, prefix=settings.API_V1)
 app.include_router(notifications_router, prefix=settings.API_V1)
+app.include_router(chatbot_router, prefix=settings.API_V1)
 
 @app.get("/")
 def root():
@@ -75,4 +83,29 @@ app.mount("/media", StaticFiles(directory="media"), name="media")
 
 # support uploads (đính kèm trong hỗ trợ)
 Path("uploads/support").mkdir(parents=True, exist_ok=True)  
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads") 
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# ========== AUTO SCAN SCHEDULER ==========
+from app.services.scheduler_service import start_scheduler
+import logging
+
+logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def startup_event():
+    """Khởi động scheduler khi ứng dụng khởi động"""
+    try:
+        start_scheduler()
+        logger.info("✅ Auto scan scheduler đã khởi động")
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi khởi động scheduler: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Dừng scheduler khi ứng dụng tắt"""
+    from app.services.scheduler_service import stop_scheduler
+    try:
+        stop_scheduler()
+        logger.info("✅ Auto scan scheduler đã dừng")
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi dừng scheduler: {e}") 

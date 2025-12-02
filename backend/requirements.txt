@@ -8,3 +8,8 @@ pymysql
 onnxruntime
 Pillow
 requests>=2.31.0
+google-generativeai
+python-dotenv
+APScheduler
+opencv-python-headless
+apscheduler

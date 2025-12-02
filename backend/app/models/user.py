@@ -29,4 +29,6 @@ class Users(Base):
     auth_links = relationship("AuthAccount", back_populates="user", cascade="all, delete-orphan")
     # Liên kết với bảng role (1 role / user)
     role = relationship("Role", back_populates="users")
-    #role = relationship("Role", backref="users")
+    # Thiết bị, ảnh và detection liên quan
+    devices = relationship("Device", back_populates="user")
+    images = relationship("Img", back_populates="user")

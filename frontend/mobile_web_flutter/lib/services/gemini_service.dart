@@ -7,8 +7,9 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 class GeminiService {
   GeminiService._();
 
-  static const _apiKey =
-      String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+  // API Key Gemini - phải truyền qua --dart-define=GEMINI_API_KEY=xxx khi chạy
+  // Key chỉ được lưu trong file .env của backend
+  static const _apiKey = String.fromEnvironment('GEMINI_API_KEY');
 
   static bool get hasApiKey => _apiKey.isNotEmpty;
 
@@ -18,7 +19,7 @@ class GeminiService {
     }
 
     final model = GenerativeModel(
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.0-flash',
       apiKey: _apiKey,
       safetySettings: [
         SafetySetting(HarmCategory.harassment, HarmBlockThreshold.medium),
@@ -45,4 +46,3 @@ class GeminiService {
     return text;
   }
 }
-
