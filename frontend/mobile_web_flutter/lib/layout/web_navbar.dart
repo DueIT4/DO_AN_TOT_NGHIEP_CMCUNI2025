@@ -1,10 +1,20 @@
+
+// lib/widgets/web_navbar.dart
 import 'package:flutter/material.dart';
+
 import '../src/routes/web_routes.dart';
 import '../core/api_base.dart';
 import '../core/user_service.dart';
 
 class WebNavbar extends StatefulWidget {
-  const WebNavbar({super.key});
+  final int currentIndex;
+  final void Function(int) onItemTap;
+
+  const WebNavbar({
+    super.key,
+    required this.currentIndex,
+    required this.onItemTap,
+  });
 
   @override
   State<WebNavbar> createState() => _WebNavbarState();
@@ -47,7 +57,6 @@ class _WebNavbarState extends State<WebNavbar> {
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 900;
-    final currentRouteName = ModalRoute.of(context)?.settings.name;
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -66,16 +75,16 @@ class _WebNavbarState extends State<WebNavbar> {
       ),
       child: Row(
         children: [
+          // Logo -> luôn về tab "Trang chủ" (index 0)
           InkWell(
-            onTap: () =>
-                _navigateTo(context, WebRoutes.home, currentRouteName),
+            onTap: () => widget.onItemTap(0),
             mouseCursor: SystemMouseCursors.click,
             child: Row(
               children: [
                 const Icon(Icons.eco, color: Colors.green, size: 30),
                 const SizedBox(width: 8),
                 Text(
-                  'PlantGuard',
+                  'ZestGuard',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -92,32 +101,28 @@ class _WebNavbarState extends State<WebNavbar> {
             spacing: 8,
             children: [
               _navItem(
-                context,
                 title: 'Trang chủ',
-                route: WebRoutes.home,
-                currentRouteName: currentRouteName,
+                index: 0,
               ),
               _navItem(
-                context,
                 title: 'Thời tiết',
-                route: WebRoutes.weather,
-                currentRouteName: currentRouteName,
+                index: 1,
               ),
               _navItem(
-                context,
                 title: 'Tin tức',
-                route: WebRoutes.news,
-                currentRouteName: currentRouteName,
+                index: 2,
               ),
 
               if (_isAdmin)
                 FilledButton.icon(
-                  onPressed: () =>
-                      _navigateTo(context, WebRoutes.admin, currentRouteName),
+                  onPressed: () {
+                    // Admin là trang riêng -> vẫn dùng Navigator
+                    Navigator.of(context).pushNamed(WebRoutes.admin);
+                  },
                   icon: const Icon(Icons.admin_panel_settings, size: 18),
                   label: const Text('Admin'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.purple.shade700,
+                    backgroundColor: Colors.green.shade700,
                   ),
                 ),
             ],
@@ -127,23 +132,14 @@ class _WebNavbarState extends State<WebNavbar> {
     );
   }
 
-  void _navigateTo(
-      BuildContext context, String route, String? currentRouteName) {
-    if (currentRouteName == route) return; // đã ở route đó rồi
-
-    Navigator.of(context).pushReplacementNamed(route);
-  }
-
-  Widget _navItem(
-    BuildContext context, {
+  Widget _navItem({
     required String title,
-    required String route,
-    required String? currentRouteName,
+    required int index,
   }) {
-    final isActive = currentRouteName == route;
+    final isActive = widget.currentIndex == index;
 
     return InkWell(
-      onTap: () => _navigateTo(context, route, currentRouteName),
+      onTap: () => widget.onItemTap(index),
       mouseCursor: SystemMouseCursors.click,
       borderRadius: BorderRadius.circular(6),
       child: Padding(

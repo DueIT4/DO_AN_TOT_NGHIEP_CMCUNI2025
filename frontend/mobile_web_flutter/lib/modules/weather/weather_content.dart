@@ -1,3 +1,5 @@
+// lib/modules/weather/weather_content.dart
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -10,13 +12,17 @@ class WeatherContent extends StatefulWidget {
   State<WeatherContent> createState() => _WeatherContentState();
 }
 
-class _WeatherContentState extends State<WeatherContent> {
+class _WeatherContentState extends State<WeatherContent>
+    with AutomaticKeepAliveClientMixin {
   bool _loading = true;
   Map<String, dynamic>? _weatherData;
   String? _error;
 
-  // TODO: Đổi thành API key thật của bạn
+  // 🔑 API key OpenWeatherMap
   static const String _apiKey = '1d1e807aeedfd968685c10f19bcc52ff';
+
+  @override
+  bool get wantKeepAlive => true; // 🔁 giữ state khi đổi tab
 
   @override
   void initState() {
@@ -25,6 +31,8 @@ class _WeatherContentState extends State<WeatherContent> {
   }
 
   Future<void> _loadWeather() async {
+    if (!mounted) return;
+
     setState(() {
       _loading = true;
       _error = null;
@@ -37,7 +45,7 @@ class _WeatherContentState extends State<WeatherContent> {
       final lat = position.latitude;
       final lon = position.longitude;
 
-      // 2. Gọi API current weather
+      // 2. API current weather
       final currentUrl = Uri.parse(
         'https://api.openweathermap.org/data/2.5/weather'
         '?lat=$lat&lon=$lon'
@@ -46,7 +54,7 @@ class _WeatherContentState extends State<WeatherContent> {
         '&lang=vi',
       );
 
-      // 3. Gọi API forecast 5 ngày
+      // 3. API forecast 5 ngày
       final forecastUrl = Uri.parse(
         'https://api.openweathermap.org/data/2.5/forecast'
         '?lat=$lat&lon=$lon'
@@ -261,6 +269,8 @@ class _WeatherContentState extends State<WeatherContent> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // ⚠️ bắt buộc khi dùng AutomaticKeepAliveClientMixin
+
     final isWide = MediaQuery.of(context).size.width >= 900;
 
     return SingleChildScrollView(
@@ -539,7 +549,8 @@ class _WeatherContentState extends State<WeatherContent> {
                           _buildTip('Nhiệt độ hiện tại phù hợp cho cây trồng'),
                           _buildTip('Độ ẩm ở mức tốt, không cần tưới nhiều'),
                           _buildTip('Thời tiết nắng, phù hợp để phơi nắng cây'),
-                          _buildTip('Nếu dự báo có mưa, chuẩn bị che chắn kịp thời'),
+                          _buildTip(
+                              'Nếu dự báo có mưa, chuẩn bị che chắn kịp thời'),
                         ],
                       ),
                     ),

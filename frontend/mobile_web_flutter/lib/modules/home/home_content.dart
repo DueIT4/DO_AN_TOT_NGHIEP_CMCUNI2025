@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart'; // 👈 thêm import này
 
 class HomeContent extends StatelessWidget {
   const HomeContent({super.key});
@@ -6,7 +7,7 @@ class HomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 900;
-
+  
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -21,10 +22,10 @@ class HomeContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const Text(
-                  'Ứng dụng MIỄN PHÍ số 1 để\nchẩn đoán và điều trị cây trồng',
+                  'Ứng dụng MIỄN PHÍ \nchẩn đoán và điều trị cây trồng',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 40,
+                    fontSize: 35,
                     fontWeight: FontWeight.w800,
                     color: Colors.black87,
                     height: 1.25,
@@ -45,18 +46,22 @@ class HomeContent extends StatelessWidget {
                       label: const Text('Dùng thử chẩn đoán'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () {
-                        // TODO: mở link store / popup QR / hướng dẫn tải app
+                      onPressed: () async {
+                        // 👇 Mở link CH Play thật
+                        const url =
+                            'https://play.google.com/store/apps/details?id=com.yourcompany.zestguard';
+                        // TODO: thay com.yourcompany.zestguard bằng packageId thật của bạn
+                        await launchUrl(Uri.parse(url));
                       },
                       icon: const Icon(Icons.android),
-                      label: const Text('Tải ngay'),
+                      label: const Text('Tải trên CH Play'),
                     ),
                   ],
                 ),
 
                 const SizedBox(height: 40),
 
-                // Ảnh demo ứng dụng
+                // Ảnh demo ứng dụng (đã đổi)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: ConstrainedBox(
@@ -87,59 +92,59 @@ class HomeContent extends StatelessWidget {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(24),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.1),
-                                          blurRadius: 20,
-                                          spreadRadius: 5,
-                                        ),
-                                      ],
-                                    ),
-                                    child: Icon(
-                                      Icons.phone_android,
-                                      size: 64,
-                                      color: Colors.green.shade700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Text(
-                                    'PlantGuard App',
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green.shade900,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Chẩn đoán bệnh cây trồng\nbằng AI thông minh',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.green.shade700,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
-                                      _AppStoreBadge(
-                                        icon: Icons.android,
-                                        label: 'Android',
-                                        color: Colors.green,
+                                  // Ảnh demo ứng dụng: chỉ ảnh, không khung gì cả
+ClipRRect(
+  borderRadius: BorderRadius.circular(16),
+  child: Image.asset(
+    'assets/images/zestguard_intro.jpg',
+    width: isWide ? 900 : double.infinity,
+    fit: BoxFit.cover,
+  ),
+),
+const SizedBox(height: 24),
+
+Text(
+  'ZestGuard',
+  style: TextStyle(
+    fontSize: 28,
+    fontWeight: FontWeight.bold,
+    color: Colors.green.shade900,
+  ),
+),
+const SizedBox(height: 8),
+Text(
+  'Chẩn đoán bệnh cây trồng\nbằng AI thông minh',
+  textAlign: TextAlign.center,
+  style: TextStyle(
+    fontSize: 16,
+    color: Colors.green.shade700,
+    height: 1.5,
+  ),
+),
+const SizedBox(height: 24),
+
+Row(
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
+    _AppStoreBadge(
+      icon: Icons.android,
+      label: 'Tải trên CH Play',
+      color: Colors.green,
+      onTap: () async {
+        const url =
+            'https://play.google.com/store/apps/details?id=com.yourcompany.zestguard';
+        await launchUrl(Uri.parse(url));
+
+
+                                        },
                                       ),
-                                      SizedBox(width: 16),
-                                      _AppStoreBadge(
-                                        icon: Icons.apple,
-                                        label: 'iOS',
-                                        color: Colors.black87,
-                                      ),
+                                      // 👇 Bỏ iOS (không dùng nữa)
+                                      // const SizedBox(width: 16),
+                                      // _AppStoreBadge(
+                                      //   icon: Icons.apple,
+                                      //   label: 'iOS',
+                                      //   color: Colors.black87,
+                                      // ),
                                     ],
                                   ),
                                 ],
@@ -166,7 +171,7 @@ class HomeContent extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  'Vì sao chọn PlantGuard?',
+                  'Vì sao chọn ZestGuard?',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 20),
@@ -260,40 +265,49 @@ class _FeatureCard extends StatelessWidget {
 }
 
 // ============================================================================
-//  APP BADGE
+//  APP BADGE (Android, có onTap mở CH Play)
 // ============================================================================
 class _AppStoreBadge extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final VoidCallback? onTap;
 
   const _AppStoreBadge({
     required this.icon,
     required this.label,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: color,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(8),
           ),
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

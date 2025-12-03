@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'src/routes/web_routes.dart';
 import 'modules/auth/auth_service.dart';
+import 'layout/web_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +25,7 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'PlantGuard',
+      title: 'ZestGuard',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -44,12 +45,10 @@ class App extends StatelessWidget {
         ),
       ),
 
-      // ❌ KHÔNG set home / initialRoute,
-      // Flutter web sẽ tự lấy route từ URL khi load trang.
-      // home: HomeWebPage(),
-      // initialRoute: WebRoutes.home,
+      // 🔑 Dùng WebShell làm layout gốc chứa navbar + các trang chính
+      home: const WebShell(),
 
-      // ✅ Tất cả điều hướng dùng named routes qua onGenerateRoute
+      // Giữ onGenerateRoute cho các route khác (admin, login, v.v.)
       onGenerateRoute: WebRoutes.onGenerate,
     );
   }

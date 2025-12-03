@@ -10,6 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  uuid: ^4.2.2
 
   # Gói cơ bản
   cupertino_icons: ^1.0.8
@@ -33,3 +34,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/zestguard_intro.jpg
+

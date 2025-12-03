@@ -1,5 +1,7 @@
 # app/api/v1/routes_detect.py
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from typing import Optional
+
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -8,6 +10,8 @@ from app.services.inference_service import detector
 from app.services.llm_service import summarize_detections_with_llm
 from app.services.detect_service import save_detection_result
 from app.api.v1.deps import get_optional_user
+from app.services.detect_limit_service import check_guest_detect_limit  # NEW
+
 
 router = APIRouter(tags=["Detection"])
 
@@ -16,7 +20,9 @@ router = APIRouter(tags=["Detection"])
 async def detect_image(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user = Depends(get_optional_user),
+    current_user=Depends(get_optional_user),
+    # đọc header X-Client-Key (frontend đã gửi)
+    client_key: Optional[str] = Header(default=None, alias="X-Client-Key"),
 ):
     if detector is None:
         raise HTTPException(status_code=500, detail="Model not loaded on server")
@@ -25,6 +31,23 @@ async def detect_image(
     if not raw:
         raise HTTPException(status_code=400, detail="Không đọc được nội dung file")
 
+    # =========================
+    # GIỚI HẠN CHO KHÁCH WEB
+    # =========================
+    if current_user is None:
+        # khách mà không gửi client_key -> coi như request không hợp lệ
+        if not client_key:
+            raise HTTPException(
+                status_code=400,
+                detail="Thiếu header X-Client-Key cho khách không đăng nhập.",
+            )
+
+        # check & tăng count, nếu quá 3 lần/ngày sẽ raise 429
+        check_guest_detect_limit(db, client_key)
+
+    # =========================
+    # XỬ LÝ DETECT NHƯ CŨ
+    # =========================
     try:
         yolo_result = detector.predict_bytes(raw_bytes=raw, conf=0.5, iou=0.5)
     except Exception as e:

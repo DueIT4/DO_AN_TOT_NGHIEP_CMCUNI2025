@@ -1,10 +1,22 @@
 // lib/admin/admin_shell.dart
 
 import 'package:flutter/material.dart';
+
 import 'package:mobile_web_flutter/core/admin_me_service.dart';
 import 'package:mobile_web_flutter/core/user_service.dart';
 import 'package:mobile_web_flutter/src/routes/web_routes.dart';
 import 'package:mobile_web_flutter/modules/auth/auth_service.dart';
+
+// Các trang con admin
+import 'package:mobile_web_flutter/modules/admin/dashboard/admin_dashboard_page.dart';
+import 'package:mobile_web_flutter/modules/admin/device/admin_devices_page.dart';
+import 'package:mobile_web_flutter/modules/admin/user/admin_users_page.dart';
+import 'package:mobile_web_flutter/modules/admin/notifications/admin_notifications_page.dart';
+import 'package:mobile_web_flutter/modules/admin/support/admin_support_page.dart';
+import 'package:mobile_web_flutter/modules/admin/history/detection_history_page.dart';
+
+/// Màu chủ đạo admin
+const Color _adminGreen = Color(0xFF3D7A3B);
 
 /// Các menu chính của admin
 enum AdminMenu {
@@ -16,23 +28,72 @@ enum AdminMenu {
   settings,
 }
 
-/// Khung layout admin dùng cho web
-class AdminShellWeb extends StatelessWidget {
-  final String title;
-  final AdminMenu current;
-  final Widget body;
+/// Khung layout admin dùng cho web – chỉ tạo **một shell**, body bên trong đổi theo menu
+class AdminShellWeb extends StatefulWidget {
+  final AdminMenu initial; // tab ban đầu
 
   const AdminShellWeb({
     super.key,
-    required this.title,
-    required this.current,
-    required this.body,
+    required this.initial,
   });
 
-  static const Color _green = Color(0xFF3D7A3B);
+  @override
+  State<AdminShellWeb> createState() => _AdminShellWebState();
+}
 
-  // service gọi /me
-  AdminMeService get _meService => AdminMeService();
+class _AdminShellWebState extends State<AdminShellWeb> {
+  late AdminMenu _current;
+  final AdminMeService _meService = AdminMeService();
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initial;
+  }
+
+  // Đổi menu (chỉ đổi body, không đổi route)
+  void _selectMenu(AdminMenu menu) {
+    if (menu == _current) return;
+    setState(() {
+      _current = menu;
+    });
+  }
+
+  String get _title {
+    switch (_current) {
+      case AdminMenu.dashboard:
+        return 'Dashboard';
+      case AdminMenu.devices:
+        return 'Quản lý thiết bị';
+      case AdminMenu.users:
+        return 'Quản lý người dùng';
+      case AdminMenu.notifications:
+        return 'Hỗ trợ / Thông báo';
+      case AdminMenu.detectionHistory:
+        return 'Lịch sử dự đoán';
+      case AdminMenu.settings:
+        return 'Cài đặt hệ thống';
+    }
+  }
+
+  Widget get _body {
+    switch (_current) {
+      case AdminMenu.dashboard:
+        return const AdminDashboardPage();
+      case AdminMenu.devices:
+        return const AdminDevicesPage();
+      case AdminMenu.users:
+        return const AdminUsersPage();
+      case AdminMenu.notifications:
+        // bạn có 2 trang: Support & Notifications – có thể tuỳ chỉnh thêm nếu muốn
+        return const AdminSupportPage(); // hoặc AdminNotificationsPage()
+      case AdminMenu.detectionHistory:
+        return const AdminDetectionHistoryPage();
+      case AdminMenu.settings:
+        // TODO: Tạo trang settings riêng sau
+        return const Center(child: Text('Trang cài đặt hệ thống (TODO)'));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +114,7 @@ class AdminShellWeb extends StatelessWidget {
                       child: Material(
                         elevation: 0,
                         color: Colors.white,
-                        child: body, // 👈 chỉ body thay đổi theo route
+                        child: _body, // 🔑 chỉ body thay đổi theo _current
                       ),
                     ),
                   ),
@@ -68,8 +129,6 @@ class AdminShellWeb extends StatelessWidget {
 
   // ===== Sidebar trái =====
   Widget _buildSidebar(BuildContext context) {
-    const green = _green;
-
     return Container(
       width: 240,
       color: const Color(0xFFEDF5E8),
@@ -83,12 +142,12 @@ class AdminShellWeb extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: green.withOpacity(0.1),
+                  color: _adminGreen.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
                   Icons.eco_rounded,
-                  color: green,
+                  color: _adminGreen,
                   size: 28,
                 ),
               ),
@@ -98,7 +157,7 @@ class AdminShellWeb extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 18,
-                  color: green,
+                  color: _adminGreen,
                 ),
               ),
             ],
@@ -120,7 +179,6 @@ class AdminShellWeb extends StatelessWidget {
             menu: AdminMenu.dashboard,
             icon: Icons.dashboard_customize_outlined,
             label: 'Dashboard',
-            routeName: WebRoutes.adminDashboard,
           ),
 
           const SizedBox(height: 20),
@@ -140,28 +198,24 @@ class AdminShellWeb extends StatelessWidget {
             menu: AdminMenu.devices,
             icon: Icons.sensors,
             label: 'Quản lý thiết bị',
-            routeName: WebRoutes.adminDevices,
           ),
           _sidebarItem(
             context: context,
             menu: AdminMenu.users,
             icon: Icons.group_outlined,
             label: 'Quản lý người dùng',
-            routeName: WebRoutes.adminUsers,
           ),
           _sidebarItem(
             context: context,
             menu: AdminMenu.notifications,
             icon: Icons.support_agent_outlined,
             label: 'Hỗ trợ người dùng',
-            routeName: WebRoutes.adminSupport,
           ),
           _sidebarItem(
             context: context,
             menu: AdminMenu.detectionHistory,
             icon: Icons.history,
             label: 'Lịch sử dự đoán',
-            routeName: WebRoutes.adminHis,
           ),
 
           const SizedBox(height: 20),
@@ -181,12 +235,10 @@ class AdminShellWeb extends StatelessWidget {
             menu: AdminMenu.settings,
             icon: Icons.settings_outlined,
             label: 'Cài đặt hệ thống',
-            routeName: '/admin/settings', // TODO: tạo route sau
           ),
 
           const Spacer(),
 
-          // Footer nhẹ
           Text(
             '© 2025 PlantGuard',
             style: TextStyle(
@@ -204,25 +256,18 @@ class AdminShellWeb extends StatelessWidget {
     required AdminMenu menu,
     required IconData icon,
     required String label,
-    required String routeName,
   }) {
-    final bool isActive = current == menu;
-    const green = _green;
+    final bool isActive = _current == menu;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
-        onTap: () {
-          if (!isActive) {
-            // 👇 chỉ thay route admin, menu/khung vẫn là AdminShellWeb
-            Navigator.of(context).pushReplacementNamed(routeName);
-          }
-        },
+        onTap: () => _selectMenu(menu), // 🔑 chỉ đổi state, không dùng Navigator
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
-            color: isActive ? green : Colors.transparent,
+            color: isActive ? _adminGreen : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -250,8 +295,6 @@ class AdminShellWeb extends StatelessWidget {
 
   // ===== Top bar =====
   Widget _buildTopBar(BuildContext context) {
-    const green = _green;
-
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -269,11 +312,11 @@ class AdminShellWeb extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            title,
+            _title,
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: green,
+              color: _adminGreen,
             ),
           ),
           const Spacer(),
@@ -329,7 +372,7 @@ class AdminShellWeb extends StatelessWidget {
                     const SizedBox(width: 8),
                     const CircleAvatar(
                       radius: 18,
-                      backgroundColor: green,
+                      backgroundColor: _adminGreen,
                       child: Icon(Icons.person, color: Colors.white),
                     ),
                   ],
@@ -352,11 +395,9 @@ class AdminShellWeb extends StatelessWidget {
   }
 
   void _handleLogout(BuildContext context) async {
-    // Xoá token + signOut Firebase + dọn cache user
     await AuthService.logout();
     UserService.clearCache();
 
-    // Điều hướng về trang login, xoá toàn bộ stack
     Navigator.of(context).pushNamedAndRemoveUntil(
       WebRoutes.login,
       (route) => false,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_web_flutter/core/detection_history_service.dart';
 import 'package:mobile_web_flutter/core/api_base.dart';
+import 'dart:html' as html; // chỉ dùng cho Flutter Web
 
 class AdminDetectionHistoryPage extends StatefulWidget {
   const AdminDetectionHistoryPage({super.key});
@@ -78,6 +79,7 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Xoá'),
           ),
+
         ],
       ),
     );
@@ -186,64 +188,79 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Header
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+               Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   color: Theme.of(context)
                       .colorScheme
                       .surfaceVariant
                       .withOpacity(0.8),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // BÊN TRÁI — Title
                       Text(
-                        'Lịch sử dự đoán (Admin)',
+                        'Lịch sử dự đoán',
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 260,
-                            child: TextField(
-                              controller: _searchCtrl,
-                              decoration: InputDecoration(
-                                hintText:
-                                    'Tìm theo bệnh, user, email, SĐT, đường dẫn ảnh...',
-                                contentPadding:
-                                    const EdgeInsets.symmetric(horizontal: 12),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onSubmitted: (_) {
-                                _search = _searchCtrl.text.trim();
-                                _fetch(page: 1);
-                              },
+
+                      const Spacer(), // đẩy phần còn lại về bên phải
+
+                      // BÊN PHẢI — Nút tải dataset
+                      FilledButton.icon(
+                        onPressed: _onDownloadDatasetTrain,
+                        icon: const Icon(Icons.download, size: 18),
+                        label: const Text('Tải dataset train'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.green.shade700,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      // Ô tìm kiếm
+                      SizedBox(
+                        width: 260,
+                        child: TextField(
+                          controller: _searchCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'Tìm theo bệnh, user, email, SĐT...',
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          FilledButton(
-                            onPressed: () {
-                              _search = _searchCtrl.text.trim();
-                              _fetch(page: 1);
-                            },
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                            ),
-                            child: const Icon(Icons.search, size: 20),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            tooltip: 'Tải lại',
-                            onPressed: () => _fetch(page: _currentPage),
-                            icon: const Icon(Icons.refresh),
-                          ),
-                        ],
+                          onSubmitted: (_) {
+                            _search = _searchCtrl.text.trim();
+                            _fetch(page: 1);
+                          },
+                        ),
+                      ),
+
+                      const SizedBox(width: 8),
+                      
+                      // Nút search
+                      FilledButton(
+                        onPressed: () {
+                          _search = _searchCtrl.text.trim();
+                          _fetch(page: 1);
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        child: const Icon(Icons.search, size: 20),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      // Nút reload
+                      IconButton(
+                        tooltip: 'Tải lại',
+                        onPressed: () => _fetch(page: _currentPage),
+                        icon: const Icon(Icons.refresh),
                       ),
                     ],
                   ),
@@ -399,5 +416,31 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
       }
     }
   }
+  Future<void> _onDownloadDatasetTrain() async {
+  setState(() {
+    _loading = true;
+  });
+
+  try {
+    await _svc.downloadDatasetTrain();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đang tải dataset train...')),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Lỗi tải dataset: $e')),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+}
+
+
 
 }

@@ -147,40 +147,56 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
               children: [
                 // Header card
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 16),
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceVariant
-                      .withOpacity(0.8),
-                  child: Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Quản lý thông báo',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      Row(
-                        children: [
-                          IconButton(
-                            tooltip: 'Tạo thông báo',
-                            onPressed: _openCreateDialog,
-                            icon: const Icon(Icons.add),
-                          ),
-                          IconButton(
-                            tooltip: 'Tải lại',
-                            onPressed: _reload,
-                            icon: const Icon(Icons.refresh),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 16),
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceVariant
+                    .withOpacity(0.8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Quay lại trang Support Ticket',
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () {
+                            // quay lại màn trước (AdminSupportPage)
+                            Navigator.pop(context);
+
+                            // Nếu bạn muốn chắc chắn về route cụ thể:
+                            // Navigator.pushReplacementNamed(context, WebRoutes.adminSupport);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Quản lý thông báo',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Tạo thông báo',
+                          onPressed: _openCreateDialog,
+                          icon: const Icon(Icons.add),
+                        ),
+                        IconButton(
+                          tooltip: 'Tải lại',
+                          onPressed: _reload,
+                          icon: const Icon(Icons.refresh),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
+              ),
+
                 const Divider(height: 1),
 
                 // Nội dung

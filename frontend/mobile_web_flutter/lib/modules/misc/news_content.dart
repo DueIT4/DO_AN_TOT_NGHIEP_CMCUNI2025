@@ -315,20 +315,30 @@ class _NewsCard extends StatelessWidget {
 class _SidebarLinks extends StatelessWidget {
   const _SidebarLinks();
 
+  Future<void> _openLink(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final links = [
       {
         'title': 'Cổng thông tin Bộ NN&PTNT',
         'subtitle': 'Nguồn tin chính thức',
+        'url': 'https://www.mard.gov.vn',
       },
       {
         'title': 'Tạp chí Nông nghiệp VN',
         'subtitle': 'Phân tích chuyên sâu',
+        'url': 'https://nongnghiep.vn',
       },
       {
         'title': 'Cẩm nang kỹ thuật',
         'subtitle': 'Kiến thức cho nông dân',
+        'url': 'https://khuyennongvn.gov.vn',
       },
     ];
 
@@ -350,9 +360,9 @@ class _SidebarLinks extends StatelessWidget {
               title: Text(e['title']!, style: const TextStyle(fontSize: 13)),
               subtitle: Text(
                 e['subtitle']!,
-                style:
-                    TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
+              onTap: () => _openLink(e['url']!),
             ),
           ),
         ),

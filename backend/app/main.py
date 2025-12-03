@@ -3,7 +3,10 @@ from pathlib import Path
 import logging
 from sqlalchemy.orm import configure_mappers
 from app.models import *   # đảm bảo toàn bộ bảng được đăng ký vào Base.metadata
+from fastapi import FastAPI
+from app.core.database import Base, engine
 
+# IMPORT ALL MODELS
 configure_mappers()
 
 from fastapi import FastAPI, Request
@@ -141,3 +144,4 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status_code=HTTP_422_UNPROCESSABLE_ENTITY,
         content={"message": "Payload không hợp lệ", "errors": exc.errors()},
     )
+Base.metadata.create_all(bind=engine)

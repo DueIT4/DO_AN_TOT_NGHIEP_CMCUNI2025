@@ -4,26 +4,19 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../core/api_base.dart';
 
-// ===== Trang hiện có =====
-import '../../modules/home/home_web.dart';
+// ===== Layout shell cho web public =====
+import '../../layout/web_shell.dart';
+
+// ===== Trang hiện có (dùng riêng) =====
 import '../../modules/detect/detect_web.dart';
 import '../../modules/auth/login_web.dart';
 
-import '../../modules/misc/library_web.dart';
-import '../../modules/misc/company_web.dart';
-import '../../modules/misc/news_web.dart';
-import '../../modules/misc/app_download_web.dart';
-
-// ✅ THAY AdminApp bằng các route admin mới
+// ✅ Admin routes
 import '../../modules/admin/admin_routes.dart';
 
 // Auth
 import '../../modules/auth/confirm_page.dart';
 import '../../modules/auth/forgot_password.dart';
-
-// Weather
-import '../../modules/weather/weather_page.dart';
-import '../../modules/weather/weather_content.dart';
 
 class WebRoutes {
   // Công khai
@@ -34,10 +27,7 @@ class WebRoutes {
   static const login = '/login';
 
   // Navbar (public)
-  static const library = '/library';
   static const news = '/news';
-  static const company = '/company';
-  static const app = '/app';
   static const weather = '/weather';
 
   // Auth
@@ -55,10 +45,12 @@ class WebRoutes {
   static const adminSupport = '/admin/support';
   static const adminNoti = '/admin/notifications';
 
-  // static const _protected = {...} // nếu sau này muốn bảo vệ route admin
-
   static Route<dynamic> onGenerate(RouteSettings s) {
-    final name = s.name ?? home;
+    // 🔧 Chuẩn hoá tên route: bỏ dấu "/" ở cuối nếu có
+    var name = s.name ?? home;
+    if (name.length > 1 && name.endsWith('/')) {
+      name = name.substring(0, name.length - 1);
+    }
 
     // Đọc bearer (nếu sau này muốn chặn chưa login)
     final bearer = (() {
@@ -80,30 +72,29 @@ class WebRoutes {
     // }
 
     switch (name) {
-      // ===== Trang chủ =====
-      case home:
-        return _p(const HomeWebPage(), s);
+      // ===== Public shell: Home / Weather / News dùng chung WebShell =====
+      case home: // '/'
+        return _p(const WebShell(initialIndex: 0), s);
 
-      // ===== Detect =====
+      case weather: // '/weather'
+        return _p(const WebShell(initialIndex: 1), s);
+
+      case news: // '/news'
+        return _p(const WebShell(initialIndex: 2), s);
+
+      // ===== Detect (trang riêng) =====
       case detect:
-        return _p(const DetectWebPage(), s);
+        return _p(DetectWebPage(), s);
+
+      // ===== Tạm route /device, /sensors về Home cho khỏi 404 =====
+      // Nếu sau này bạn có trang riêng thì đổi ở đây
+      case device:
+      case sensors:
+        return _p(const WebShell(initialIndex: 0), s);
 
       // LOGIN
       case login:
         return _p(const LoginWebPage(), s);
-
-      // ===== Navbar hiện có =====
-      case weather:
-        return _p(const WeatherPage(), s);
-
-      case library:
-        return _p(const LibraryWebPage(), s);
-
-      case news:
-        return _p(const NewsWeb(), s);
-
-      case app:
-        return _p(const AppDownloadWebPage(), s);
 
       // ===== Auth =====
       case confirm:
@@ -144,7 +135,6 @@ class WebRoutes {
       case adminUsers: // /admin/users
         return _p(const AdminUsersRoute(), s);
 
-      // Chưa làm 2 trang này nên tạm reuse Devices (hoặc bạn tạo route riêng)
       case adminPredict:
       case adminSensors:
         return _p(const AdminDevicesRoute(), s);
@@ -155,12 +145,12 @@ class WebRoutes {
           builder: (_) => Scaffold(
             body: Center(child: Text('404: $name')),
           ),
-          settings: s, // giữ settings (name) -> URL đúng khi 404
+          settings: s,
         );
     }
   }
 
-  // 🔑 Quan trọng: giữ nguyên RouteSettings (name + arguments)
+  // 🔑 Giữ nguyên RouteSettings (name + arguments)
   static MaterialPageRoute _p(Widget w, RouteSettings settings) =>
       MaterialPageRoute(
         builder: (_) => w,
