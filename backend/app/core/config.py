@@ -54,7 +54,10 @@ class Settings(BaseSettings):
 
     # CORS: để dạng CHUỖI raw để tránh pydantic parse list trước
     CORS_ORIGINS_RAW: str = "*"   # ví dụ: '*', hoặc CSV, hoặc JSON array
-    CORS_ORIGIN_REGEX: str = r"http://localhost:\d+|http://127\.0\.0\.1:\d+"
+    #CORS_ORIGIN_REGEX: str = r"http://localhost:\d+|http://127\.0\.0\.1:\d+"
+    CORS_ORIGIN_REGEX: str = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
+    #CORS_ORIGIN_REGEX: str = r"^http://localhost:\d+$"
+
 
     # Chuyển từ chuỗi sang list dùng property
     @property

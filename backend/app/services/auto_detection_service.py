@@ -15,7 +15,8 @@ from app.models.image_detection import Img, Detection, Disease, SourceType
 from app.models.sensor_readings import SensorReadings
 from app.models.notification import Notification
 from app.services.camera_service import capture_multiple_images
-from app.services.inference_service import OnnxDetector
+#rom app.services.inference_service import OnnxDetector
+from app.services.inference_service import YoloDetector, detector, MODEL_PATH
 from app.services.detect_service import save_detection_result
 from app.services.llm_service import summarize_detections_with_llm
 from PIL import Image
@@ -240,7 +241,7 @@ def detect_from_camera_auto(
     # 2. Load detector (giống như routes_detect.py)
     THIS_DIR = Path(__file__).resolve().parent  # .../backend/app/services
     REPO_ROOT = THIS_DIR.parents[2]  # go up to repo root
-    MODEL_PATH = os.getenv("MODEL_PATH", str(REPO_ROOT / "ml/exports/v1.0/best.onnx"))
+    MODEL_PATH = os.getenv("MODEL_PATH", str(REPO_ROOT / "ml/exports/v1.0/best.pt"))
     LABELS_PATH = os.getenv("LABELS_PATH", str(REPO_ROOT / "ml/exports/v1.0/labels.txt"))
     
     try:

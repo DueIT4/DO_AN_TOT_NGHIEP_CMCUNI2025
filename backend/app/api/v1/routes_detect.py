@@ -1,17 +1,17 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from io import BytesIO
 from PIL import Image, UnidentifiedImageError
-from app.services.inference_service import OnnxDetector
+#from app.services.inference_service import OnnxDetector
+from app.services.inference_service import YoloDetector
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.models.user import Users
 from app.models.image_detection import Img, Disease, Detection, SourceType
 from app.schemas.detection import DetectionHistoryItem, DetectionDetail
+from uuid import uuid4
 import os
 from pathlib import Path
-from uuid import uuid4
-import shutil
 
 router = APIRouter(prefix="/detect", tags=["detect"])
 
@@ -20,35 +20,17 @@ THIS_DIR = Path(__file__).resolve().parent  # .../backend/app/api/v1
 REPO_ROOT = THIS_DIR.parents[3]             # go up to repo root
 
 # Defaults relative to repo root; allow env overrides
-MODEL_PATH = os.getenv("MODEL_PATH", str(REPO_ROOT / "ml/exports/v1.0/best.onnx"))
+MODEL_PATH = os.getenv("MODEL_PATH", str(REPO_ROOT / "ml/exports/v1.0/best.pt"))
 LABELS_PATH = os.getenv("LABELS_PATH", str(REPO_ROOT / "ml/exports/v1.0/labels.txt"))
 
 try:
-    detector = OnnxDetector(model_path=MODEL_PATH, labels_path=LABELS_PATH)
+    detector = YoloDetector(model_path=MODEL_PATH)
 except FileNotFoundError:
     detector = None
-
-# Thư mục lưu ảnh detection
-IMG_UPLOAD_ROOT = Path("media") / "img"
-IMG_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
-
-def _save_detection_image(user_id: int, image_data: bytes, filename: str = None) -> str:
-    """Lưu ảnh detection vào media/img/{user_id}/{uuid}.jpg"""
-    user_dir = IMG_UPLOAD_ROOT / str(user_id)
-    user_dir.mkdir(parents=True, exist_ok=True)
-    ext = Path(filename).suffix.lower() if filename else ".jpg"
-    if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
-        ext = ".jpg"
-    safe_name = f"{uuid4().hex}{ext}"
-    save_path = user_dir / safe_name
-    with save_path.open("wb") as f:
-        f.write(image_data)
-    return f"/media/img/{user_id}/{safe_name}"
 
 @router.post("/analyze")
 async def detect(
     image: UploadFile = File(...),
-    source_type: str = Form("camera"),  # "camera" hoặc "upload"
     db: Session = Depends(get_db),
     user: Users = Depends(get_current_user),
 ):
@@ -56,21 +38,29 @@ async def detect(
         raise HTTPException(status_code=500, detail=f"Model not available: {MODEL_PATH}")
     try:
         data = await image.read()
-        img = Image.open(BytesIO(data))
-    except UnidentifiedImageError:
-        raise HTTPException(status_code=400, detail="Invalid image file")
-    try:
-        result = detector.infer_top1(img)
+                # ===== LƯU FILE ẢNH THẬT RA Ổ ĐĨA (tránh 404) =====
+        save_dir = Path("media/detections")
+        save_dir.mkdir(parents=True, exist_ok=True)
 
-        # Xác định source_type
-        src_type = SourceType.camera if source_type.lower() == "camera" else SourceType.upload
-        
-        # Lưu file ảnh (data đã được đọc ở trên)
-        file_url = _save_detection_image(user.user_id, data, image.filename)
+        ext = Path(image.filename or "").suffix.lower()
+        if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
+            ext = ".jpg"
+
+        filename = f"{uuid4().hex}{ext}"
+        (save_dir / filename).write_bytes(data)
+
+        file_url = f"/media/detections/{filename}"
+
+        try:
+            Image.open(BytesIO(data)).verify()
+        except UnidentifiedImageError:
+            raise HTTPException(status_code=400, detail="Invalid image file")
+
+        result = detector.predict_bytes(data)
 
         # ===== LƯU LỊCH SỬ VÀO img / detections =====
         img_row = Img(
-            source_type=src_type,
+            source_type=SourceType.camera,
             device_id=None,
             user_id=user.user_id,
             file_url=file_url,
@@ -78,18 +68,25 @@ async def detect(
         db.add(img_row)
         db.flush()
 
-        disease_name = str(result.get("disease", "Không xác định"))
+        # Lấy disease_name + confidence từ output predict_bytes
+        if result["num_detections"] == 0:
+            disease_name = "Không phát hiện"
+            confidence = 0.0
+        else:
+            top = result["detections"][0]
+            disease_name = top["class_name"]
+            try:
+                confidence = float(top["confidence"]) * 100.0  # % để lưu DB
+            except (TypeError, ValueError):
+                confidence = 0.0
+
+        # Tạo / lấy Disease trong DB
         disease_row = db.query(Disease).filter(Disease.name == disease_name).first()
         if not disease_row:
             disease_row = Disease(name=disease_name)
             db.add(disease_row)
             db.flush()
 
-        confidence_raw = result.get("confidence", 0.0) or 0.0
-        try:
-            confidence = float(confidence_raw) * 100.0
-        except (TypeError, ValueError):
-            confidence = 0.0
 
         det = Detection(
             img_id=img_row.img_id,
@@ -104,12 +101,15 @@ async def detect(
 
         return {
             "disease": disease_name,
-            "confidence": result.get("confidence", 0.0),
+            "confidence": confidence / 100.0,  # trả về dạng 0-1
             "detection_id": det.detection_id,
             "img_url": img_row.file_url,
-            "source_type": img_row.source_type.value,
             "created_at": det.created_at.isoformat(),
+            "num_detections": result["num_detections"],
+            "detections": result["detections"],
+            "explanation": result["explanation"],
         }
+
     except HTTPException:
         raise
     except Exception as e:
@@ -141,8 +141,8 @@ def my_history(
                 disease_name=name,
                 confidence=conf,
                 img_url=img_row.file_url,
-                source_type=img_row.source_type.value,
                 created_at=det.created_at,
+                source_type=img_row.source_type.value if hasattr(img_row.source_type, "value") else str(img_row.source_type),
             )
         )
     return items

@@ -39,11 +39,14 @@ class DetectionService {
       final createdAt =
           createdAtStr != null ? DateTime.parse(createdAtStr) : DateTime.now();
       final guide = _guideFor(diseaseName);
-      
+
       // Parse source_type từ backend
-      final sourceTypeStr = (item['source_type'] ?? 'camera').toString().toLowerCase();
-      final source = sourceTypeStr == 'camera' ? DetectionSource.camera : DetectionSource.upload;
-      
+      final sourceTypeStr =
+          (item['source_type'] ?? 'camera').toString().toLowerCase();
+      final source = sourceTypeStr == 'camera'
+          ? DetectionSource.camera
+          : DetectionSource.upload;
+
       // Build full URL cho ảnh
       final imgUrlRaw = item['img_url']?.toString();
       final imageUrl = imgUrlRaw != null && imgUrlRaw.isNotEmpty
@@ -114,7 +117,8 @@ class DetectionService {
     final bytes = await file.readAsBytes();
 
     final uri = Uri.parse(ApiBase.api('/detect/analyze'));
-    final sourceTypeValue = source == DetectionSource.camera ? 'camera' : 'upload';
+    final sourceTypeValue =
+        source == DetectionSource.camera ? 'camera' : 'upload';
     final request = http.MultipartRequest('POST', uri)
       ..headers.addAll(ApiClient.authHeaders(json: false))
       ..fields['source_type'] = sourceTypeValue
@@ -151,7 +155,7 @@ class DetectionService {
     final diseaseName = (data['disease'] ?? 'Không xác định').toString();
     final accuracy = _normalizeConfidence(data['confidence']);
     final guide = _guideFor(diseaseName);
-    
+
     // Build full URL cho ảnh từ backend
     final imgUrlRaw = data['img_url']?.toString();
     final imageUrl = imgUrlRaw != null && imgUrlRaw.isNotEmpty
@@ -159,14 +163,16 @@ class DetectionService {
         : null;
 
     final record = DetectionRecord(
-      id: (data['detection_id'] ?? 'detection_${DateTime.now().millisecondsSinceEpoch}').toString(),
+      id: (data['detection_id'] ??
+              'detection_${DateTime.now().millisecondsSinceEpoch}')
+          .toString(),
       diseaseName: diseaseName,
       accuracy: double.parse(accuracy.toStringAsFixed(2)),
       detectedAt: DateTime.now(),
       cause: guide.$1,
       solution: guide.$2,
       imageUrl: imageUrl,
-      imageBytes: null,  // Không cần lưu bytes nữa, dùng URL
+      imageBytes: null, // Không cần lưu bytes nữa, dùng URL
       source: source,
     );
 
@@ -174,4 +180,3 @@ class DetectionService {
     return record;
   }
 }
-
