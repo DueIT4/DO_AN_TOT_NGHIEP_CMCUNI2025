@@ -1,7 +1,8 @@
 # app/core/config.py
 import json
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -17,6 +18,9 @@ class Settings(BaseSettings):
     MEDIA_ROOT: str = "media"
 
     # ===== Database =====
+    # Ưu tiên dùng DATABASE_URL (Neon/Postgres). Nếu không set thì fallback qua DB_*
+    DATABASE_URL: Optional[str] = None
+
     DB_USER: str = "plantai"
     DB_PASS: str = "changeme-StrongPwd!"
     DB_HOST: str = "localhost"
@@ -24,7 +28,12 @@ class Settings(BaseSettings):
     DB_NAME: str = "ai_plant_db"
 
     @property
-    def DATABASE_URL(self) -> str:
+    def db_url(self) -> str:
+        # 1) Nếu có DATABASE_URL trong env → dùng luôn (Postgres/Neon)
+        if self.DATABASE_URL and self.DATABASE_URL.strip():
+            return self.DATABASE_URL.strip()
+
+        # 2) Fallback: build MySQL URL (giữ để dev local nếu cần)
         return (
             f"mysql+pymysql://{self.DB_USER}:{self.DB_PASS}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
@@ -60,6 +69,9 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-print(">>> DB_USER from env:", settings.DB_USER)
-print(">>> Final DATABASE_URL:", settings.DATABASE_URL)
+# Debug (khuyên: chỉ bật khi dev)
+print(">>> Raw DATABASE_URL from env:", settings.DATABASE_URL)
+print(">>> Final DB URL used:", settings.db_url)
 print(">>> GEMINI_MODEL:", settings.GEMINI_MODEL)
+import os
+print("DATABASE_URL =", os.getenv("DATABASE_URL"))

@@ -116,9 +116,9 @@ class WebRoutes {
         );
 
       // ===== ADMIN: mỗi route là 1 Shell riêng =====
-      case admin: // /admin: tạm cho về trang thiết bị
-      case adminDevices: // /admin/devices
-        return _p(const AdminDevicesRoute(), s);
+      case admin: // /
+      case adminDashboard: 
+        return _p(const AdminDashboardRoute(), s);
 
       case adminSupport:
         return _p(const AdminSupportRoute(), s);

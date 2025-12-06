@@ -13,12 +13,11 @@ from app.models.user import Users, UserStatus
 from app.schemas.user import UserOut, UserListOut
 from app.models.role import Role, RoleType
 from app.services.permissions import require_perm
+from app.services.passwords import hash_password
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-def _hash_password_sha256(s: str) -> str:
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
 def _to_user_out(u: Users) -> UserOut:
@@ -108,7 +107,7 @@ def create_user(
     user = Users(
         username=username,
         phone=phone,
-        password=_hash_password_sha256(password),
+        password=hash_password(password),
         email=email,
         address=address,
         avt_url=avt_url,
@@ -185,7 +184,7 @@ def update_user(
 
     # password
     if password:
-        user.password = _hash_password_sha256(password)
+        user.password =hash_password(password)
 
     # role
     if role_id is not None:
