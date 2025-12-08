@@ -1,8 +1,17 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:video_player/video_player.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../widgets/web_hls_player.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/notification.dart' as models;
 import '../services/api_client.dart';
+import '../services/device_service.dart';
+import '../core/api_base.dart';
 import 'ai_chat_page.dart';
 import 'camera_detection_page.dart';
 import 'devices_page.dart';
@@ -48,7 +57,8 @@ class _HomeUserPageState extends State<HomeUserPage> {
     if (success) {
       try {
         final notifications = (data as List)
-            .map((json) => models.AppNotification.fromJson(json as Map<String, dynamic>))
+            .map((json) =>
+                models.AppNotification.fromJson(json as Map<String, dynamic>))
             .toList();
         setState(() {
           _notifications = notifications;
@@ -380,27 +390,352 @@ class _HomeUserPageState extends State<HomeUserPage> {
 }
 
 // ================= DROICAM VIEW (bản mobile – placeholder) =================
-
-class DroicamView extends StatelessWidget {
+class DroicamView extends StatefulWidget {
   final String url;
-
   const DroicamView({super.key, required this.url});
+
+  @override
+  State<DroicamView> createState() => _DroicamViewState();
+}
+
+class _DroicamViewState extends State<DroicamView> {
+  String? _hlsUrl;
+  String? _tempKey;
+  bool _starting = false;
+  VideoPlayerController? _videoController;
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureStream();
+  }
+
+  @override
+  void didUpdateWidget(covariant DroicamView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _stopTempStreamIfAny();
+      _ensureStream();
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    _stopTempStreamIfAny();
+    super.dispose();
+  }
+
+  Future<void> _ensureStream() async {
+    setState(() {
+      _starting = true;
+      _hlsUrl = null;
+    });
+
+    try {
+      final uri = Uri.parse(ApiBase.api('/streams/start_temp'));
+      final resp = await http.post(uri,
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({"url": widget.url}));
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final hls = data['hls_url'] as String?;
+        final key = data['key'] as String?;
+        if (hls != null) {
+          final full = hls.startsWith('http') ? hls : ApiBase.host + hls;
+          _tempKey = key;
+          await _startVideo(full);
+          setState(() {
+            _hlsUrl = full;
+          });
+          return;
+        }
+      }
+      setState(() {
+        _hlsUrl = null;
+      });
+    } catch (e) {
+      setState(() {
+        _hlsUrl = null;
+      });
+    } finally {
+      setState(() {
+        _starting = false;
+      });
+    }
+  }
+
+  Future<void> _startVideo(String url) async {
+    // On web we use the embedded hls.js player (iframe). video_player
+    // is used for mobile platforms only.
+    if (kIsWeb) {
+      return;
+    }
+
+    _videoController?.dispose();
+    _videoController = VideoPlayerController.network(url);
+    try {
+      await _videoController!.initialize();
+      _videoController!.setLooping(true);
+      await _videoController!.play();
+      setState(() {});
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _stopTempStreamIfAny() async {
+    if (_tempKey == null) return;
+    try {
+      final uri = Uri.parse(ApiBase.api('/streams/stop_temp'));
+      await http.post(uri,
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({"key": _tempKey}));
+    } catch (_) {}
+    _tempKey = null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    // TẠM THỜI: trên Android chỉ hiển thị placeholder,
-    // chưa stream được Droicam trực tiếp.
-    return Center(
-      child: Text(
-        '${l10n.translate('droicam_configured')}\n$url\n\n'
-        '${l10n.translate('droicam_desc')}',
-        style: const TextStyle(color: Colors.white),
-        textAlign: TextAlign.center,
-      ),
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            color: Colors.black,
+            child: _starting
+                ? const Center(child: CircularProgressIndicator())
+                : (kIsWeb
+                    // On web use hls.js iframe player
+                    ? (_hlsUrl != null
+                        ? WebHlsPlayer(
+                            hlsUrl: _hlsUrl!,
+                            viewId: 'hls-${_tempKey ?? 'tmp'}',
+                          )
+                        : Center(
+                            child: Text(
+                              l10n.translate('camera_hint'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ))
+                    // On mobile/desktop use VideoPlayer
+                    : (_videoController != null &&
+                            _videoController!.value.isInitialized)
+                        ? AspectRatio(
+                            aspectRatio: _videoController!.value.aspectRatio,
+                            child: VideoPlayer(_videoController!),
+                          )
+                        : Center(
+                            child: Text(
+                              l10n.translate('camera_hint'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          )),
+          ),
+        ),
+        Positioned(
+          right: 8,
+          top: 8,
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                onPressed: _starting
+                    ? null
+                    : () {
+                        _ensureStream();
+                      },
+                tooltip: 'Làm mới',
+              ),
+              if (_videoController != null)
+                IconButton(
+                  icon: Icon(
+                    _videoController!.value.isPlaying
+                        ? Icons.pause
+                        : Icons.play_arrow,
+                    color: Colors.white,
+                  ),
+                  onPressed: () {
+                    if (_videoController!.value.isPlaying) {
+                      _videoController!.pause();
+                    } else {
+                      _videoController!.play();
+                    }
+                    setState(() {});
+                  },
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
+
+// class DroicamView extends StatefulWidget {
+//   final String url;
+
+//   const DroicamView({super.key, required this.url});
+
+//   @override
+//   State<DroicamView> createState() => _DroicamViewState();
+// }
+
+// class _DroicamViewState extends State<DroicamView> {
+//   int? _deviceId;
+//   String? _imageUrl; // full URL to show
+//   String? _statusMsg;
+//   Timer? _pollTimer;
+//   bool _loading = false;
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _initForUrl();
+//     _startPolling();
+//   }
+
+//   @override
+//   void didUpdateWidget(covariant DroicamView oldWidget) {
+//     super.didUpdateWidget(oldWidget);
+//     if (oldWidget.url != widget.url) {
+//       _initForUrl();
+//     }
+//   }
+
+//   @override
+//   void dispose() {
+//     _pollTimer?.cancel();
+//     super.dispose();
+//   }
+
+//   void _startPolling() {
+//     _pollTimer?.cancel();
+//     // Poll every 30 seconds for new detection images
+//     _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+//       if (_deviceId != null) _fetchLatest();
+//     });
+//   }
+
+//   Future<void> _initForUrl() async {
+//     setState(() {
+//       _statusMsg = 'Đang tìm thiết bị...';
+//       _loading = true;
+//       _imageUrl = null;
+//       _deviceId = null;
+//     });
+
+//     try {
+//       final devices = await DeviceService.fetchDevices();
+//       final matched = devices.firstWhere(
+//         (d) {
+//           final s = (d['stream_url'] ?? '') as String;
+//           final g = (d['gateway_stream_id'] ?? '') as String;
+//           return s == widget.url || g == widget.url;
+//         },
+//         orElse: () => null,
+//       );
+
+//       if (matched != null) {
+//         setState(() {
+//           _deviceId = matched['id'] as int?;
+//           _statusMsg = null;
+//         });
+//         await _fetchLatest();
+//       } else {
+//         setState(() {
+//           _statusMsg = 'Không tìm thấy thiết bị khớp. Chưa có ảnh hiển thị.';
+//         });
+//       }
+//     } catch (e) {
+//       setState(() {
+//         _statusMsg = 'Lỗi khi tìm thiết bị';
+//       });
+//     } finally {
+//       setState(() {
+//         _loading = false;
+//       });
+//     }
+//   }
+
+//   Future<void> _fetchLatest() async {
+//     if (_deviceId == null) return;
+//     setState(() => _loading = true);
+//     try {
+//       final data = await DeviceService.fetchLatest(_deviceId!);
+//       if (data != null && data['found'] == true && data['img_url'] != null) {
+//         var url = data['img_url'] as String;
+//         if (!url.startsWith('http')) {
+//           url = ApiBase.host + url;
+//         }
+//         setState(() {
+//           _imageUrl = url;
+//           _statusMsg = null;
+//         });
+//       } else {
+//         setState(() {
+//           _statusMsg = 'Chưa có ảnh phân tích gần đây.';
+//         });
+//       }
+//     } catch (e) {
+//       setState(() {
+//         _statusMsg = 'Lỗi khi tải ảnh';
+//       });
+//     } finally {
+//       setState(() => _loading = false);
+//     }
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final l10n = AppLocalizations.of(context);
+//     return Stack(
+//       children: [
+//         AspectRatio(
+//           aspectRatio: 16 / 9,
+//           child: Container(
+//             color: Colors.black,
+//             child: _imageUrl == null
+//                 ? Center(
+//                     child: _loading
+//                         ? const CircularProgressIndicator()
+//                         : Text(
+//                             _statusMsg ?? l10n.translate('camera_hint'),
+//                             textAlign: TextAlign.center,
+//                             style: const TextStyle(color: Colors.white70),
+//                           ),
+//                   )
+//                 : Image.network(
+//                     _imageUrl!,
+//                     fit: BoxFit.cover,
+//                     errorBuilder: (ctx, err, st) => Center(
+//                       child: Text(
+//                         l10n.translate('camera_hint'),
+//                         style: const TextStyle(color: Colors.white70),
+//                       ),
+//                     ),
+//                   ),
+//           ),
+//         ),
+//         Positioned(
+//           right: 8,
+//           top: 8,
+//           child: Row(
+//             children: [
+//               IconButton(
+//                 icon: const Icon(Icons.refresh, color: Colors.white),
+//                 onPressed: _loading ? null : _fetchLatest,
+//                 tooltip: 'Làm mới',
+//               ),
+//             ],
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+// }
 
 // ======================= WIDGET PHỤ =======================
 

@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  #flutter_mjpeg: ^2.0.4
 
   # Gói cơ bản
   cupertino_icons: ^1.0.8
@@ -27,6 +28,7 @@ dependencies:
   # Chọn ảnh (gallery/camera)
   image_picker: ^1.1.2
   intl: ^0.19.0
+  video_player: ^2.5.1
 
 dev_dependencies:
   flutter_test:

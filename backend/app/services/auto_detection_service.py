@@ -242,15 +242,24 @@ def detect_from_camera_auto(
     THIS_DIR = Path(__file__).resolve().parent  # .../backend/app/services
     REPO_ROOT = THIS_DIR.parents[2]  # go up to repo root
     MODEL_PATH = os.getenv("MODEL_PATH", str(REPO_ROOT / "ml/exports/v1.0/best.pt"))
-    LABELS_PATH = os.getenv("LABELS_PATH", str(REPO_ROOT / "ml/exports/v1.0/labels.txt"))
-    
+
+    # Prefer the shared detector instance from inference_service if available.
+    # Otherwise, try to instantiate the YoloDetector defined in inference_service.
+    local_detector = None
     try:
-        detector = OnnxDetector(model_path=MODEL_PATH, labels_path=LABELS_PATH)
-    except FileNotFoundError:
-        return {
-            'success': False,
-            'error': f'Model not found: {MODEL_PATH}'
-        }
+        # `detector` and `YoloDetector` were imported at module top from inference_service
+        local_detector = detector
+    except NameError:
+        local_detector = None
+
+    if local_detector is None:
+        try:
+            local_detector = YoloDetector(MODEL_PATH)
+        except FileNotFoundError:
+            return {
+                'success': False,
+                'error': f'Model not found: {MODEL_PATH}'
+            }
     
     # 3. Detect từng ảnh và tổng hợp kết quả
     all_detections = []
@@ -259,22 +268,26 @@ def detect_from_camera_auto(
     
     for i, img_data in enumerate(images):
         try:
-            # Convert bytes to PIL Image
-            img = Image.open(BytesIO(img_data))
-            # Detect using infer_top1
-            result = detector.infer_top1(img)
-            
-            # Convert result to format expected by LLM service
-            class_name = result.get('disease', 'Không xác định')
-            confidence = result.get('confidence', 0.0)
-            
+            # Use the detector's byte-based predict API
+            pred = local_detector.predict_bytes(img_data)
+
+            # Normalize to expected keys
+            if not pred or pred.get('num_detections', 0) == 0:
+                class_name = 'Không xác định'
+                confidence = 0.0
+            else:
+                top = pred.get('detections', [])[0]
+                # prefer raw class key if present, otherwise use class_name
+                class_name = top.get('class_key') or top.get('class_name') or 'Không xác định'
+                confidence = float(top.get('confidence', 0.0))
+
             detection_item = {
                 'class_name': class_name,
                 'confidence': confidence
             }
-            
+
             all_detections.append(detection_item)
-            
+
             # Tìm detection có confidence cao nhất
             if confidence > best_confidence:
                 best_confidence = confidence

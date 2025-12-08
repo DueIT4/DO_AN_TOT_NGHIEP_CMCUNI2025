@@ -24,6 +24,7 @@ class Device(Base):
         default="active"
     )
     stream_url = Column(String(700))
+    gateway_stream_id = Column(String(255), nullable=True, unique=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

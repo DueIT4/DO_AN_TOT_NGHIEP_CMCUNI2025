@@ -2,6 +2,7 @@
 """
 Scheduler để tự động quét ảnh từ camera 2 lần/ngày
 """
+from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
@@ -51,36 +52,59 @@ def scan_all_cameras():
     finally:
         db.close()
 
+# def start_scheduler():
+#     """
+#     Khởi động scheduler với 2 lần quét mỗi ngày:
+#     - 8:00 sáng
+#     - 18:00 chiều
+#     """
+#     if scheduler.running:
+#         logger.warning("[Scheduler] Scheduler đã chạy rồi!")
+#         return
+    
+#     # Thêm job quét vào 8:00 sáng mỗi ngày
+#     scheduler.add_job(
+#         scan_all_cameras,
+#         trigger=CronTrigger(hour=8, minute=0),
+#         id='morning_scan',
+#         name='Quét camera buổi sáng (8:00)',
+#         replace_existing=True
+#     )
+    
+#     # Thêm job quét vào 18:00 chiều mỗi ngày
+#     scheduler.add_job(
+#         scan_all_cameras,
+#         trigger=CronTrigger(hour=18, minute=0),
+#         id='evening_scan',
+#         name='Quét camera buổi chiều (18:00)',
+#         replace_existing=True
+#     )
+    
+#     scheduler.start()
+#     logger.info("[Scheduler] Đã khởi động scheduler - Quét camera 2 lần/ngày (8:00 và 18:00)")
+
 def start_scheduler():
-    """
-    Khởi động scheduler với 2 lần quét mỗi ngày:
-    - 8:00 sáng
-    - 18:00 chiều
-    """
     if scheduler.running:
         logger.warning("[Scheduler] Scheduler đã chạy rồi!")
         return
-    
-    # Thêm job quét vào 8:00 sáng mỗi ngày
+
+    # ✅ TEST: quét mỗi 15 giây
     scheduler.add_job(
         scan_all_cameras,
-        trigger=CronTrigger(hour=8, minute=0),
-        id='morning_scan',
-        name='Quét camera buổi sáng (8:00)',
-        replace_existing=True
+        trigger=IntervalTrigger(seconds=30),
+        id='test_scan_every_15s',
+        name='[TEST] Quét camera mỗi 15s',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True
     )
-    
-    # Thêm job quét vào 18:00 chiều mỗi ngày
-    scheduler.add_job(
-        scan_all_cameras,
-        trigger=CronTrigger(hour=18, minute=0),
-        id='evening_scan',
-        name='Quét camera buổi chiều (18:00)',
-        replace_existing=True
-    )
-    
+
     scheduler.start()
-    logger.info("[Scheduler] Đã khởi động scheduler - Quét camera 2 lần/ngày (8:00 và 18:00)")
+    logger.info("[Scheduler] Đã khởi động scheduler - TEST mỗi 15s")
+
+
+    scheduler.start()
+    logger.info("[Scheduler] Đã khởi động scheduler - TEST mỗi 1 phút")
 
 def stop_scheduler():
     """

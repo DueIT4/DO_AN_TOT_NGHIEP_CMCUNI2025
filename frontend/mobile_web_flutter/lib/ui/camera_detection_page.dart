@@ -37,11 +37,21 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
 
   Future<void> _handlePick(ImageSource source) async {
     if (_loading.value) return;
-    final file = await _picker.pickImage(
-      source: source,
-      imageQuality: 85,
-      maxWidth: 1600,
-    );
+    XFile? file;
+    try {
+      file = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1600,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể truy cập camera/album: $e')),
+        );
+      }
+      return;
+    }
     if (file == null) return;
 
     _loading.value = true;
@@ -71,6 +81,12 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
     } finally {
       _loading.value = false;
     }
+  }
+
+  @override
+  void dispose() {
+    _loading.dispose();
+    super.dispose();
   }
 
   @override
@@ -109,48 +125,57 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                   children: [
                     _CameraPreviewBox(loading: _loading),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _handlePick(ImageSource.camera),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 14,
-                              ),
-                              backgroundColor: const Color(0xFF7CCD2B),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            icon: const Icon(Icons.camera_alt_outlined),
-                            label: const Text(
-                              'Chụp ảnh',
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _handlePick(ImageSource.gallery),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 14,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _loading,
+                      builder: (_, bool isLoading, __) {
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: isLoading
+                                    ? null
+                                    : () => _handlePick(ImageSource.camera),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  backgroundColor: const Color(0xFF7CCD2B),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.camera_alt_outlined),
+                                label: const Text(
+                                  'Chụp ảnh',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
                               ),
                             ),
-                            icon: const Icon(Icons.photo_library_outlined),
-                            label: const Text(
-                              'Thư viện',
-                              style: TextStyle(fontWeight: FontWeight.w600),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: isLoading
+                                    ? null
+                                    : () => _handlePick(ImageSource.gallery),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.photo_library_outlined),
+                                label: const Text(
+                                  'Thư viện',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -430,4 +455,3 @@ class _DetectionCard extends StatelessWidget {
     );
   }
 }
-

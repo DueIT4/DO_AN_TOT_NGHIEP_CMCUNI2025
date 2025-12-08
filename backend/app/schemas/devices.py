@@ -13,6 +13,7 @@ class DeviceBase(BaseModel):
     location: Optional[str] = None
     status: Optional[str] = "active"
     stream_url: Optional[str] = None
+    gateway_stream_id: Optional[str] = None
 
     # ✅ Chuẩn hóa parent_device_id: nếu = 0 hoặc "0" -> None
     @validator("parent_device_id", pre=True)
@@ -63,6 +64,7 @@ class DeviceOut(BaseModel):
     location: Optional[str]
     status: str
     stream_url: Optional[str]
+    gateway_stream_id: Optional[str]
     created_at: datetime
     updated_at: datetime
 

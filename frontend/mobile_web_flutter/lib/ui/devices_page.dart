@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import 'camera_detection_page.dart';
 import 'user_settings_page.dart';
+import '../services/device_service.dart';
 
 enum DeviceCategory { camera, sensor }
 
 class DeviceInfo {
+  final int? deviceId;
   final String name;
   final DeviceCategory category;
   final bool isOnline;
@@ -15,13 +17,16 @@ class DeviceInfo {
   final int? batteryPercent;
   final int? humidityPercent;
   final DateTime updatedAt;
+  final String? latestImageUrl;
 
   const DeviceInfo({
+    this.deviceId,
     required this.name,
     required this.category,
     required this.isOnline,
     required this.icon,
     required this.updatedAt,
+    this.latestImageUrl,
     this.bandwidthMbps,
     this.batteryPercent,
     this.humidityPercent,
@@ -36,35 +41,7 @@ class DevicesPage extends StatefulWidget {
 }
 
 class _DevicesPageState extends State<DevicesPage> {
-  final List<DeviceInfo> _devices = [
-    DeviceInfo(
-      name: 'Camera chính',
-      category: DeviceCategory.camera,
-      isOnline: true,
-      icon: Icons.videocam_outlined,
-      bandwidthMbps: 25,
-      batteryPercent: 85,
-      updatedAt: DateTime.now().subtract(const Duration(minutes: 1)),
-    ),
-    DeviceInfo(
-      name: 'Cảm biến nhiệt độ A1',
-      category: DeviceCategory.sensor,
-      isOnline: true,
-      icon: Icons.thermostat_outlined,
-      humidityPercent: 85,
-      batteryPercent: 80,
-      updatedAt: DateTime.now().subtract(const Duration(minutes: 2)),
-    ),
-    DeviceInfo(
-      name: 'Cảm biến nhiệt độ B2',
-      category: DeviceCategory.sensor,
-      isOnline: true,
-      icon: Icons.water_drop_outlined,
-      humidityPercent: 83,
-      batteryPercent: 86,
-      updatedAt: DateTime.now().subtract(const Duration(minutes: 5)),
-    ),
-  ];
+  List<DeviceInfo> _devices = [];
 
   DeviceCategory? _filter; // null = all
 
@@ -81,6 +58,56 @@ class _DevicesPageState extends State<DevicesPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Tính năng thêm thiết bị sẽ sớm có.')),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDevices();
+  }
+
+  Future<void> _loadDevices() async {
+    try {
+      final list = await DeviceService.fetchDevices();
+      final items = <DeviceInfo>[];
+      for (final d in list) {
+        final name = (d['name'] ?? 'Thiết bị').toString();
+        final streamUrl = (d['stream_url'] ?? '').toString();
+        final gateway = (d['gateway_stream_id'] ?? '').toString();
+        final isCamera = (streamUrl.isNotEmpty || gateway.isNotEmpty);
+        DateTime updated = DateTime.now();
+        final updatedRaw = d['updated_at']?.toString();
+        if (updatedRaw != null) {
+          try {
+            updated = DateTime.parse(updatedRaw);
+          } catch (_) {}
+        }
+
+        String? latestUrl;
+        if (isCamera && d['device_id'] != null) {
+          final latest = await DeviceService.fetchLatest(d['device_id']);
+          if (latest != null &&
+              latest['found'] == true &&
+              latest['img_url'] != null) {
+            latestUrl = latest['img_url'] as String?;
+          }
+        }
+
+        items.add(DeviceInfo(
+          deviceId: d['device_id'] as int?,
+          name: name,
+          category: isCamera ? DeviceCategory.camera : DeviceCategory.sensor,
+          isOnline: true,
+          icon: isCamera ? Icons.videocam_outlined : Icons.sensors_outlined,
+          updatedAt: updated,
+          latestImageUrl: latestUrl,
+        ));
+      }
+
+      if (mounted) setState(() => _devices = items);
+    } catch (e) {
+      // ignore errors for now
+    }
   }
 
   @override
@@ -395,6 +422,24 @@ class _DeviceCard extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              if (device.latestImageUrl != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    device.latestImageUrl!,
+                    height: 120,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 120,
+                      color: const Color(0xFFE8F4D9),
+                      child: const Center(child: Icon(Icons.broken_image)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ] else ...[
               Row(
                 children: [
@@ -425,4 +470,3 @@ class _DeviceCard extends StatelessWidget {
     );
   }
 }
-

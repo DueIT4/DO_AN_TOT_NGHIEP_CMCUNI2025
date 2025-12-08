@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HLS Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.0/dist/hls.min.js"></script>
+    <style>
+      html,body { margin:0; height:100%; background:black }
+      #video { width:100%; height:100%; background:black }
+    </style>
+  </head>
+  <body>
+    <video id="video" controls playsinline webkit-playsinline></video>
+    <script>
+      function getQueryParam(name) {
+        const params = new URLSearchParams(window.location.search);
+        return params.get(name);
+      }
+
+      function startHls(url) {
+        const video = document.getElementById('video');
+        if (!url) return console.error('No url');
+        try {
+          if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+              video.play().catch(()=>{});
+            });
+            window._hls = hls;
+          } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = url;
+            video.addEventListener('loadedmetadata', function() { video.play().catch(()=>{}); });
+          } else {
+            console.error('HLS not supported');
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      function stopHls() {
+        try {
+          if (window._hls) {
+            window._hls.destroy();
+            window._hls = null;
+          }
+          const video = document.getElementById('video');
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        } catch (e) {}
+      }
+
+      // If URL provided via query param, start automatically
+      const src = getQueryParam('url');
+      if (src) startHls(decodeURIComponent(src));
+
+      // expose for parent frames if needed
+      window.startHls = startHls;
+      window.stopHls = stopHls;
+    </script>
+  </body>
+</html>
