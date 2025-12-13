@@ -38,8 +38,17 @@ def start_stream(device_id: int, rtsp_url: str) -> Optional[str]:
     """
     with _lock:
         if device_id in _procs:
-            # already running
-            return hls_url_for(device_id)
+            proc = _procs[device_id]
+            # nếu process đã chết, dọn dẹp để khởi động lại
+            if proc.poll() is not None:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+                _procs.pop(device_id, None)
+            else:
+                # đang chạy -> trả về HLS hiện tại
+                return hls_url_for(device_id)
 
         out_dir = _hls_dir(device_id)
         index_path = out_dir / "index.m3u8"
@@ -47,8 +56,12 @@ def start_stream(device_id: int, rtsp_url: str) -> Optional[str]:
         # ffmpeg command: re-encode to H.264 + AAC and produce short HLS segments
         # build ffmpeg command depending on URL scheme
         cmd = ["ffmpeg", "-y"]
-        if rtsp_url.lower().startswith('rtsp://'):
+        url_lower = rtsp_url.lower()
+        if url_lower.startswith('rtsp://'):
             cmd += ["-rtsp_transport", "tcp"]
+        else:
+            # DroidCam / HTTP MJPEG streams need explicit demuxer
+            cmd += ["-f", "mjpeg", "-analyzeduration", "0", "-probesize", "32"]
         cmd += [
             "-i", rtsp_url,
             "-c:v",
@@ -92,15 +105,26 @@ def start_stream_temp(key: str, rtsp_url: str) -> Optional[str]:
     """Start ffmpeg for a temporary key (no DB)."""
     with _lock:
         if key in _temp_procs:
-            return hls_url_for_temp(key)
+            proc = _temp_procs[key]
+            if proc.poll() is not None:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+                _temp_procs.pop(key, None)
+            else:
+                return hls_url_for_temp(key)
 
         out_dir = _hls_temp_dir(key)
         index_path = out_dir / "index.m3u8"
 
         # build ffmpeg command depending on URL scheme
         cmd = ["ffmpeg", "-y"]
-        if rtsp_url.lower().startswith('rtsp://'):
+        url_lower = rtsp_url.lower()
+        if url_lower.startswith('rtsp://'):
             cmd += ["-rtsp_transport", "tcp"]
+        else:
+            cmd += ["-f", "mjpeg", "-analyzeduration", "0", "-probesize", "32"]
         cmd += [
             "-i", rtsp_url,
             "-c:v",

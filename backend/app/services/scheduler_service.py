@@ -96,7 +96,8 @@ def start_scheduler():
         name='[TEST] Quét camera mỗi 15s',
         replace_existing=True,
         max_instances=1,
-        coalesce=True
+        coalesce=True,
+        misfire_grace_time=15,
     )
 
     scheduler.start()

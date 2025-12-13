@@ -18,6 +18,7 @@ class DeviceInfo {
   final int? humidityPercent;
   final DateTime updatedAt;
   final String? latestImageUrl;
+  final String status;
 
   const DeviceInfo({
     this.deviceId,
@@ -30,6 +31,7 @@ class DeviceInfo {
     this.bandwidthMbps,
     this.batteryPercent,
     this.humidityPercent,
+    this.status = 'inactive',
   });
 }
 
@@ -42,6 +44,7 @@ class DevicesPage extends StatefulWidget {
 
 class _DevicesPageState extends State<DevicesPage> {
   List<DeviceInfo> _devices = [];
+  int? _selectedCameraId;
 
   DeviceCategory? _filter; // null = all
 
@@ -101,13 +104,47 @@ class _DevicesPageState extends State<DevicesPage> {
           icon: isCamera ? Icons.videocam_outlined : Icons.sensors_outlined,
           updatedAt: updated,
           latestImageUrl: latestUrl,
+          status: (d['status'] ?? 'inactive').toString(),
         ));
       }
 
-      if (mounted) setState(() => _devices = items);
+      if (mounted) {
+        final cameraDevices =
+            items.where((d) => d.category == DeviceCategory.camera).toList();
+        int? defaultCam;
+        if (cameraDevices.isNotEmpty) {
+          final activeCam = cameraDevices.firstWhere(
+            (d) => d.status == 'active',
+            orElse: () => cameraDevices.first,
+          );
+          defaultCam = activeCam.deviceId;
+        }
+
+        setState(() {
+          _devices = items;
+          _selectedCameraId = defaultCam;
+        });
+      }
     } catch (e) {
       // ignore errors for now
     }
+  }
+
+  void _selectCamera(DeviceInfo device) {
+    if (device.deviceId == null) return;
+    setState(() => _selectedCameraId = device.deviceId);
+    DeviceService.selectCamera(device.deviceId!).then((ok) {
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không lưu được lựa chọn camera')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Đang sử dụng camera: ${device.name}')),
+        );
+      }
+    });
   }
 
   @override
@@ -199,10 +236,51 @@ class _DevicesPageState extends State<DevicesPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                if (_devices.any((d) => d.category == DeviceCategory.camera))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline,
+                              color: Color(0xFF7CCD2B)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _devices
+                                          .where((d) =>
+                                              d.category ==
+                                              DeviceCategory.camera)
+                                          .length >
+                                      1
+                                  ? 'Chọn một camera để sử dụng (tối đa 1)'
+                                  : 'Camera sẽ được dùng mặc định',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ..._visibleDevices
                     .map((device) => Padding(
                           padding: const EdgeInsets.only(bottom: 16),
-                          child: _DeviceCard(device: device),
+                          child: _DeviceCard(
+                            device: device,
+                            isSelected:
+                                device.category == DeviceCategory.camera &&
+                                    device.deviceId != null &&
+                                    device.deviceId == _selectedCameraId,
+                            onSelect: device.category == DeviceCategory.camera
+                                ? () => _selectCamera(device)
+                                : null,
+                          ),
                         ))
                     .toList(),
                 if (_visibleDevices.isEmpty)
@@ -321,8 +399,14 @@ class _FilterButton extends StatelessWidget {
 
 class _DeviceCard extends StatelessWidget {
   final DeviceInfo device;
+  final bool isSelected;
+  final VoidCallback? onSelect;
 
-  const _DeviceCard({required this.device});
+  const _DeviceCard({
+    required this.device,
+    this.isSelected = false,
+    this.onSelect,
+  });
 
   String _statusText() => device.isOnline ? 'Đang hoạt động' : 'Ngoại tuyến';
 
@@ -401,6 +485,42 @@ class _DeviceCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (isCamera)
+                  InkWell(
+                    onTap: onSelect,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF7CCD2B)
+                            : const Color(0xFFE8F4D9),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF7CCD2B),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isSelected ? 'Đang dùng' : 'Chọn dùng',
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : const Color(0xFF4B8D1F),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 16),

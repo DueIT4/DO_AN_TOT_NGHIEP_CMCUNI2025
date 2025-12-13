@@ -17,6 +17,16 @@ class DeviceService {
     return [];
   }
 
+  static Future<bool> selectCamera(int deviceId) async {
+    final uri = Uri.parse(ApiBase.api('/devices/select_camera'));
+    final resp = await http.post(
+      uri,
+      headers: ApiClient.authHeaders(),
+      body: jsonEncode({"device_id": deviceId}),
+    );
+    return resp.statusCode >= 200 && resp.statusCode < 300;
+  }
+
   static Future<Map<String, dynamic>?> fetchLatest(int deviceId) async {
     final uri = Uri.parse(ApiBase.api('/devices/$deviceId/latest_detection'));
     final resp = await http.get(uri, headers: ApiClient.authHeaders());

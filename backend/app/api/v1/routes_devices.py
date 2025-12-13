@@ -4,9 +4,11 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.models.devices import Device
+from app.models.device_type import DeviceType
 from app.models.image_detection import Detection, Img, Disease
 from app.schemas.devices import DeviceOut
 from app.schemas.detection import DetectionHistoryItem
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -49,3 +51,34 @@ def device_latest_detection(device_id: int, db: Session = Depends(get_db), user 
         "img_url": img_row.file_url,
         "created_at": det.created_at,
     }
+
+
+class SelectCameraIn(BaseModel):
+    device_id: int
+
+
+@router.post("/select_camera")
+def select_camera(payload: SelectCameraIn, db: Session = Depends(get_db), user = Depends(get_current_user)):
+    device = db.get(Device, payload.device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    if device.user_id != user.user_id:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    # chỉ áp dụng cho thiết bị có stream (camera)
+    dt = db.get(DeviceType, device.device_type_id)
+    if not dt or not dt.has_stream:
+        raise HTTPException(status_code=400, detail="Device is not a camera")
+
+    # inactive tất cả camera của user (tránh dùng join() trong update gây InvalidRequestError)
+    db.query(Device).filter(
+        Device.user_id == user.user_id,
+        Device.device_type.has(DeviceType.has_stream == True)
+    ).update({Device.status: "inactive"}, synchronize_session=False)
+
+    # set active cho camera được chọn
+    device.status = "active"
+    db.commit()
+    db.refresh(device)
+
+    return {"selected_device_id": device.device_id, "status": device.status}

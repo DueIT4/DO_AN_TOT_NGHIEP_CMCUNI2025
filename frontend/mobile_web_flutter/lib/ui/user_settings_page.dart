@@ -9,6 +9,7 @@ import '../services/user_service.dart';
 import 'camera_detection_page.dart';
 import 'devices_page.dart';
 import 'login_page.dart';
+import 'support_list_page.dart';
 
 class UserSettingsPage extends StatefulWidget {
   const UserSettingsPage({super.key});
@@ -20,8 +21,7 @@ class UserSettingsPage extends StatefulWidget {
 class _UserSettingsPageState extends State<UserSettingsPage> {
   late Future<UserProfile> _profileFuture;
   bool _notificationsEnabled = true;
-  String _currentLanguageCode =
-      LanguageService.instance.locale.languageCode;
+  String _currentLanguageCode = LanguageService.instance.locale.languageCode;
   final ImagePicker _avatarPicker = ImagePicker();
   bool _avatarUploading = false;
 
@@ -71,8 +71,8 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                 Navigator.of(context).pop(updated);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(AppLocalizations.of(context)
-                        .translate('info_updated')),
+                    content: Text(
+                        AppLocalizations.of(context).translate('info_updated')),
                   ),
                 );
               }
@@ -191,8 +191,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                       : null,
                   onTap: () {
                     LanguageService.instance.setLocale(locale);
-                    setState(() =>
-                        _currentLanguageCode = locale.languageCode);
+                    setState(() => _currentLanguageCode = locale.languageCode);
                     Navigator.pop(ctx);
                   },
                 ),
@@ -327,8 +326,9 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                           child: Column(
                             children: [
                               GestureDetector(
-                                onTap:
-                                    _avatarUploading ? null : _showAvatarActions,
+                                onTap: _avatarUploading
+                                    ? null
+                                    : _showAvatarActions,
                                 child: SizedBox(
                                   width: 120,
                                   height: 120,
@@ -337,11 +337,10 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                                     children: [
                                       CircleAvatar(
                                         radius: 56,
-                                        backgroundImage:
-                                            profile.avatarUrl.isNotEmpty
-                                                ? NetworkImage(
-                                                    profile.avatarUrl)
-                                                : null,
+                                        backgroundImage: profile
+                                                .avatarUrl.isNotEmpty
+                                            ? NetworkImage(profile.avatarUrl)
+                                            : null,
                                         child: profile.avatarUrl.isEmpty
                                             ? const Icon(Icons.person,
                                                 size: 48, color: Colors.white)
@@ -446,6 +445,21 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                               );
                             },
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        _SettingTile(
+                          icon: Icons.support_agent_outlined,
+                          label: 'Hỗ trợ',
+                          trailing:
+                              const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SupportListPage(),
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 12),
                         _SettingTile(
@@ -564,4 +578,3 @@ class _SettingTile extends StatelessWidget {
     );
   }
 }
-

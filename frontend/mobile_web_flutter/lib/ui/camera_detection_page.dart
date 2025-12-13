@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -21,6 +23,8 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
   final ValueNotifier<bool> _loading = ValueNotifier(false);
 
   List<DetectionRecord> _history = const [];
+  Uint8List? _previewBytes;
+  String? _previewUrl;
 
   @override
   void initState() {
@@ -54,6 +58,17 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
     }
     if (file == null) return;
 
+    // Hiển thị ngay ảnh vừa chọn trong khung preview
+    try {
+      final bytes = await file.readAsBytes();
+      setState(() {
+        _previewBytes = bytes;
+        _previewUrl = null;
+      });
+    } catch (_) {
+      // bỏ qua lỗi đọc bytes để không chặn flow phân tích
+    }
+
     _loading.value = true;
     try {
       final record = await DetectionService.analyzeImage(
@@ -65,6 +80,8 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       if (!mounted) return;
       setState(() {
         _history = [record, ..._history];
+        _previewBytes = record.imageBytes ?? _previewBytes;
+        _previewUrl = record.imageUrl ?? _previewUrl;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -123,7 +140,11 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   children: [
-                    _CameraPreviewBox(loading: _loading),
+                    _CameraPreviewBox(
+                      loading: _loading,
+                      previewBytes: _previewBytes,
+                      previewUrl: _previewUrl,
+                    ),
                     const SizedBox(height: 16),
                     ValueListenableBuilder<bool>(
                       valueListenable: _loading,
@@ -263,75 +284,118 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
 
 class _CameraPreviewBox extends StatelessWidget {
   final ValueNotifier<bool> loading;
+  final Uint8List? previewBytes;
+  final String? previewUrl;
 
-  const _CameraPreviewBox({required this.loading});
+  const _CameraPreviewBox({
+    required this.loading,
+    this.previewBytes,
+    this.previewUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 220,
+    Widget child;
+    if (previewBytes != null) {
+      child = Image.memory(
+        previewBytes!,
+        fit: BoxFit.cover,
+      );
+    } else if (previewUrl != null && previewUrl!.isNotEmpty) {
+      child = Image.network(
+        previewUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _placeholder(),
+        loadingBuilder: (context, widget, progress) {
+          if (progress == null) return widget;
+          return Stack(
+            children: [
+              Positioned.fill(child: _placeholder()),
+              const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      child = _placeholder();
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        height: 220,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF101010), Color(0xFF202020)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(child: child),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: ValueListenableBuilder(
+                valueListenable: loading,
+                builder: (_, bool isLoading, __) {
+                  if (!isLoading) return const SizedBox.shrink();
+                  return Container(
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Đang phân tích...',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white10),
         gradient: const LinearGradient(
           colors: [Color(0xFF101010), Color(0xFF202020)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: const Center(
-                child: Text(
-                  'Luồng camera trực tiếp sẽ hiển thị tại đây',
-                  style: TextStyle(color: Colors.white70),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomRight,
-            child: ValueListenableBuilder(
-              valueListenable: loading,
-              builder: (_, bool isLoading, __) {
-                if (!isLoading) return const SizedBox.shrink();
-                return Container(
-                  margin: const EdgeInsets.all(16),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Đang phân tích...',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+      child: const Center(
+        child: Text(
+          'Ảnh vừa tải lên sẽ hiển thị tại đây',
+          style: TextStyle(color: Colors.white70),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }

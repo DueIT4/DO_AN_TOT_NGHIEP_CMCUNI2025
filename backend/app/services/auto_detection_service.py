@@ -228,7 +228,12 @@ def detect_from_camera_auto(
     
     # 1. Lấy nhiều ảnh từ camera
     logger.info(f"[AutoDetection] Lấy {num_images} ảnh từ camera {device.device_id}...")
-    images = capture_multiple_images(device.stream_url, count=num_images, interval=1.0)
+    images = capture_multiple_images(
+        device.stream_url,
+        count=num_images,
+        interval=1.0,
+        device_id=device.device_id,
+    )
     
     if not images:
         return {

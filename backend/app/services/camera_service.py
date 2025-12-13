@@ -129,7 +129,39 @@ def _capture_from_rtsp(rtsp_url: str, timeout: int = 10) -> Optional[bytes]:
         logger.error(f"[Camera] Error capturing RTSP: {e}")
         return None
 
-def capture_multiple_images(stream_url: str, count: int = 3, interval: float = 1.0) -> list[bytes]:
+def _capture_image_from_hls(device_id: int) -> bytes | None:
+    """Lấy một frame từ HLS đã được stream_service tạo sẵn.
+    Ưu tiên dùng khi RTSP bị độc quyền bởi ffmpeg.
+    """
+    try:
+        hls_dir = Path("media") / "hls" / str(device_id)
+        if not hls_dir.exists():
+            return None
+
+        segments = sorted(hls_dir.glob("*.ts"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not segments:
+            return None
+
+        latest = segments[0]
+        cap = cv2.VideoCapture(str(latest))
+        if not cap.isOpened():
+            return None
+        ret, frame = cap.read()
+        cap.release()
+        if not ret or frame is None:
+            return None
+
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(frame_rgb)
+        output = BytesIO()
+        img.save(output, format='JPEG', quality=85)
+        return output.getvalue()
+    except Exception as e:
+        logger.error(f"[Camera] Error capturing HLS frame for device {device_id}: {e}")
+        return None
+
+
+def capture_multiple_images(stream_url: str, count: int = 3, interval: float = 1.0, device_id: int | None = None) -> list[bytes]:
     """
     Lấy nhiều ảnh từ camera (để tăng độ chính xác).
     
@@ -145,7 +177,12 @@ def capture_multiple_images(stream_url: str, count: int = 3, interval: float = 1
     
     images = []
     for i in range(count):
-        img_data = capture_image_from_stream(stream_url)
+        img_data = None
+        # Nếu có device_id, thử lấy từ HLS trước (tránh xung đột RTSP)
+        if device_id is not None:
+            img_data = _capture_image_from_hls(device_id)
+        if img_data is None:
+            img_data = capture_image_from_stream(stream_url)
         if img_data:
             images.append(img_data)
         
