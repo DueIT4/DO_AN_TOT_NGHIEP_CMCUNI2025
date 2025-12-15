@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_web_flutter/core/admin_user_service.dart';
+import 'package:mobile_web_flutter/core/toast.dart';
 
 class AdminUsersPage extends StatefulWidget {
   const AdminUsersPage({super.key});
@@ -56,11 +57,12 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         _searchResult = res.items;
       });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi tìm kiếm: $e')),
-        );
-      }
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        message: 'Lỗi tìm kiếm: $e',
+        type: ToastType.error,
+      );
     }
   }
 
@@ -74,11 +76,15 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (u['email'] != null)
-              Text('Email: ${u['email']}',
-                  style: const TextStyle(fontSize: 13)),
+              Text(
+                'Email: ${u['email']}',
+                style: const TextStyle(fontSize: 13),
+              ),
             if (u['phone'] != null)
-              Text('SĐT: ${u['phone']}',
-                  style: const TextStyle(fontSize: 13)),
+              Text(
+                'SĐT: ${u['phone']}',
+                style: const TextStyle(fontSize: 13),
+              ),
             if (u['address'] != null &&
                 (u['address'] as String).isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -104,6 +110,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => _UserFormDialog(
+        key: UniqueKey(),
         title: 'Tạo người dùng mới',
         onSubmit: (data) async {
           await AdminUserService.createUser(
@@ -120,6 +127,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     );
 
     if (ok == true) {
+      if (mounted) {
+        AppToast.show(
+          context,
+          message: 'Tạo người dùng thành công',
+          type: ToastType.success,
+        );
+      }
       _reload();
     }
   }
@@ -128,6 +142,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => _UserFormDialog(
+        key: UniqueKey(),
         title: 'Cập nhật người dùng',
         initialUser: user,
         onSubmit: (data) async {
@@ -146,16 +161,40 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     );
 
     if (ok == true) {
+      if (mounted) {
+        AppToast.show(
+          context,
+          message: 'Cập nhật người dùng thành công',
+          type: ToastType.success,
+        );
+      }
       _reload();
     }
   }
 
   Future<void> _setStatus(int userId, String status) async {
-    await AdminUserService.updateUser(
-      userId: userId,
-      status: status,
-    );
-    _reload();
+    try {
+      await AdminUserService.updateUser(
+        userId: userId,
+        status: status,
+      );
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        message: status == 'active'
+            ? 'Đã kích hoạt người dùng'
+            : 'Đã ngưng hoạt động người dùng',
+        type: ToastType.success,
+      );
+      _reload();
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        message: 'Lỗi cập nhật trạng thái: $e',
+        type: ToastType.error,
+      );
+    }
   }
 
   Widget _buildStatusChip(String? status) {
@@ -251,8 +290,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               children: [
                 // Header card
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   color: Theme.of(context)
                       .colorScheme
                       .surfaceVariant
@@ -275,8 +314,9 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                               controller: _searchCtrl,
                               decoration: InputDecoration(
                                 hintText: 'Tìm theo tên, email, SĐT...',
-                                contentPadding:
-                                    const EdgeInsets.symmetric(horizontal: 12),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -290,7 +330,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                             style: FilledButton.styleFrom(
                               backgroundColor: Colors.blue,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12),
+                                horizontal: 12,
+                              ),
                             ),
                             child: const Icon(Icons.search, size: 20),
                           ),
@@ -315,7 +356,9 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 // Nội dung
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: FutureBuilder<List<Map<String, dynamic>>>(
                     future: _future,
                     builder: (context, snap) {
@@ -341,8 +384,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                       if (users.isEmpty) {
                         return const Padding(
                           padding: EdgeInsets.all(24),
-                          child:
-                              Text('Chưa có người dùng nào trong hệ thống.'),
+                          child: Text('Chưa có người dùng nào trong hệ thống.'),
                         );
                       }
 
@@ -412,31 +454,31 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                                           _setStatus(id, 'inactive');
                                         }
                                       },
-                                      itemBuilder: (context) => [
-                                        const PopupMenuItem(
+                                      itemBuilder: (context) => const [
+                                        PopupMenuItem(
                                           value: 'view',
                                           child: ListTile(
                                             leading: Icon(Icons.info_outline),
                                             title: Text('Xem chi tiết'),
                                           ),
                                         ),
-                                        const PopupMenuItem(
+                                        PopupMenuItem(
                                           value: 'edit',
                                           child: ListTile(
                                             leading: Icon(Icons.edit),
                                             title: Text('Sửa'),
                                           ),
                                         ),
-                                        const PopupMenuDivider(),
-                                        const PopupMenuItem(
+                                        PopupMenuDivider(),
+                                        PopupMenuItem(
                                           value: 'active',
                                           child: ListTile(
-                                            leading:
-                                                Icon(Icons.check_circle_outline),
+                                            leading: Icon(
+                                                Icons.check_circle_outline),
                                             title: Text('Kích hoạt'),
                                           ),
                                         ),
-                                        const PopupMenuItem(
+                                        PopupMenuItem(
                                           value: 'inactive',
                                           child: ListTile(
                                             leading: Icon(Icons.block),
@@ -471,6 +513,7 @@ class _UserFormDialog extends StatefulWidget {
   final Future<void> Function(Map<String, dynamic> data) onSubmit;
 
   const _UserFormDialog({
+    super.key,
     required this.title,
     this.initialUser,
     required this.onSubmit,
@@ -494,7 +537,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
 
   bool get _isEdit => widget.initialUser != null;
 
-  // role (khớp DB: admin, support, support_admin, viewer)
+  // role (khớp DB)
   late String _roleValue;
 
   static const Map<String, int> _roleIdMap = {
@@ -522,28 +565,21 @@ class _UserFormDialogState extends State<_UserFormDialog> {
   void initState() {
     super.initState();
     _usernameCtrl = TextEditingController(
-        text: widget.initialUser != null
-            ? widget.initialUser!['username']
-            : '');
+      text: widget.initialUser != null ? widget.initialUser!['username'] : '',
+    );
     _phoneCtrl = TextEditingController(
-        text: widget.initialUser != null
-            ? widget.initialUser!['phone']
-            : '');
+      text: widget.initialUser != null ? widget.initialUser!['phone'] : '',
+    );
     _emailCtrl = TextEditingController(
-        text: widget.initialUser != null
-            ? widget.initialUser!['email'] ?? ''
-            : '');
+      text: widget.initialUser != null ? widget.initialUser!['email'] ?? '' : '',
+    );
     _addressCtrl = TextEditingController(
-        text: widget.initialUser != null
-            ? widget.initialUser!['address'] ?? ''
-            : '');
+      text: widget.initialUser != null ? widget.initialUser!['address'] ?? '' : '',
+    );
     _passwordCtrl = TextEditingController();
 
-    // role mặc định
-    if (widget.initialUser != null &&
-        widget.initialUser!['role_type'] != null) {
-      _roleValue =
-          (widget.initialUser!['role_type'] as String).toLowerCase();
+    if (widget.initialUser != null && widget.initialUser!['role_type'] != null) {
+      _roleValue = (widget.initialUser!['role_type'] as String).toLowerCase();
     } else {
       _roleValue = 'viewer';
     }
@@ -551,11 +587,8 @@ class _UserFormDialogState extends State<_UserFormDialog> {
       _roleValue = 'viewer';
     }
 
-    // status mặc định
-    if (widget.initialUser != null &&
-        widget.initialUser!['status'] != null) {
-      _statusValue =
-          (widget.initialUser!['status'] as String).toLowerCase();
+    if (widget.initialUser != null && widget.initialUser!['status'] != null) {
+      _statusValue = (widget.initialUser!['status'] as String).toLowerCase();
     } else {
       _statusValue = 'active';
     }
@@ -584,12 +617,10 @@ class _UserFormDialogState extends State<_UserFormDialog> {
 
     final String username = _usernameCtrl.text.trim();
     final String phone = _phoneCtrl.text.trim();
-    final String? email = _emailCtrl.text.trim().isEmpty
-        ? null
-        : _emailCtrl.text.trim();
-    final String? address = _addressCtrl.text.trim().isEmpty
-        ? null
-        : _addressCtrl.text.trim();
+    final String? email =
+        _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim();
+    final String? address =
+        _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim();
     final String? password =
         _passwordCtrl.text.isEmpty ? null : _passwordCtrl.text;
 
@@ -673,8 +704,6 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   maxLines: 2,
                 ),
                 const SizedBox(height: 12),
-
-                // Vai trò
                 DropdownButtonFormField<String>(
                   value: _roleValue,
                   items: _roleOptions
@@ -696,8 +725,6 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // Trạng thái
                 DropdownButtonFormField<String>(
                   value: _statusValue,
                   items: _statusOptions
@@ -719,7 +746,6 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _passwordCtrl,
                   decoration: InputDecoration(
@@ -741,8 +767,10 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   const SizedBox(height: 8),
                   Text(
                     _error!,
-                    style:
-                        const TextStyle(color: Colors.red, fontSize: 12),
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ],

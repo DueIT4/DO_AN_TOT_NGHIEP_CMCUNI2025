@@ -1,19 +1,21 @@
-
-// lib/widgets/web_navbar.dart
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../src/routes/web_routes.dart';
 import '../core/api_base.dart';
 import '../core/user_service.dart';
+import '../src/routes/web_routes.dart';
 
 class WebNavbar extends StatefulWidget {
-  final int currentIndex;
-  final void Function(int) onItemTap;
+  /// Giữ tương thích code cũ:
+  /// - Nếu truyền currentIndex/onItemTap => hoạt động kiểu cũ (setState)
+  /// - Nếu không truyền => hoạt động kiểu chuẩn web (context.go)
+  final int? currentIndex;
+  final void Function(int)? onItemTap;
 
   const WebNavbar({
     super.key,
-    required this.currentIndex,
-    required this.onItemTap,
+    this.currentIndex,
+    this.onItemTap,
   });
 
   @override
@@ -22,7 +24,8 @@ class WebNavbar extends StatefulWidget {
 
 class _WebNavbarState extends State<WebNavbar> {
   bool _isAdmin = false;
-  bool _isLoggedIn = false; // giữ nhưng không dùng auth hiển thị
+
+  bool get _legacyMode => widget.currentIndex != null && widget.onItemTap != null;
 
   @override
   void initState() {
@@ -31,32 +34,54 @@ class _WebNavbarState extends State<WebNavbar> {
   }
 
   Future<void> _checkUser() async {
-    if (!mounted) return;
-
     final hasToken =
         ApiBase.bearerToken != null && ApiBase.bearerToken!.isNotEmpty;
 
-    if (hasToken) {
-      _isLoggedIn = true;
-      try {
-        _isAdmin = await UserService.isAdmin();
-      } catch (e) {
-        _isAdmin = false;
-        _isLoggedIn = false;
-      }
-    } else {
-      _isLoggedIn = false;
-      _isAdmin = false;
+    if (!hasToken) {
+      if (mounted) setState(() => _isAdmin = false);
+      return;
     }
 
-    if (mounted) {
-      setState(() {});
+    try {
+      final ok = await UserService.isAdmin();
+      if (mounted) setState(() => _isAdmin = ok);
+    } catch (_) {
+      if (mounted) setState(() => _isAdmin = false);
+    }
+  }
+
+  int _routeIndex(BuildContext context) {
+    final path = GoRouterState.of(context).uri.path;
+    if (path == WebRoutes.weather) return 1;
+    if (path == WebRoutes.news) return 2;
+    return 0;
+  }
+
+  void _tapIndex(BuildContext context, int index) {
+    if (_legacyMode) {
+      // kiểu cũ: chỉ đổi nội dung
+      widget.onItemTap!(index);
+      return;
+    }
+
+    // kiểu chuẩn web: đổi URL
+    switch (index) {
+      case 0:
+        context.go(WebRoutes.home);
+        break;
+      case 1:
+        context.go(WebRoutes.weather);
+        break;
+      case 2:
+        context.go(WebRoutes.news);
+        break;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 900;
+    final current = _legacyMode ? widget.currentIndex! : _routeIndex(context);
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -75,9 +100,8 @@ class _WebNavbarState extends State<WebNavbar> {
       ),
       child: Row(
         children: [
-          // Logo -> luôn về tab "Trang chủ" (index 0)
           InkWell(
-            onTap: () => widget.onItemTap(0),
+            onTap: () => _tapIndex(context, 0),
             mouseCursor: SystemMouseCursors.click,
             child: Row(
               children: [
@@ -94,30 +118,35 @@ class _WebNavbarState extends State<WebNavbar> {
               ],
             ),
           ),
-
           const Spacer(),
-
           Wrap(
             spacing: 8,
             children: [
               _navItem(
                 title: 'Trang chủ',
-                index: 0,
+                active: current == 0,
+                onTap: () => _tapIndex(context, 0),
               ),
               _navItem(
                 title: 'Thời tiết',
-                index: 1,
+                active: current == 1,
+                onTap: () => _tapIndex(context, 1),
               ),
               _navItem(
                 title: 'Tin tức',
-                index: 2,
+                active: current == 2,
+                onTap: () => _tapIndex(context, 2),
               ),
-
               if (_isAdmin)
                 FilledButton.icon(
                   onPressed: () {
-                    // Admin là trang riêng -> vẫn dùng Navigator
-                    Navigator.of(context).pushNamed(WebRoutes.admin);
+                    if (_legacyMode) {
+                      // nếu đang legacy mode, vẫn cho đi admin bằng navigator stack cũ
+                      // nhưng tốt nhất là chuyển sang go_router hết.
+                      context.go(WebRoutes.adminDashboard);
+                    } else {
+                      context.go(WebRoutes.adminDashboard);
+                    }
                   },
                   icon: const Icon(Icons.admin_panel_settings, size: 18),
                   label: const Text('Admin'),
@@ -134,12 +163,11 @@ class _WebNavbarState extends State<WebNavbar> {
 
   Widget _navItem({
     required String title,
-    required int index,
+    required bool active,
+    required VoidCallback onTap,
   }) {
-    final isActive = widget.currentIndex == index;
-
     return InkWell(
-      onTap: () => widget.onItemTap(index),
+      onTap: onTap,
       mouseCursor: SystemMouseCursors.click,
       borderRadius: BorderRadius.circular(6),
       child: Padding(
@@ -149,7 +177,7 @@ class _WebNavbarState extends State<WebNavbar> {
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: isActive ? Colors.green.shade700 : Colors.black87,
+            color: active ? Colors.green.shade700 : Colors.black87,
           ),
         ),
       ),

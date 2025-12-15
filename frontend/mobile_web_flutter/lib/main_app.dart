@@ -9,9 +9,13 @@ import 'modules/auth/auth_service.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/language_service.dart';
 import 'services/api_client.dart';
+import 'ui/forgot_password_page.dart';
+import 'ui/verify_otp_page.dart';
+import 'ui/reset_password_page.dart';
 
 import 'ui/login_page.dart';
 import 'ui/home_user.dart';
+import 'ui/home_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,9 +61,14 @@ class ZestGuardMobileApp extends StatelessWidget {
             ),
           ),
           home: const LoginPage(),
-          routes: {
-            '/home_user': (_) => const HomeUserPage(),
-          },
+routes: {
+  '/home_user': (_) => const HomeShell(),
+  '/forgot_password': (_) => const ForgotPasswordPage(),
+  '/verify_otp': (_) => const VerifyOtpPage(),
+  '/reset_password': (_) => const ResetPasswordPage(),
+
+},
+
         );
       },
     );

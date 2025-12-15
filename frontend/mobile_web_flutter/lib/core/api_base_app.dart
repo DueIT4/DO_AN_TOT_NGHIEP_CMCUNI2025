@@ -15,10 +15,19 @@ class ApiBase {
 
   static const String _prefix = '/api/v1';
 
-  static Uri uri(String path) {
-    final p = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$host$_prefix$p');
-  }
+  static Uri uri(String path, {Map<String, String>? queryParameters}) {
+  final p = path.startsWith('/') ? path : '/$path';
+
+  // tạo uri gốc như cũ
+  final base = Uri.parse('$host$_prefix$p');
+
+  // nếu không truyền query => y như cũ (không ảnh hưởng api khác)
+  if (queryParameters == null || queryParameters.isEmpty) return base;
+
+  // gắn queryParameters một cách chuẩn
+  return base.replace(queryParameters: queryParameters);
+}
+
 
   // giữ tương thích nếu nơi khác còn dùng string
   static String api(String path) => uri(path).toString();

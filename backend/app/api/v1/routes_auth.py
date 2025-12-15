@@ -1,3 +1,6 @@
+import secrets
+from datetime import datetime, timedelta
+from sqlalchemy import delete
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update, and_
@@ -13,6 +16,8 @@ from app.schemas.auth import (
     SocialLoginIn,
     TokenOut,
     ForgotPasswordIn,
+    ForgotPasswordOTPIn,
+    VerifyResetOTPIn,
     ResetPasswordIn,
 )
 from app.models.user import Users, UserStatus
@@ -21,6 +26,8 @@ from app.services.confirm_token import make_confirm_token, parse_confirm_token
 from app.services.notifier import send_sms, send_email, send_facebook_dm
 from app.services.auth_jwt import make_access_token
 from app.models.role import Role, RoleType
+from app.models.password_reset import PasswordResetOTP
+
 from app.services.identity_verify import (
     phone_exists_really, verify_google_id_token, verify_facebook_access_token
 )
@@ -395,3 +402,75 @@ def send_phone_confirm(phone: str = Query(...), db: Session = Depends(get_db)):
     return {"ok": True, "message": "Đã gửi lại link xác nhận số điện thoại."}
 
 
+@router.post("/forgot-password-otp")
+def forgot_password_otp(payload: ForgotPasswordOTPIn, db: Session = Depends(get_db)):
+    if not payload.email and not payload.phone:
+        raise HTTPException(400, "Phải nhập email hoặc số điện thoại")
+
+    user = None
+    contact = None
+
+    if payload.email:
+        user = db.scalar(select(Users).where(Users.email == payload.email))
+        contact = payload.email
+    else:
+        user = db.scalar(select(Users).where(Users.phone == payload.phone))
+        contact = payload.phone
+
+    if not user:
+        # KHÔNG tiết lộ tài khoản tồn tại hay không
+        return {"ok": True, "message": "Nếu tài khoản tồn tại, OTP đã được gửi"}
+
+    # tạo OTP
+    otp = f"{secrets.randbelow(1000000):06d}"
+    expires = datetime.utcnow() + timedelta(minutes=5)
+
+    db.execute(
+        delete(PasswordResetOTP)
+        .where(PasswordResetOTP.user_id == user.user_id)
+    )
+
+    db.add(PasswordResetOTP(
+        user_id=user.user_id,
+        contact=contact,
+        otp_code=otp,
+        expires_at=expires
+    ))
+    db.commit()
+
+    if payload.email:
+        send_email(contact, "Mã OTP đặt lại mật khẩu", f"Mã OTP của bạn là: {otp}")
+    else:
+        send_sms(contact, f"OTP dat lai mat khau: {otp}")
+
+    return {"ok": True, "message": "OTP đã được gửi"}
+@router.post("/verify-reset-otp")
+def verify_reset_otp(payload: VerifyResetOTPIn, db: Session = Depends(get_db)):
+    record = db.scalar(
+        select(PasswordResetOTP)
+        .where(PasswordResetOTP.contact == payload.contact)
+    )
+
+    if not record:
+        raise HTTPException(400, "OTP không hợp lệ")
+
+    if record.expires_at < datetime.utcnow():
+        raise HTTPException(400, "OTP đã hết hạn")
+
+    if record.attempts >= 5:
+        raise HTTPException(429, "Nhập sai quá nhiều lần")
+
+    if record.otp_code != payload.otp:
+        record.attempts += 1
+        db.commit()
+        raise HTTPException(400, "OTP không đúng")
+
+    # OTP đúng → tạo reset_token
+    reset_token = make_confirm_token(
+        record.user_id, "reset", record.contact, minutes=10
+    )
+
+    db.delete(record)
+    db.commit()
+
+    return {"ok": True, "reset_token": reset_token}

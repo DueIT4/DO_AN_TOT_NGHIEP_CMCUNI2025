@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart'; // 👈 thêm import này
+import 'package:go_router/go_router.dart';
+import 'package:mobile_web_flutter/src/routes/web_routes.dart';
 
 class HomeContent extends StatelessWidget {
   const HomeContent({super.key});
@@ -41,7 +43,7 @@ class HomeContent extends StatelessWidget {
                   alignment: WrapAlignment.center,
                   children: [
                     FilledButton.icon(
-                      onPressed: () => Navigator.pushNamed(context, '/detect'),
+                  onPressed: () => context.go(WebRoutes.detect),
                       icon: const Icon(Icons.camera_alt),
                       label: const Text('Dùng thử chẩn đoán'),
                     ),

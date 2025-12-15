@@ -50,14 +50,37 @@ class _AdminShellWebState extends State<AdminShellWeb> {
     super.initState();
     _current = widget.initial;
   }
-
-  // Đổi menu (chỉ đổi body, không đổi route)
-  void _selectMenu(AdminMenu menu) {
-    if (menu == _current) return;
-    setState(() {
-      _current = menu;
-    });
+String _routeFor(AdminMenu m) {
+  switch (m) {
+    case AdminMenu.dashboard:
+      return WebRoutes.adminDashboard;
+    case AdminMenu.devices:
+      return WebRoutes.adminDevices;
+    case AdminMenu.users:
+      return WebRoutes.adminUsers;
+    case AdminMenu.notifications:
+      return WebRoutes.adminSupport; // hoặc WebRoutes.adminNoti
+    case AdminMenu.detectionHistory:
+      return WebRoutes.adminHis;
+    case AdminMenu.settings:
+      return WebRoutes.adminDashboard; // tạm, vì chưa có route settings
   }
+}
+
+void _go(AdminMenu menu) {
+  if (menu == _current) return;
+
+  final target = _routeFor(menu);
+  final currentRoute = ModalRoute.of(context)?.settings.name;
+
+  // highlight menu ngay
+  setState(() => _current = menu);
+
+  // đổi URL, không chồng stack
+  if (currentRoute != target) {
+    Navigator.of(context).pushReplacementNamed(target);
+  }
+}
 
   String get _title {
     switch (_current) {
@@ -263,7 +286,7 @@ class _AdminShellWebState extends State<AdminShellWeb> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
-        onTap: () => _selectMenu(menu), // 🔑 chỉ đổi state, không dùng Navigator
+        onTap: () =>  _go(menu), // 🔑 chỉ đổi state, không dùng Navigator
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
@@ -291,6 +314,7 @@ class _AdminShellWebState extends State<AdminShellWeb> {
         ),
       ),
     );
+    
   }
 
   // ===== Top bar =====
@@ -403,6 +427,7 @@ class _AdminShellWebState extends State<AdminShellWeb> {
       (route) => false,
     );
   }
+  
 }
 
 /// ===== Dialog xem + cập nhật thông tin cá nhân admin =====

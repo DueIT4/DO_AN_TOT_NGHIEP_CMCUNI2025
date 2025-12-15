@@ -63,6 +63,10 @@ class ForgotPasswordIn(BaseModel):
     def has_any(self) -> bool:
         return bool(self.email or self.phone)
 
+# app/schemas/auth.py
+class ForgotPasswordOTPIn(BaseModel):
+    email: str | None = None
+    phone: str | None = None
 
 class ResetPasswordIn(BaseModel):
     token: str
@@ -74,3 +78,7 @@ class ResetPasswordIn(BaseModel):
         if len(v) < 6:
             raise ValueError("Mật khẩu mới phải ít nhất 6 ký tự")
         return v
+    
+class VerifyResetOTPIn(BaseModel):
+    contact: str
+    otp: str

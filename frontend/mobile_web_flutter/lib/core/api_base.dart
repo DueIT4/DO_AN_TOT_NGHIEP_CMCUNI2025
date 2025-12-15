@@ -41,51 +41,69 @@ class ApiBase {
       };
 
   // ========================
+  // 🧩 Helpers
+  // ========================
+  static dynamic _decodeBody(http.Response r) {
+    if (r.bodyBytes.isEmpty) return null;
+    return json.decode(utf8.decode(r.bodyBytes));
+  }
+
+  static void _ensure2xx(http.Response r, String method, String path) {
+    if (r.statusCode ~/ 100 != 2) {
+      throw Exception('$method $path => ${r.statusCode}: ${r.body}');
+    }
+  }
+
+  // ========================
   // 📡 GET JSON
   // ========================
   static Future<dynamic> getJson(String path) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.get(url, headers: _headers());
-    if (r.statusCode ~/ 100 != 2) {
-      throw Exception('GET $path => ${r.statusCode}: ${r.body}');
-    }
-    return json.decode(utf8.decode(r.bodyBytes));
+    _ensure2xx(r, 'GET', path);
+    return _decodeBody(r);
   }
 
   // ========================
   // 📡 POST JSON
   // ========================
-  static Future<dynamic> postJson(
-      String path, Map<String, dynamic> body) async {
+  static Future<dynamic> postJson(String path, Map<String, dynamic> body) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.post(
       url,
       headers: _headers(),
       body: json.encode(body),
     );
-    if (r.statusCode ~/ 100 != 2) {
-      throw Exception('POST $path => ${r.statusCode}: ${r.body}');
-    }
-    if (r.body.isEmpty) return null;
-    return json.decode(utf8.decode(r.bodyBytes));
+    _ensure2xx(r, 'POST', path);
+    return _decodeBody(r);
   }
 
   // ========================
   // ✏️ PUT JSON
   // ========================
-  static Future<dynamic> putJson(
-      String path, Map<String, dynamic> body) async {
+  static Future<dynamic> putJson(String path, Map<String, dynamic> body) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.put(
       url,
       headers: _headers(),
       body: json.encode(body),
     );
-    if (r.statusCode ~/ 100 != 2) {
-      throw Exception('PUT $path => ${r.statusCode}: ${r.body}');
-    }
-    if (r.body.isEmpty) return null;
-    return json.decode(utf8.decode(r.bodyBytes));
+    _ensure2xx(r, 'PUT', path);
+    return _decodeBody(r);
+  }
+
+  // ========================
+  // 🩹 PATCH JSON  ✅ (THÊM MỚI)
+  // ========================
+  static Future<dynamic> patchJson(String path, Map<String, dynamic> body) async {
+    final url = Uri.parse('$baseURL$path');
+    final r = await http.patch(
+      url,
+      headers: _headers(),
+      body: json.encode(body),
+    );
+    _ensure2xx(r, 'PATCH', path);
+    return _decodeBody(r);
   }
 
   // ========================
@@ -94,10 +112,7 @@ class ApiBase {
   static Future<dynamic> deleteJson(String path) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.delete(url, headers: _headers());
-    if (r.statusCode ~/ 100 != 2) {
-      throw Exception('DELETE $path => ${r.statusCode}: ${r.body}');
-    }
-    if (r.body.isEmpty) return null;
-    return json.decode(utf8.decode(r.bodyBytes));
+    _ensure2xx(r, 'DELETE', path);
+    return _decodeBody(r);
   }
 }

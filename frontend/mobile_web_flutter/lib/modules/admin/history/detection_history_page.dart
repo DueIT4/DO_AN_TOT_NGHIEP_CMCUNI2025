@@ -3,6 +3,8 @@ import 'package:mobile_web_flutter/core/detection_history_service.dart';
 import 'package:mobile_web_flutter/core/api_base.dart';
 import 'dart:html' as html; // chỉ dùng cho Flutter Web
 
+import 'package:mobile_web_flutter/core/toast.dart'; // ✅ toast
+
 class AdminDetectionHistoryPage extends StatefulWidget {
   const AdminDetectionHistoryPage({super.key});
 
@@ -35,7 +37,13 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
     super.dispose();
   }
 
+  void _toast(String msg, ToastType type) {
+    if (!mounted) return;
+    AppToast.show(context, message: msg, type: type);
+  }
+
   Future<void> _fetch({int? page}) async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -48,38 +56,42 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
         page: p,
         search: _search.isEmpty ? null : _search,
       );
+
+      if (!mounted) return;
       setState(() {
         _currentPage = p;
         _data = res;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = '$e';
       });
+      _toast('Lỗi tải dữ liệu: $e', ToastType.error);
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (!mounted) return;
+      setState(() => _loading = false);
     }
   }
 
   Future<void> _onDelete(DetectionHistoryItem item) async {
+    // ✅ dùng dialogContext để pop, tránh lỗi Navigator/go_router assert
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Xoá bản ghi'),
         content: const Text('Bạn chắc chắn muốn xoá lịch sử dự đoán này?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Hủy'),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Xoá'),
           ),
-
         ],
       ),
     );
@@ -88,17 +100,13 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
 
     try {
       await _svc.deleteDetectionAdmin(item.detectionId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã xoá bản ghi.')),
-        );
-      }
-      _fetch(); // reload
+      if (!mounted) return;
+
+      _toast('Đã xoá bản ghi.', ToastType.success);
+      await _fetch(page: _currentPage); // reload an toàn
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi xoá: $e')),
-      );
+      _toast('Lỗi xoá: $e', ToastType.error);
     }
   }
 
@@ -111,7 +119,6 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
       );
     }
 
-    // file_url BE trả dạng "/media/detections/...."
     final fullUrl = '${ApiBase.baseURL}${item.fileUrl}';
 
     return ClipRRect(
@@ -166,10 +173,46 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
     );
   }
 
+  Future<void> _onExportTrain(DetectionHistoryItem item) async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+
+    try {
+      await _svc.exportToTrainData(item.detectionId);
+      if (!mounted) return;
+      _toast('Đã lưu ảnh vào dataset train.', ToastType.success);
+    } catch (e) {
+      if (!mounted) return;
+      _toast('Lỗi export: $e', ToastType.error);
+    } finally {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _onDownloadDatasetTrain() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+
+    try {
+      await _svc.downloadDatasetTrain();
+      if (!mounted) return;
+      _toast('Đang tải dataset train...', ToastType.info);
+    } catch (e) {
+      if (!mounted) return;
+      _toast('Lỗi tải dataset: $e', ToastType.error);
+    } finally {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _data?.items ?? [];
     final total = _data?.total ?? 0;
+
+    // NOTE: PAGE_SIZE giả định là const/global trong project bạn
     final totalPages =
         total == 0 ? 1 : ((total + PAGE_SIZE - 1) / PAGE_SIZE).floor();
 
@@ -188,15 +231,15 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Header
-               Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   color: Theme.of(context)
                       .colorScheme
                       .surfaceVariant
                       .withOpacity(0.8),
                   child: Row(
                     children: [
-                      // BÊN TRÁI — Title
                       Text(
                         'Lịch sử dự đoán',
                         style: Theme.of(context)
@@ -204,30 +247,25 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                             .titleMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
-
-                      const Spacer(), // đẩy phần còn lại về bên phải
-
-                      // BÊN PHẢI — Nút tải dataset
-                      FilledButton.icon(
-                        onPressed: _onDownloadDatasetTrain,
-                        icon: const Icon(Icons.download, size: 18),
-                        label: const Text('Tải dataset train'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.green.shade700,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      const Spacer(),
+                      Tooltip(
+                        message: 'Tải dataset train',
+                        child: IconButton.filledTonal(
+                          onPressed: _loading ? null : _onDownloadDatasetTrain,
+                          icon: const Icon(Icons.download, size: 20),
                         ),
                       ),
 
                       const SizedBox(width: 12),
 
-                      // Ô tìm kiếm
                       SizedBox(
                         width: 260,
                         child: TextField(
                           controller: _searchCtrl,
                           decoration: InputDecoration(
                             hintText: 'Tìm theo bệnh, user, email, SĐT...',
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 12),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -238,28 +276,26 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                           },
                         ),
                       ),
-
                       const SizedBox(width: 8),
-                      
-                      // Nút search
+
                       FilledButton(
-                        onPressed: () {
-                          _search = _searchCtrl.text.trim();
-                          _fetch(page: 1);
-                        },
+                        onPressed: _loading
+                            ? null
+                            : () {
+                                _search = _searchCtrl.text.trim();
+                                _fetch(page: 1);
+                              },
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.green,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                         ),
                         child: const Icon(Icons.search, size: 20),
                       ),
-
                       const SizedBox(width: 8),
 
-                      // Nút reload
                       IconButton(
                         tooltip: 'Tải lại',
-                        onPressed: () => _fetch(page: _currentPage),
+                        onPressed: _loading ? null : () => _fetch(page: _currentPage),
                         icon: const Icon(Icons.refresh),
                       ),
                     ],
@@ -305,54 +341,53 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                             ].where((x) => x != null && x!.isNotEmpty).join(' • ');
 
                             return ListTile(
-                            leading: _buildThumb(it),
-                            title: Text(
-                              it.diseaseName ?? 'Không xác định',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
+                              leading: _buildThumb(it),
+                              title: Text(
+                                it.diseaseName ?? 'Không xác định',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (userLabel.isNotEmpty)
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (userLabel.isNotEmpty)
+                                    Text(
+                                      userLabel,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
                                   Text(
-                                    userLabel,
+                                    'Thời gian: ${it.createdAt.toLocal()}',
                                     style: const TextStyle(fontSize: 12),
                                   ),
-                                Text(
-                                  'Thời gian: ${it.createdAt.toLocal()}',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                const SizedBox(height: 4),
-                                _buildStatusTag(it),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Lưu làm data train',
-                                  icon: const Icon(
-                                    Icons.download_for_offline,
-                                    color: Colors.green,
-                                    size: 20,
+                                  const SizedBox(height: 4),
+                                  _buildStatusTag(it),
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Lưu làm data train',
+                                    icon: const Icon(
+                                      Icons.download_for_offline,
+                                      color: Colors.green,
+                                      size: 20,
+                                    ),
+                                    onPressed: _loading ? null : () => _onExportTrain(it),
                                   ),
-                                  onPressed: () => _onExportTrain(it),
-                                ),
-                                IconButton(
-                                  tooltip: 'Xoá',
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                    size: 18,
+                                  IconButton(
+                                    tooltip: 'Xoá',
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: Colors.red,
+                                      size: 18,
+                                    ),
+                                    onPressed: _loading ? null : () => _onDelete(it),
                                   ),
-                                  onPressed: () => _onDelete(it),
-                                ),
-                              ],
-                            ),
-                          );
-
+                                ],
+                              ),
+                            );
                           },
                         ),
                         const SizedBox(height: 12),
@@ -372,8 +407,7 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                                   icon: const Icon(Icons.chevron_left),
                                 ),
                                 IconButton(
-                                  onPressed: _currentPage < totalPages &&
-                                          !_loading
+                                  onPressed: _currentPage < totalPages && !_loading
                                       ? () => _fetch(page: _currentPage + 1)
                                       : null,
                                   icon: const Icon(Icons.chevron_right),
@@ -392,55 +426,4 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
       ),
     );
   }
-    Future<void> _onExportTrain(DetectionHistoryItem item) async {
-    setState(() {
-      _loading = true;
-    });
-
-    try {
-      await _svc.exportToTrainData(item.detectionId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu ảnh vào dataset train.')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi export: $e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
-  Future<void> _onDownloadDatasetTrain() async {
-  setState(() {
-    _loading = true;
-  });
-
-  try {
-    await _svc.downloadDatasetTrain();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đang tải dataset train...')),
-    );
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Lỗi tải dataset: $e')),
-    );
-  } finally {
-    if (mounted) {
-      setState(() {
-        _loading = false;
-      });
-    }
-  }
-}
-
-
-
 }

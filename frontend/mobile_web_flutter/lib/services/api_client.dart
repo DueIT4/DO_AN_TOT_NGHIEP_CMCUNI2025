@@ -1,4 +1,3 @@
-// lib/services/api_client.dart
 import 'dart:async';
 import 'dart:convert';
 
@@ -10,14 +9,15 @@ import '../core/api_base_app.dart';
 
 class ApiClient {
   static String? authToken;
-
   static const _kTokenKey = 'auth_token';
 
   // ✅ gọi ở main() để tự login lại
   static Future<void> restoreToken() async {
     final prefs = await SharedPreferences.getInstance();
     authToken = prefs.getString(_kTokenKey);
-    if (kDebugMode) debugPrint('RESTORE TOKEN: ${authToken?.isNotEmpty == true}');
+    if (kDebugMode) {
+      debugPrint('RESTORE TOKEN: ${authToken?.isNotEmpty == true}');
+    }
   }
 
   // ✅ lưu token sau login
@@ -31,12 +31,13 @@ class ApiClient {
     }
   }
 
-  // ✅ logout là xoá token
-  static Future<void> logout() async {
+  static Future<void> clearAuth() async {
     authToken = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kTokenKey);
   }
+
+  static Future<void> logout() async => clearAuth();
 
   static Map<String, String> authHeaders({
     bool json = true,
@@ -55,10 +56,11 @@ class ApiClient {
   }
 
   // =========================
-  // REGISTER
+  // REGISTER (BE: POST /auth/register/phone)
+  // body: {username, phone, password}
   // =========================
   static Future<(bool, String)> register({
-    required String name,
+    required String name, // username
     required String identity, // phone
     required String password,
   }) async {
@@ -73,7 +75,7 @@ class ApiClient {
       final resp = await http
           .post(
             uri,
-            headers: authHeaders(), // ✅ dùng chung
+            headers: authHeaders(),
             body: jsonEncode({
               'username': name.trim(),
               'phone': phone,
@@ -87,12 +89,7 @@ class ApiClient {
         final msg = (data?['message'] ?? 'Đăng ký thành công').toString();
         return (true, msg);
       } else {
-        final data = _safeJson(resp.body);
-        final err = (data?['detail'] ??
-                data?['message'] ??
-                'Đăng ký thất bại (${resp.statusCode})')
-            .toString();
-        return (false, err);
+        return (false, _extractDetail(resp.body));
       }
     } on TimeoutException {
       return (false, 'Hết thời gian kết nối máy chủ');
@@ -102,7 +99,8 @@ class ApiClient {
   }
 
   // =========================
-  // LOGIN PHONE
+  // LOGIN PHONE (BE: POST /auth/login/phone)
+  // body: {phone, password}
   // =========================
   static Future<(bool, String)> login({
     required String identity, // phone
@@ -128,15 +126,10 @@ class ApiClient {
         if (token.isEmpty) {
           return (false, 'Đăng nhập thành công nhưng không nhận token');
         }
-        await setAuthToken(token); // ✅ lưu token
+        await setAuthToken(token);
         return (true, token);
       } else {
-        final data = _safeJson(resp.body);
-        final err = (data?['detail'] ??
-                data?['message'] ??
-                'Đăng nhập thất bại (${resp.statusCode})')
-            .toString();
-        return (false, err);
+        return (false, _extractDetail(resp.body));
       }
     } on TimeoutException {
       return (false, 'Hết thời gian kết nối máy chủ');
@@ -146,10 +139,12 @@ class ApiClient {
   }
 
   // =========================
-  // GOOGLE LOGIN
+  // GOOGLE LOGIN (BE: POST /auth/login/google)
+  // body: {token: idToken}
   // =========================
   static Future<(bool, String)> loginWithGoogle(String idToken) async {
     final uri = ApiBase.uri('/auth/login/google');
+
     try {
       final res = await http
           .post(
@@ -163,18 +158,21 @@ class ApiClient {
         final data = _safeJson(res.body);
         final token =
             (data?['access_token'] ?? data?['token'] ?? '').toString();
-        if (token.isEmpty) return (false, 'Google login OK nhưng không có token');
-        await setAuthToken(token); // ✅ lưu token
+        if (token.isEmpty) {
+          return (false, 'Google login OK nhưng không có token');
+        }
+        await setAuthToken(token);
         return (true, token);
       }
-      return (false, res.body);
+      return (false, _extractDetail(res.body));
     } catch (e) {
       return (false, 'Network error: $e');
     }
   }
 
   // =========================
-  // FACEBOOK LOGIN
+  // FACEBOOK LOGIN (BE: POST /auth/login/facebook)
+  // body: {token: accessToken}
   // =========================
   static Future<(bool, String)> loginWithFacebook(String accessToken) async {
     final uri = ApiBase.uri('/auth/login/facebook');
@@ -192,17 +190,114 @@ class ApiClient {
         final data = _safeJson(resp.body);
         final token =
             (data?['access_token'] ?? data?['token'] ?? '').toString();
-        if (token.isEmpty) return (false, 'Facebook login OK nhưng không có token');
-        await setAuthToken(token); // ✅ lưu token
+        if (token.isEmpty) {
+          return (false, 'Facebook login OK nhưng không có token');
+        }
+        await setAuthToken(token);
         return (true, token);
       } else {
-        final data = _safeJson(resp.body);
-        final err = (data?['detail'] ??
-                data?['message'] ??
-                'Facebook login thất bại (${resp.statusCode})')
-            .toString();
-        return (false, err);
+        return (false, _extractDetail(resp.body));
       }
+    } on TimeoutException {
+      return (false, 'Hết thời gian kết nối máy chủ');
+    } catch (e) {
+      return (false, 'Lỗi kết nối: $e');
+    }
+  }
+
+  // =========================
+  // FORGOT PASSWORD OTP (BE: POST /auth/forgot-password-otp)
+  // body: {email? , phone?}
+  // =========================
+  static Future<(bool, String)> forgotPasswordOtp({
+    String? email,
+    String? phone,
+  }) async {
+    final uri = ApiBase.uri('/auth/forgot-password-otp');
+
+    final body = <String, dynamic>{
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+    };
+
+    try {
+      final res = await http
+          .post(
+            uri,
+            headers: authHeaders(),
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final data = _safeJson(res.body);
+        return (true, (data?['message'] ?? 'OTP đã được gửi').toString());
+      }
+      return (false, _extractDetail(res.body));
+    } on TimeoutException {
+      return (false, 'Hết thời gian kết nối máy chủ');
+    } catch (e) {
+      return (false, 'Lỗi kết nối: $e');
+    }
+  }
+
+  // =========================
+  // VERIFY RESET OTP (BE: POST /auth/verify-reset-otp)
+  // body: {contact, otp}
+  // =========================
+  static Future<(bool, String)> verifyResetOtp({
+    required String contact,
+    required String otp,
+  }) async {
+    final uri = ApiBase.uri('/auth/verify-reset-otp');
+
+    try {
+      final res = await http
+          .post(
+            uri,
+            headers: authHeaders(),
+            body: jsonEncode({'contact': contact.trim(), 'otp': otp.trim()}),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final data = _safeJson(res.body);
+        final resetToken = (data?['reset_token'] ?? '').toString();
+        if (resetToken.isEmpty) return (false, 'Thiếu reset_token từ máy chủ');
+        return (true, resetToken);
+      }
+      return (false, _extractDetail(res.body));
+    } on TimeoutException {
+      return (false, 'Hết thời gian kết nối máy chủ');
+    } catch (e) {
+      return (false, 'Lỗi kết nối: $e');
+    }
+  }
+
+  // =========================
+  // RESET PASSWORD (BE: POST /auth/reset-password)
+  // body: {token, new_password}
+  // =========================
+  static Future<(bool, String)> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    final uri = ApiBase.uri('/auth/reset-password');
+
+    try {
+      final res = await http
+          .post(
+            uri,
+            headers: authHeaders(),
+            body: jsonEncode({'token': token, 'new_password': newPassword}),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final data = _safeJson(res.body);
+        return (true, (data?['message'] ?? 'OK').toString());
+      }
+      return (false, _extractDetail(res.body));
     } on TimeoutException {
       return (false, 'Hết thời gian kết nối máy chủ');
     } catch (e) {
@@ -226,12 +321,7 @@ class ApiClient {
         if (data is List) return (true, data, '');
         return (false, [], 'Dữ liệu không hợp lệ');
       } else {
-        final data = _safeJson(resp.body);
-        final err = (data?['detail'] ??
-                data?['message'] ??
-                'Lỗi lấy thông báo (${resp.statusCode})')
-            .toString();
-        return (false, [], err);
+        return (false, [], _extractDetail(resp.body));
       }
     } on TimeoutException {
       return (false, [], 'Hết thời gian kết nối máy chủ');
@@ -240,7 +330,8 @@ class ApiClient {
     }
   }
 
-  static Future<(bool, dynamic, String)> markNotificationAsRead(int notificationId) async {
+  static Future<(bool, dynamic, String)> markNotificationAsRead(
+      int notificationId) async {
     final uri = ApiBase.uri('/notifications/$notificationId/read');
 
     try {
@@ -251,12 +342,7 @@ class ApiClient {
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         return (true, _safeJson(resp.body), '');
       } else {
-        final data = _safeJson(resp.body);
-        final err = (data?['detail'] ??
-                data?['message'] ??
-                'Lỗi đánh dấu đã đọc (${resp.statusCode})')
-            .toString();
-        return (false, null, err);
+        return (false, null, _extractDetail(resp.body));
       }
     } on TimeoutException {
       return (false, null, 'Hết thời gian kết nối máy chủ');
@@ -266,7 +352,7 @@ class ApiClient {
   }
 
   // =========================
-  // CHATBOT (giữ nguyên, chỉ đổi uri)
+  // CHATBOT
   // =========================
   static Future<(bool, List<dynamic>, String)> listChatbotSessions() async {
     final uri = ApiBase.uri('/chatbot/sessions');
@@ -280,12 +366,7 @@ class ApiClient {
         if (data is List) return (true, data, '');
         return (false, [], 'Dữ liệu không hợp lệ');
       } else {
-        final data = _safeJson(resp.body);
-        final err = (data?['detail'] ??
-                data?['message'] ??
-                'Lỗi lấy danh sách sessions (${resp.statusCode})')
-            .toString();
-        return (false, [], err);
+        return (false, [], _extractDetail(resp.body));
       }
     } on TimeoutException {
       return (false, [], 'Hết thời gian kết nối máy chủ');
@@ -304,12 +385,7 @@ class ApiClient {
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         return (true, _safeJson(resp.body), '');
       } else {
-        final data = _safeJson(resp.body);
-        final err = (data?['detail'] ??
-                data?['message'] ??
-                'Lỗi lấy session (${resp.statusCode})')
-            .toString();
-        return (false, null, err);
+        return (false, null, _extractDetail(resp.body));
       }
     } on TimeoutException {
       return (false, null, 'Hết thời gian kết nối máy chủ');
@@ -328,12 +404,7 @@ class ApiClient {
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         return (true, _safeJson(resp.body), '');
       } else {
-        final data = _safeJson(resp.body);
-        final err = (data?['detail'] ??
-                data?['message'] ??
-                'Lỗi tạo session (${resp.statusCode})')
-            .toString();
-        return (false, null, err);
+        return (false, null, _extractDetail(resp.body));
       }
     } on TimeoutException {
       return (false, null, 'Hết thời gian kết nối máy chủ');
@@ -358,12 +429,7 @@ class ApiClient {
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         return (true, _safeJson(resp.body), '');
       } else {
-        final data = _safeJson(resp.body);
-        final err = (data?['detail'] ??
-                data?['message'] ??
-                'Lỗi gửi tin nhắn (${resp.statusCode})')
-            .toString();
-        return (false, null, err);
+        return (false, null, _extractDetail(resp.body));
       }
     } on TimeoutException {
       return (false, null, 'Hết thời gian kết nối máy chủ');
@@ -372,7 +438,8 @@ class ApiClient {
     }
   }
 
-  static Future<(bool, List<dynamic>, String)> getChatbotMessages(int chatbotId) async {
+  static Future<(bool, List<dynamic>, String)> getChatbotMessages(
+      int chatbotId) async {
     final uri = ApiBase.uri('/chatbot/sessions/$chatbotId/messages');
     try {
       final resp = await http
@@ -384,12 +451,7 @@ class ApiClient {
         if (data is List) return (true, data, '');
         return (false, [], 'Dữ liệu không hợp lệ');
       } else {
-        final data = _safeJson(resp.body);
-        final err = (data?['detail'] ??
-                data?['message'] ??
-                'Lỗi lấy lịch sử (${resp.statusCode})')
-            .toString();
-        return (false, [], err);
+        return (false, [], _extractDetail(resp.body));
       }
     } on TimeoutException {
       return (false, [], 'Hết thời gian kết nối máy chủ');
@@ -398,12 +460,24 @@ class ApiClient {
     }
   }
 
+  // =========================
+  // Helpers
+  // =========================
   static Map<String, dynamic>? _safeJson(String body) {
     try {
       final decoded = jsonDecode(body);
       return decoded is Map<String, dynamic> ? decoded : null;
     } catch (_) {
       return null;
+    }
+  }
+
+  static String _extractDetail(String body) {
+    try {
+      final data = jsonDecode(body);
+      return (data['detail'] ?? data['message'] ?? 'Có lỗi xảy ra').toString();
+    } catch (_) {
+      return 'Có lỗi xảy ra';
     }
   }
 }

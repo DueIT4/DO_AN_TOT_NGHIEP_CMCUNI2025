@@ -5,26 +5,28 @@ import 'package:flutter/material.dart';
 import '../../layout/web_navbar.dart';
 import '../../src/routes/web_routes.dart';
 import 'detect_content.dart';
+import 'package:go_router/go_router.dart';
+
 
 class DetectWebPage extends StatelessWidget {
   const DetectWebPage({super.key});
 
   void _handleNavTap(BuildContext context, int index) {
-    // index giống WebShell: 0 = Home, 1 = Weather, 2 = News
-    switch (index) {
-      case 0:
-        Navigator.pushReplacementNamed(context, WebRoutes.home);
-        break;
-      case 1:
-        Navigator.pushReplacementNamed(context, WebRoutes.weather);
-        break;
-      case 2:
-        Navigator.pushReplacementNamed(context, WebRoutes.news);
-        break;
-      default:
-        break;
-    }
+  switch (index) {
+    case 0:
+      context.go(WebRoutes.home);
+      break;
+    case 1:
+      context.go(WebRoutes.weather);
+      break;
+    case 2:
+      context.go(WebRoutes.news);
+      break;
+    default:
+      break;
   }
+}
+
 
   @override
   Widget build(BuildContext context) {

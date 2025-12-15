@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
+import '../core/weather_api.dart';
 import '../l10n/app_localizations.dart';
 import '../models/notification.dart' as models;
 import '../services/api_client.dart';
 import 'ai_chat_page.dart';
-import 'camera_detection_page.dart';
-import 'devices_page.dart';
 import 'notifications_list_page.dart';
 import 'user_settings_page.dart';
 
@@ -26,10 +26,16 @@ class _HomeUserPageState extends State<HomeUserPage> {
   List<models.AppNotification> _notifications = [];
   bool _notificationsLoading = false;
 
+  // Thời tiết
+  Map<String, dynamic>? _weather;
+  bool _weatherLoading = false;
+  String? _weatherError;
+
   @override
   void initState() {
     super.initState();
     _loadNotifications();
+    _loadWeather();
   }
 
   @override
@@ -48,7 +54,8 @@ class _HomeUserPageState extends State<HomeUserPage> {
     if (success) {
       try {
         final notifications = (data as List)
-            .map((json) => models.AppNotification.fromJson(json as Map<String, dynamic>))
+            .map((json) =>
+                models.AppNotification.fromJson(json as Map<String, dynamic>))
             .toList();
         setState(() {
           _notifications = notifications;
@@ -69,8 +76,57 @@ class _HomeUserPageState extends State<HomeUserPage> {
   int get _unreadCount => _notifications.where((n) => !n.isRead).length;
   bool get _hasUnread => _unreadCount > 0;
 
+  Future<void> _loadWeather() async {
+    setState(() {
+      _weatherLoading = true;
+      _weatherError = null;
+    });
+
+    try {
+      final pos = await _determinePosition();
+
+      final data = await WeatherApi.getWeather(
+        lat: pos.latitude,
+        lon: pos.longitude,
+        lang: 'vi',
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _weather = data;
+        _weatherLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _weatherError = '$e';
+        _weatherLoading = false;
+      });
+    }
+  }
+
+  Future<Position> _determinePosition() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('Vui lòng bật GPS');
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception('Bạn đã từ chối quyền vị trí');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception('Quyền vị trí bị từ chối vĩnh viễn');
+    }
+
+    return Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+  }
+
   Future<void> _showDroicamDialog() async {
-    // gợi ý lại url cũ nếu đã có
     _droicamCtrl.text = _droicamUrl ?? '';
 
     await showDialog(
@@ -96,9 +152,7 @@ class _HomeUserPageState extends State<HomeUserPage> {
                 final url = _droicamCtrl.text.trim();
                 if (url.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Vui lòng nhập địa chỉ Droicam'),
-                    ),
+                    const SnackBar(content: Text('Vui lòng nhập địa chỉ Droicam')),
                   );
                   return;
                 }
@@ -118,6 +172,19 @@ class _HomeUserPageState extends State<HomeUserPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+
+    final humidityText = _weatherLoading
+        ? '...'
+        : (_weather == null || _weatherError != null)
+            ? '--'
+            : '${_weather!['humidity'] ?? '--'}%';
+
+    final tempText = _weatherLoading
+        ? '...'
+        : (_weather == null || _weatherError != null)
+            ? '--'
+            : '${_weather!['temperature'] ?? '--'} °C';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF2F9E9),
       body: SafeArea(
@@ -170,13 +237,13 @@ class _HomeUserPageState extends State<HomeUserPage> {
               ),
               const SizedBox(height: 16),
 
-              // ========== 2 CARD ĐỘ ẨM / NHIỆT ĐỘ ==========
+              // ========== 2 CARD ĐỘ ẨM / NHIỆT ĐỘ (từ API thời tiết) ==========
               Row(
                 children: [
                   Expanded(
                     child: _MetricCard(
                       title: l10n.translate('humidity'),
-                      value: '70%',
+                      value: humidityText,
                       icon: Icons.water_drop_outlined,
                     ),
                   ),
@@ -184,17 +251,51 @@ class _HomeUserPageState extends State<HomeUserPage> {
                   Expanded(
                     child: _MetricCard(
                       title: l10n.translate('temperature'),
-                      value: '27 °C',
+                      value: tempText,
                       icon: Icons.thermostat_outlined,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              // ========== DỰ BÁO 3 NGÀY (gọn cho nông dân) ==========
+              if (_weatherError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_off, color: Colors.red, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Không lấy được thời tiết: $_weatherError',
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _loadWeather,
+                        child: const Text('Thử lại'),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_weather != null)
+                Column(
+                  children: [
+                    _WeatherForecast3DaysCard(weather: _weather!),
+                    const SizedBox(height: 16),
+                  ],
+                )
+              else if (_weatherLoading)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: LinearProgressIndicator(minHeight: 6),
+                ),
 
               // ========== CAMERA ==========
               GestureDetector(
-                onTap: _showDroicamDialog, // chạm để nhập địa chỉ Droicam
+                onTap: _showDroicamDialog,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: AspectRatio(
@@ -297,9 +398,7 @@ class _HomeUserPageState extends State<HomeUserPage> {
                       icon: Icons.insert_chart_outlined,
                       title: l10n.translate('report'),
                       subtitle: l10n.translate('view_analytics'),
-                      onTap: () {
-                        // TODO: điều hướng sang trang báo cáo
-                      },
+                      onTap: () {},
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -316,7 +415,6 @@ class _HomeUserPageState extends State<HomeUserPage> {
                             builder: (_) => const NotificationsListPage(),
                           ),
                         ).then((_) {
-                          // Reload notifications khi quay lại
                           _loadNotifications();
                         });
                       },
@@ -329,58 +427,11 @@ class _HomeUserPageState extends State<HomeUserPage> {
           ),
         ),
       ),
-
-      // ========== BOTTOM NAV ==========
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          if (index == 1) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CameraDetectionPage()),
-            );
-            return;
-          }
-          if (index == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DevicesPage()),
-            );
-            return;
-          }
-          if (index == 3) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const UserSettingsPage()),
-            );
-            return;
-          }
-          setState(() => _currentIndex = index);
-        },
-        selectedItemColor: const Color(0xFF7CCD2B),
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.home_outlined),
-              label: l10n.translate('home_tab')),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.videocam_outlined),
-              label: l10n.translate('camera_tab')),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.sensors_outlined),
-              label: l10n.translate('device_tab')),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.person_outline),
-              label: l10n.translate('personal_tab')),
-        ],
-      ),
     );
   }
 }
 
 // ================= DROICAM VIEW (bản mobile – placeholder) =================
-
 class DroicamView extends StatelessWidget {
   final String url;
 
@@ -389,8 +440,6 @@ class DroicamView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    // TẠM THỜI: trên Android chỉ hiển thị placeholder,
-    // chưa stream được Droicam trực tiếp.
     return Center(
       child: Text(
         '${l10n.translate('droicam_configured')}\n$url\n\n'
@@ -403,7 +452,6 @@ class DroicamView extends StatelessWidget {
 }
 
 // ======================= WIDGET PHỤ =======================
-
 class _MetricCard extends StatelessWidget {
   final String title;
   final String value;
@@ -432,10 +480,7 @@ class _MetricCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           const SizedBox(height: 4),
           LinearProgressIndicator(
@@ -478,15 +523,9 @@ class _SmallCard extends StatelessWidget {
           children: [
             Icon(icon, color: const Color(0xFF7CCD2B)),
             const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: const TextStyle(color: Colors.black54),
-            ),
+            Text(subtitle, style: const TextStyle(color: Colors.black54)),
           ],
         ),
       ),
@@ -556,14 +595,71 @@ class _NotificationCard extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: Colors.black54),
-                ),
+                Text(subtitle, style: const TextStyle(color: Colors.black54)),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ========== WIDGET DỰ BÁO 3 NGÀY ==========
+class _WeatherForecast3DaysCard extends StatelessWidget {
+  final Map<String, dynamic> weather;
+  const _WeatherForecast3DaysCard({required this.weather});
+
+  @override
+  Widget build(BuildContext context) {
+    final forecast = (weather['forecast'] as List?) ?? const [];
+    final days = forecast.take(3).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F4D9),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Dự báo 3 ngày tới',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          for (final d in days)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 70,
+                    child: Text(
+                      '${d['day'] ?? ''}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Text('${d['icon'] ?? '☁️'}',
+                      style: const TextStyle(fontSize: 20)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${d['desc'] ?? ''}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                  ),
+                  Text('${d['high'] ?? '--'}°',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 6),
+                  Text('${d['low'] ?? '--'}°',
+                      style: const TextStyle(color: Colors.black54)),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -13,7 +13,7 @@ from app.schemas.device_type import (
 )
 from app.services.device_type_service import device_type_service as svc
 
-router = APIRouter( tags=["Device Type"])
+router = APIRouter(prefix="/device-types", tags=["Device Types"])
 
 
 # =============================

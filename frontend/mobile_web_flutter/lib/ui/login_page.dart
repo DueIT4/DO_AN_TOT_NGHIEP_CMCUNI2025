@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../services/api_client.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'home_shell.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -76,7 +77,10 @@ class _LoginPageState extends State<LoginPage> {
             'Đăng nhập OK, token: ${token.substring(0, token.length > 12 ? 12 : token.length)}...');
         // 👉 Sau khi đăng nhập thành công, chuyển sang home_user
         if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/home_user');
+        Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(builder: (_) => const HomeShell()),
+);
       } else {
         _showSnack(token);
       }
@@ -314,6 +318,13 @@ class _LoginPageState extends State<LoginPage> {
                       onPressed: () => setState(() => _isRegister = !_isRegister),
                       child: Text(_isRegister ? l10n.translate('toggle_to_login') : l10n.translate('toggle_to_register')),
                     ),
+                    TextButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/forgot_password');
+                    },
+                    child: const Text("Quên mật khẩu?"),
+                  ),
+
                   ],
                 ),
               ),

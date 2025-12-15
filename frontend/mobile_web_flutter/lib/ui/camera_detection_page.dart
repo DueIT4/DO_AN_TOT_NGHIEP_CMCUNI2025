@@ -1,13 +1,11 @@
+// lib/ui/camera_detection_page.dart
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
-import '../l10n/app_localizations.dart';
 import '../models/detection_record.dart';
 import '../services/detection_service.dart';
 import 'detection_detail_page.dart';
-import 'devices_page.dart';
-import 'user_settings_page.dart';
 
 class CameraDetectionPage extends StatefulWidget {
   const CameraDetectionPage({super.key});
@@ -29,14 +27,21 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
   }
 
   Future<void> _loadHistory() async {
-    final data = await DetectionService.fetchHistory();
-    if (mounted) {
+    try {
+      final data = await DetectionService.fetchHistory(skip: 0, limit: 50);
+      if (!mounted) return;
       setState(() => _history = data);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không tải được lịch sử: $e')),
+      );
     }
   }
 
   Future<void> _handlePick(ImageSource source) async {
     if (_loading.value) return;
+
     final file = await _picker.pickImage(
       source: source,
       imageQuality: 85,
@@ -52,10 +57,16 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
             ? DetectionSource.camera
             : DetectionSource.upload,
       );
+
       if (!mounted) return;
       setState(() {
-        _history = [record, ..._history];
+        _history = [record, ..._history]; // hiển thị ngay
       });
+
+      // ✅ quan trọng: đồng bộ lại list để lấy detection_id thật + % thật
+      await _loadHistory();
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -73,9 +84,10 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
     }
   }
 
+  int? _parseDetectionId(DetectionRecord r) => int.tryParse(r.id);
+
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF2F9E9),
       body: SafeArea(
@@ -94,8 +106,8 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.settings_outlined),
+                    onPressed: _loadHistory,
+                    icon: const Icon(Icons.refresh),
                   ),
                 ],
               ),
@@ -115,9 +127,8 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                           child: ElevatedButton.icon(
                             onPressed: () => _handlePick(ImageSource.camera),
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 14,
-                              ),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
                               backgroundColor: const Color(0xFF7CCD2B),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
@@ -136,9 +147,8 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                           child: OutlinedButton.icon(
                             onPressed: () => _handlePick(ImageSource.gallery),
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 14,
-                              ),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -155,9 +165,10 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                     const SizedBox(height: 24),
                     Text(
                       'Lịch sử phát hiện bệnh',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 12),
                     if (_history.isEmpty)
@@ -175,14 +186,40 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                       ..._history.map(
                         (record) => _DetectionCard(
                           record: record,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    DetectionDetailPage(record: record),
-                              ),
-                            );
+                          onTap: () async {
+                            try {
+                              final detId = _parseDetectionId(record);
+                              if (detId == null) {
+                                throw Exception(
+                                  'Bản ghi đang đồng bộ (id=${record.id}). Hãy bấm refresh.',
+                                );
+                              }
+
+                              final detail =
+                                  await DetectionService.fetchHistoryDetail(detId);
+
+                              if (!mounted) return;
+
+                              final deleted = await Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      DetectionDetailPage(record: detail),
+                                ),
+                              );
+
+                              if (!mounted) return;
+                              if (deleted == true) {
+                                await _loadHistory();
+                              }
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Không tải được chi tiết: $e'),
+                                ),
+                              );
+                            }
                           },
                         ),
                       ),
@@ -193,44 +230,6 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF7CCD2B),
-        unselectedItemColor: Colors.grey,
-        items: [
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.home_outlined),
-              label: l10n.translate('home_tab')),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.videocam_outlined),
-              label: l10n.translate('camera_tab')),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.sensors_outlined),
-              label: l10n.translate('device_tab')),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.person_outline),
-              label: l10n.translate('personal_tab')),
-        ],
-        onTap: (index) {
-          if (index == 1) return;
-          if (index == 0) {
-            Navigator.pop(context);
-            return;
-          }
-          if (index == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DevicesPage()),
-            );
-            return;
-          }
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const UserSettingsPage()),
-          );
-        },
       ),
     );
   }
@@ -318,16 +317,22 @@ class _DetectionCard extends StatelessWidget {
 
   const _DetectionCard({required this.record, required this.onTap});
 
-  String _formattedDate() {
-    return DateFormat('dd/MM/yyyy HH:mm').format(record.detectedAt);
-  }
+  String _formattedDate() =>
+      DateFormat('dd/MM/yyyy HH:mm').format(record.detectedAt);
 
   Widget _buildImage() {
     if (record.imageBytes != null) {
       return Image.memory(record.imageBytes!, fit: BoxFit.cover);
     }
     if (record.imageUrl != null && record.imageUrl!.isNotEmpty) {
-      return Image.network(record.imageUrl!, fit: BoxFit.cover);
+      return Image.network(
+        record.imageUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          color: const Color(0xFFE8F4D9),
+          child: const Icon(Icons.broken_image, size: 40),
+        ),
+      );
     }
     return Container(
       color: const Color(0xFFE8F4D9),
@@ -362,11 +367,7 @@ class _DetectionCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 72,
-                height: 72,
-                child: _buildImage(),
-              ),
+              child: SizedBox(width: 72, height: 72, child: _buildImage()),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -405,7 +406,8 @@ class _DetectionCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     _formattedDate(),
-                    style: const TextStyle(color: Colors.black54, fontSize: 13),
+                    style:
+                        const TextStyle(color: Colors.black54, fontSize: 13),
                   ),
                   const SizedBox(height: 6),
                   Row(

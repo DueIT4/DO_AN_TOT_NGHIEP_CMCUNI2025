@@ -1,11 +1,9 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
-import 'src/routes/web_routes.dart';
 import 'modules/auth/auth_service.dart';
-import 'layout/web_shell.dart';
+import 'src/routes/app_router.dart'; // ✅ đúng
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +22,7 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'ZestGuard',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -44,12 +42,7 @@ class App extends StatelessWidget {
           ),
         ),
       ),
-
-      // 🔑 Dùng WebShell làm layout gốc chứa navbar + các trang chính
-      home: const WebShell(),
-
-      // Giữ onGenerateRoute cho các route khác (admin, login, v.v.)
-      onGenerateRoute: WebRoutes.onGenerate,
+      routerConfig: appRouter, // ✅ có rồi
     );
   }
 }

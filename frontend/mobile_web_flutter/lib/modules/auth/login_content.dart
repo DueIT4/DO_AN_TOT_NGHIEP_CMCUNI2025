@@ -1,5 +1,6 @@
-// lib/modules/auth/login_content.dart
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../src/routes/web_routes.dart';
 import '../../core/user_service.dart';
 import '../auth/auth_service.dart';
@@ -35,6 +36,18 @@ class _LoginContentState extends State<LoginContent> {
     super.dispose();
   }
 
+  String _safeNext(String? raw) {
+    // ✅ đảm bảo không bị null/rỗng, và tránh open redirect bậy bạ
+    if (raw == null || raw.trim().isEmpty) return WebRoutes.home;
+    final v = raw.trim();
+
+    // chỉ cho phép internal path (bắt đầu bằng "/")
+    if (!v.startsWith('/')) return WebRoutes.home;
+
+    // nếu bạn muốn khóa chỉ cho phép vài route nhất định, có thể check tại đây
+    return v;
+  }
+
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
 
@@ -46,22 +59,19 @@ class _LoginContentState extends State<LoginContent> {
     try {
       final input = _accountCtrl.text.trim();
 
-      // Dùng AuthService để login + lưu token luôn
       await AuthService.loginWithCredentials(
         identifier: input,
         password: _passCtrl.text,
       );
 
-      // Sau khi login xong, clear cache & load lại user hiện tại (nếu cần)
       UserService.clearCache();
       await UserService.getCurrentUser(forceRefresh: true);
 
       if (!mounted) return;
-      final routeArg = ModalRoute.of(context)?.settings.arguments;
-      final returnTo = widget.returnTo ?? (routeArg is String ? routeArg : null);
-      final next = returnTo ?? WebRoutes.home;
 
-      Navigator.pushNamedAndRemoveUntil(context, next, (r) => false);
+      final next = _safeNext(widget.returnTo);
+      // ✅ go_router điều hướng chuẩn web
+      context.go(next);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -78,9 +88,7 @@ class _LoginContentState extends State<LoginContent> {
 
   @override
   Widget build(BuildContext context) {
-    final routeArg = ModalRoute.of(context)?.settings.arguments;
-    final returnTo = widget.returnTo ?? (routeArg is String ? routeArg : null);
-
+    final returnTo = widget.returnTo;
     final primary = Theme.of(context).colorScheme.primary;
 
     return Center(
@@ -100,7 +108,6 @@ class _LoginContentState extends State<LoginContent> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ===== Logo lá giống navbar/home =====
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -122,7 +129,6 @@ class _LoginContentState extends State<LoginContent> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ===== Tiêu đề =====
                   Text(
                     'Welcome Admin',
                     textAlign: TextAlign.center,
@@ -142,7 +148,7 @@ class _LoginContentState extends State<LoginContent> {
                   ),
                   const SizedBox(height: 20),
 
-                  if (returnTo != null)
+                  if (returnTo != null && returnTo.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
@@ -152,7 +158,6 @@ class _LoginContentState extends State<LoginContent> {
                       ),
                     ),
 
-                  // ===== Input email hoặc sđt =====
                   TextFormField(
                     controller: _accountCtrl,
                     decoration: const InputDecoration(
@@ -171,7 +176,6 @@ class _LoginContentState extends State<LoginContent> {
                   ),
                   const SizedBox(height: 12),
 
-                  // ===== Input mật khẩu + nút hiện/ẩn =====
                   TextFormField(
                     controller: _passCtrl,
                     obscureText: _obscurePassword,
@@ -183,9 +187,7 @@ class _LoginContentState extends State<LoginContent> {
                       ),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() {
@@ -203,13 +205,11 @@ class _LoginContentState extends State<LoginContent> {
                   ),
                   const SizedBox(height: 8),
 
-                  // ===== Quên mật khẩu =====
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        Navigator.pushNamed(
-                            context, WebRoutes.forgotPassword);
+                        context.go(WebRoutes.forgotPassword);
                       },
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -221,7 +221,6 @@ class _LoginContentState extends State<LoginContent> {
                   ),
                   const SizedBox(height: 8),
 
-                  // ===== Hiển thị lỗi =====
                   if (_error != null) ...[
                     Text(
                       _error!,
@@ -233,7 +232,6 @@ class _LoginContentState extends State<LoginContent> {
                     const SizedBox(height: 12),
                   ],
 
-                  // ===== Nút đăng nhập gradient =====
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -271,10 +269,7 @@ class _LoginContentState extends State<LoginContent> {
                                 : Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: const [
-                                      Icon(
-                                        Icons.login_rounded,
-                                        color: Colors.white,
-                                      ),
+                                      Icon(Icons.login_rounded, color: Colors.white),
                                       SizedBox(width: 8),
                                       Text(
                                         'Đăng nhập',

@@ -1,14 +1,16 @@
+// lib/ui/user_settings_page.dart
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../l10n/app_localizations.dart';
 import '../l10n/language_service.dart';
 import '../models/user_profile.dart';
 import '../services/api_client.dart';
 import '../services/user_service.dart';
-import 'camera_detection_page.dart';
-import 'devices_page.dart';
+
 import 'login_page.dart';
+import 'support_list_page.dart';
 
 class UserSettingsPage extends StatefulWidget {
   const UserSettingsPage({super.key});
@@ -19,16 +21,47 @@ class UserSettingsPage extends StatefulWidget {
 
 class _UserSettingsPageState extends State<UserSettingsPage> {
   late Future<UserProfile> _profileFuture;
+
   bool _notificationsEnabled = true;
-  String _currentLanguageCode =
-      LanguageService.instance.locale.languageCode;
+  String _currentLanguageCode = LanguageService.instance.locale.languageCode;
+
   final ImagePicker _avatarPicker = ImagePicker();
   bool _avatarUploading = false;
+
+  // ✅ Thêm: bootstrap để restore token trước khi gọi API
+  Future<UserProfile> _bootstrapAndFetchProfile() async {
+    // 1) Restore token nếu ApiClient đang null (hay bị khi reload web)
+    if (ApiClient.authToken == null || ApiClient.authToken!.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('auth_token'); // 🔥 key bạn lưu token
+      if (saved != null && saved.isNotEmpty) {
+        ApiClient.authToken = saved; // restore vào memory
+      }
+    }
+
+    // 2) Nếu vẫn không có token => về login
+    final token = ApiClient.authToken;
+    if (token == null || token.isEmpty) {
+      // tránh setState sau khi dispose
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginPage()),
+            (route) => false,
+          );
+        });
+      }
+      return UserProfile.placeholder();
+    }
+
+    // 3) Có token => gọi API lấy profile
+    return await UserService.fetchProfile();
+  }
 
   @override
   void initState() {
     super.initState();
-    _profileFuture = UserService.fetchProfile();
+    _profileFuture = _bootstrapAndFetchProfile();
   }
 
   @override
@@ -39,15 +72,32 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
 
   Future<void> _refreshProfile() async {
     setState(() {
-      _profileFuture = UserService.fetchProfile();
+      _profileFuture = _bootstrapAndFetchProfile();
     });
   }
 
+  // ✅ Logout: clear token cả memory + storage
+  Future<void> _handleLogout() async {
+    await ApiClient.clearAuth();
+    // nếu ApiClient.clearAuth chưa xoá prefs token thì xoá thêm:
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
+  }
+
   Future<void> _openEditSheet(UserProfile profile) async {
+    final l10n = AppLocalizations.of(context);
+
     final nameCtrl = TextEditingController(text: profile.name);
     final phoneCtrl = TextEditingController(text: profile.phone);
     final emailCtrl = TextEditingController(text: profile.email);
     final addressCtrl = TextEditingController(text: profile.address);
+
     bool loading = false;
 
     await showModalBottomSheet<UserProfile>(
@@ -70,10 +120,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
               if (mounted) {
                 Navigator.of(context).pop(updated);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(AppLocalizations.of(context)
-                        .translate('info_updated')),
-                  ),
+                  SnackBar(content: Text(l10n.translate('info_updated'))),
                 );
               }
             }
@@ -99,15 +146,14 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      AppLocalizations.of(context).translate('edit_info'),
+                      l10n.translate('edit_info'),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: nameCtrl,
                       decoration: InputDecoration(
-                        labelText:
-                            AppLocalizations.of(context).translate('name'),
+                        labelText: l10n.translate('name'),
                         prefixIcon: const Icon(Icons.person_outline),
                       ),
                     ),
@@ -116,8 +162,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                       controller: phoneCtrl,
                       keyboardType: TextInputType.phone,
                       decoration: InputDecoration(
-                        labelText:
-                            AppLocalizations.of(context).translate('phone'),
+                        labelText: l10n.translate('phone'),
                         prefixIcon: const Icon(Icons.call_outlined),
                       ),
                     ),
@@ -126,8 +171,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                       controller: emailCtrl,
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
-                        labelText:
-                            AppLocalizations.of(context).translate('email'),
+                        labelText: l10n.translate('email'),
                         prefixIcon: const Icon(Icons.email_outlined),
                       ),
                     ),
@@ -135,8 +179,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                     TextField(
                       controller: addressCtrl,
                       decoration: InputDecoration(
-                        labelText:
-                            AppLocalizations.of(context).translate('address'),
+                        labelText: l10n.translate('address'),
                         prefixIcon: const Icon(Icons.location_on_outlined),
                       ),
                     ),
@@ -148,8 +191,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                         onPressed: loading ? null : handleSave,
                         child: loading
                             ? const CircularProgressIndicator()
-                            : Text(AppLocalizations.of(context)
-                                .translate('save_changes')),
+                            : Text(l10n.translate('save_changes')),
                       ),
                     ),
                   ],
@@ -161,9 +203,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
       },
     ).then((value) {
       if (value != null) {
-        setState(() {
-          _profileFuture = Future.value(value);
-        });
+        setState(() => _profileFuture = Future.value(value));
       } else {
         _refreshProfile();
       }
@@ -184,15 +224,15 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
           children: locales
               .map(
                 (locale) => ListTile(
-                  title: Text(LanguageService.instance
-                      .displayName(locale.languageCode)),
+                  title: Text(
+                    LanguageService.instance.displayName(locale.languageCode),
+                  ),
                   trailing: locale.languageCode == _currentLanguageCode
                       ? const Icon(Icons.check, color: Color(0xFF7CCD2B))
                       : null,
                   onTap: () {
                     LanguageService.instance.setLocale(locale);
-                    setState(() =>
-                        _currentLanguageCode = locale.languageCode);
+                    setState(() => _currentLanguageCode = locale.languageCode);
                     Navigator.pop(ctx);
                   },
                 ),
@@ -202,17 +242,6 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
       },
     );
   }
-
-Future<void> _handleLogout() async {
-  await ApiClient.logout();
-  if (!mounted) return;
-
-  Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute(builder: (_) => const LoginPage()),
-    (route) => false,
-  );
-}
-
 
   void _showAvatarActions() {
     showModalBottomSheet(
@@ -246,38 +275,37 @@ Future<void> _handleLogout() async {
   }
 
   Future<void> _pickAvatar(ImageSource source) async {
-    final l10n = AppLocalizations.of(context);
-    final file = await _avatarPicker.pickImage(
-      source: source,
-      imageQuality: 85,
-      maxWidth: 1024,
+  final file = await _avatarPicker.pickImage(
+    source: source,
+    imageQuality: 85,
+    maxWidth: 1024,
+  );
+  if (file == null) return;
+
+  setState(() => _avatarUploading = true);
+
+  try {
+    final updated = await UserService.uploadAvatar(file); // ✅ await ở ngoài
+
+    if (!mounted) return;
+    setState(() {
+      _profileFuture = Future.value(updated); // ✅ setState sync
+    });
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Không thể cập nhật avatar: $e')),
     );
-    if (file == null) return;
-    setState(() => _avatarUploading = true);
-    try {
-      final updated = await UserService.uploadAvatar(file);
-      if (!mounted) return;
-      setState(() {
-        _profileFuture = Future.value(updated);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.translate('info_updated'))),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể cập nhật avatar: $e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _avatarUploading = false);
-      }
-    }
+  } finally {
+    if (mounted) setState(() => _avatarUploading = false);
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF2F9E9),
       body: SafeArea(
@@ -296,8 +324,8 @@ Future<void> _handleLogout() async {
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.settings_outlined),
+                    onPressed: _refreshProfile,
+                    icon: const Icon(Icons.refresh),
                   ),
                 ],
               ),
@@ -307,6 +335,17 @@ Future<void> _handleLogout() async {
                 future: _profileFuture,
                 builder: (context, snapshot) {
                   final profile = snapshot.data ?? UserProfile.placeholder();
+
+                  // ✅ Nếu lỗi API (token hết hạn...) => show snack + về login
+                  if (snapshot.hasError) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) async {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(snapshot.error.toString())),
+                      );
+                    });
+                  }
+
                   return SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
@@ -318,10 +357,7 @@ Future<void> _handleLogout() async {
                               horizontal: 16, vertical: 24),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFFB8F28B),
-                                Color(0xFFF8FFE1),
-                              ],
+                              colors: [Color(0xFFB8F28B), Color(0xFFF8FFE1)],
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                             ),
@@ -330,8 +366,7 @@ Future<void> _handleLogout() async {
                           child: Column(
                             children: [
                               GestureDetector(
-                                onTap:
-                                    _avatarUploading ? null : _showAvatarActions,
+                                onTap: _avatarUploading ? null : _showAvatarActions,
                                 child: SizedBox(
                                   width: 120,
                                   height: 120,
@@ -340,17 +375,14 @@ Future<void> _handleLogout() async {
                                     children: [
                                       CircleAvatar(
                                         radius: 56,
-                                        backgroundImage:
-                                            profile.avatarUrl.isNotEmpty
-                                                ? NetworkImage(
-                                                    profile.avatarUrl)
-                                                : null,
+                                        backgroundImage: profile.avatarUrl.isNotEmpty
+                                            ? NetworkImage(profile.avatarUrl)
+                                            : null,
                                         child: profile.avatarUrl.isEmpty
                                             ? const Icon(Icons.person,
                                                 size: 48, color: Colors.white)
                                             : null,
-                                        backgroundColor:
-                                            const Color(0xFF7CCD2B),
+                                        backgroundColor: const Color(0xFF7CCD2B),
                                       ),
                                       Positioned(
                                         bottom: 8,
@@ -359,8 +391,7 @@ Future<void> _handleLogout() async {
                                           padding: const EdgeInsets.all(6),
                                           decoration: BoxDecoration(
                                             color: Colors.white,
-                                            borderRadius:
-                                                BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: const Icon(
                                             Icons.camera_alt_outlined,
@@ -372,8 +403,7 @@ Future<void> _handleLogout() async {
                                       if (_avatarUploading)
                                         Container(
                                           decoration: BoxDecoration(
-                                            color:
-                                                Colors.black.withOpacity(0.4),
+                                            color: Colors.black.withOpacity(0.4),
                                             shape: BoxShape.circle,
                                           ),
                                           width: 112,
@@ -411,25 +441,26 @@ Future<void> _handleLogout() async {
                           ),
                         ),
                         const SizedBox(height: 24),
+
                         _SettingTile(
                           icon: Icons.edit_outlined,
                           label: l10n.translate('edit_info'),
-                          trailing:
-                              const Icon(Icons.arrow_forward_ios, size: 16),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                           onTap: () => _openEditSheet(profile),
                         ),
                         const SizedBox(height: 12),
+
                         _SettingTile(
                           icon: Icons.language_outlined,
                           label: l10n.translate('language'),
                           trailing: Text(
-                            LanguageService.instance
-                                .displayName(_currentLanguageCode),
+                            LanguageService.instance.displayName(_currentLanguageCode),
                             style: const TextStyle(color: Colors.black54),
                           ),
                           onTap: _openLanguageSheet,
                         ),
                         const SizedBox(height: 12),
+
                         _SettingTile(
                           icon: Icons.notifications_none,
                           label: l10n.translate('notifications'),
@@ -451,6 +482,20 @@ Future<void> _handleLogout() async {
                           ),
                         ),
                         const SizedBox(height: 12),
+
+                        _SettingTile(
+                          icon: Icons.support_agent_outlined,
+                          label: 'Hỗ trợ',
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SupportListPage()),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
                         _SettingTile(
                           icon: Icons.logout,
                           label: l10n.translate('logout'),
@@ -458,6 +503,7 @@ Future<void> _handleLogout() async {
                           iconColor: Colors.red,
                           onTap: _handleLogout,
                         ),
+
                         const SizedBox(height: 32),
                       ],
                     ),
@@ -467,46 +513,6 @@ Future<void> _handleLogout() async {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 3,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF7CCD2B),
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          if (index == 3) return;
-          if (index == 0) {
-            Navigator.pop(context);
-            return;
-          }
-          if (index == 1) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CameraDetectionPage()),
-            );
-            return;
-          }
-          if (index == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DevicesPage()),
-            );
-          }
-        },
-        items: [
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.home_outlined),
-              label: l10n.translate('home_tab')),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.videocam_outlined),
-              label: l10n.translate('camera_tab')),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.sensors_outlined),
-              label: l10n.translate('device_tab')),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.person_outline),
-              label: l10n.translate('personal_tab')),
-        ],
       ),
     );
   }

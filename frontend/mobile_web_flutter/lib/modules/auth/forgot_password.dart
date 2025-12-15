@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
 import 'package:mobile_web_flutter/core/api_base.dart';
 import 'package:mobile_web_flutter/src/routes/web_routes.dart';
 
@@ -53,10 +55,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       Map<String, dynamic> body;
 
       if (input.contains('@')) {
-        // Email
         body = {'email': input};
       } else {
-        // SĐT
         body = {'phone': input};
       }
 
@@ -66,71 +66,60 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       );
 
       if (!mounted) return;
-
       setState(() {
-        _step = 2; // chuyển sang bước nhập mã + mật khẩu
+        _step = 2;
         _info = (res['message'] as String?) ??
             'Đã gửi mã xác thực. Vui lòng kiểm tra email / tin nhắn của bạn.';
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = '$e';
-      });
+      setState(() => _error = '$e');
     } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
-Future<void> _submitStep2() async {
-  if (!_formKeyStep2.currentState!.validate()) return;
 
-  setState(() {
-    _loading = true;
-    _error = null;
-  });
+  // ================== BƯỚC 2: ĐỔI MẬT KHẨU ==================
+  Future<void> _submitStep2() async {
+    if (!_formKeyStep2.currentState!.validate()) return;
 
-  try {
-    final code = _codeCtrl.text.trim();        // chính là token
-    final newPassword = _passwordCtrl.text.trim();
-
-    // 👇 body đúng theo backend: cần "token"
-    final body = {
-      'token': code,
-      'new_password': newPassword,
-    };
-
-    final res = await ApiBase.postJson(
-      ApiBase.api('/auth/reset-password'),
-      body,
-    );
-
-    if (!mounted) return;
     setState(() {
-      _info = (res['message'] as String?) ??
-          'Đổi mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới.';
+      _loading = true;
+      _error = null;
     });
 
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      final code = _codeCtrl.text.trim(); // token
+      final newPassword = _passwordCtrl.text.trim();
+
+      final body = {
+        'token': code,
+        'new_password': newPassword,
+      };
+
+      final res = await ApiBase.postJson(
+        ApiBase.api('/auth/reset-password'),
+        body,
+      );
+
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, WebRoutes.login);
-    });
-  } catch (e) {
-    if (!mounted) return;
-    setState(() {
-      _error = '$e';
-    });
-  } finally {
-    if (mounted) {
       setState(() {
-        _loading = false;
+        _info = (res['message'] as String?) ??
+            'Đổi mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới.';
       });
+
+      // ✅ điều hướng chuẩn web
+      Future.delayed(const Duration(seconds: 1), () {
+        if (!mounted) return;
+        context.go(WebRoutes.login);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -174,8 +163,7 @@ Future<void> _submitStep2() async {
                   if (_info != null) ...[
                     Text(
                       _info!,
-                      style:
-                          const TextStyle(color: Colors.green, fontSize: 13),
+                      style: const TextStyle(color: Colors.green, fontSize: 13),
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -228,7 +216,6 @@ Future<void> _submitStep2() async {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Hiển thị lại email/phone để user biết đang reset cho tài khoản nào
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
@@ -251,7 +238,6 @@ Future<void> _submitStep2() async {
                               if (v == null || v.trim().isEmpty) {
                                 return 'Vui lòng nhập mã xác thực';
                               }
-                              // Nếu BE quy định độ dài, bạn có thể check thêm ở đây
                               return null;
                             },
                           ),
@@ -327,12 +313,7 @@ Future<void> _submitStep2() async {
 
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () {
-                            Navigator.pushReplacementNamed(
-                                context, WebRoutes.login);
-                          },
+                    onPressed: _loading ? null : () => context.go(WebRoutes.login),
                     child: const Text('Quay lại đăng nhập'),
                   ),
                 ],

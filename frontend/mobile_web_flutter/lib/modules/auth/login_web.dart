@@ -1,5 +1,5 @@
-// lib/modules/auth/login_web.dart
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'login_content.dart';
 
 class LoginWebPage extends StatelessWidget {
@@ -7,7 +7,9 @@ class LoginWebPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final returnTo = ModalRoute.of(context)?.settings.arguments as String?;
+    // ✅ Lấy returnTo từ query: /login?returnTo=/admin/support
+    final returnTo =
+        GoRouterState.of(context).uri.queryParameters['returnTo'];
 
     return Scaffold(
       body: SafeArea(

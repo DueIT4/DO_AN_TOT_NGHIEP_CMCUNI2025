@@ -15,7 +15,9 @@ dependencies:
     sdk: flutter
   # Gói cơ bản
   cupertino_icons: ^1.0.8
-  
+  go_router: ^14.0.0
+  path_provider: ^2.1.0
+  open_filex: ^4.0.0
   # Gọi API backend
   http: ^1.2.2
   google_sign_in: ^6.2.1

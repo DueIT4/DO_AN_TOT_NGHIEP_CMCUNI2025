@@ -220,25 +220,24 @@ def my_detection_history_detail(
     )
 
     detections_payload = []
+    # 4) detections_payload
     for d, dis in rows:
         name = dis.name if dis and dis.name else "Không xác định"
-        conf = float(d.confidence or 0.0) / 100.0  # DB đang lưu 0..100
-        detections_payload.append(
-            {
-                "detection_id": int(d.detection_id),
-                "class_name": name,
-                "confidence": float(conf),
-                "bbox": d.bbox,  # JSONB
-                "model_version": d.model_version,
-                "created_at": d.created_at,
-                # ✅ dùng field có sẵn để làm "giải thích / hướng dẫn"
-                "description": d.description,
-                "treatment_guideline": d.treatment_guideline,
-            }
-        )
+        conf = float(d.confidence or 0.0)   # ✅ bỏ /100
+        detections_payload.append({
+            "detection_id": int(d.detection_id),
+            "class_name": name,
+            "confidence": float(conf),
+            "bbox": d.bbox,
+            "model_version": d.model_version,
+            "created_at": d.created_at,
+            "description": d.description,
+            "treatment_guideline": d.treatment_guideline,
+        })
 
     # 5) payload tổng
-    confidence = float(det.confidence or 0.0) / 100.0
+    confidence = float(det.confidence or 0.0)  # ✅ bỏ /100
+
 
     return {
         "detection_id": int(det.detection_id),

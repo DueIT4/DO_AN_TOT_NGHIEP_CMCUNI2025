@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:html' as html; // chỉ web
+import 'package:go_router/go_router.dart';
+
 import '../../core/api_base.dart';
 import '../../src/routes/web_routes.dart';
 
@@ -19,29 +19,13 @@ class _ConfirmPageState extends State<ConfirmPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _confirm();
-    });
+    // an toàn vì GoRouterState có sẵn trong build context sau frame đầu
+    WidgetsBinding.instance.addPostFrameCallback((_) => _confirm());
   }
 
   Future<void> _confirm() async {
-    String? token;
-    
-    if (kIsWeb) {
-      // Web: lấy token từ URL query parameters
-      final url = html.window.location.href;
-      final uri = Uri.parse(url);
-      token = uri.queryParameters['token'];
-    } else {
-      // Mobile: có thể lấy từ route arguments hoặc deep link
-      // Tạm thời lấy từ route arguments nếu có
-      final args = ModalRoute.of(context)?.settings.arguments;
-      if (args is Map<String, dynamic>) {
-        token = args['token'] as String?;
-      }
-      // Hoặc từ URL nếu có (deep linking)
-      // Có thể dùng go_router hoặc flutter_native_splash để xử lý deep links
-    }
+    // ✅ Lấy token từ URL: /auth/confirm?token=...
+    final token = GoRouterState.of(context).uri.queryParameters['token'];
 
     if (token == null || token.isEmpty) {
       setState(() {
@@ -53,13 +37,18 @@ class _ConfirmPageState extends State<ConfirmPage> {
     }
 
     try {
-      final res = await ApiBase.getJson(ApiBase.api('/auth/confirm?token=$token'));
+      final res = await ApiBase.getJson(
+        ApiBase.api('/auth/confirm?token=$token'),
+      );
+
+      if (!mounted) return;
       setState(() {
         _message = res['message']?.toString() ?? 'Xác nhận thành công';
         _loading = false;
         _success = true;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _message = 'Xác nhận thất bại: $e';
         _loading = false;
@@ -102,27 +91,20 @@ class _ConfirmPageState extends State<ConfirmPage> {
                       if (_success) ...[
                         FilledButton.icon(
                           onPressed: () {
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              WebRoutes.login,
-                              (route) => false,
-                            );
+                            // ✅ go_router: đổi URL chuẩn web
+                            context.go(WebRoutes.login);
                           },
                           icon: const Icon(Icons.login),
                           label: const Text('Đăng nhập'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: Colors.green.shade700,
+                            backgroundColor: Colors.green,
                           ),
                         ),
                         const SizedBox(width: 12),
                       ],
                       OutlinedButton.icon(
                         onPressed: () {
-                          Navigator.pushNamedAndRemoveUntil(
-                            context,
-                            WebRoutes.home,
-                            (route) => false,
-                          );
+                          context.go(WebRoutes.home);
                         },
                         icon: const Icon(Icons.home),
                         label: const Text('Về trang chủ'),
