@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Báo cáo tổng quan</title>
+  <link rel="stylesheet" href="assets/report.css" />
+</head>
+<body>
+  <div class="header-national center">
+    <div class="q1">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+    <div class="q2">Độc lập - Tự do - Hạnh phúc</div>
+    <div class="line"></div>
+  </div>
+
+  <div class="center title">BÁO CÁO TỔNG QUAN HỆ THỐNG</div>
+  <div class="center sub">
+    Kỳ báo cáo: <span class="bold">{{ range_label }}</span>
+  </div>
+
+  <div class="section">
+    <div class="h">I. Phạm vi thời gian</div>
+    <table>
+      <tr>
+        <th style="width:30%">Kỳ</th>
+        <th>Thời gian</th>
+      </tr>
+      <tr>
+        <td class="bold">Kỳ này</td>
+        <td>{{ cur_from }} → {{ cur_to }}</td>
+      </tr>
+      <tr>
+        <td class="bold">Kỳ trước</td>
+        <td>{{ prev_from }} → {{ prev_to }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="h">II. Bảng so sánh chỉ số chính</div>
+    <table>
+      <tr>
+        <th style="width:34%">Chỉ số</th>
+        <th style="width:18%">Kỳ này</th>
+        <th style="width:18%">Kỳ trước</th>
+        <th style="width:15%">Chênh lệch</th>
+        <th style="width:15%">Tỷ lệ</th>
+      </tr>
+
+      <tr>
+        <td>Tổng người dùng</td>
+        <td class="center">{{ curr_total_users }}</td>
+        <td class="center">{{ prev_total_users }}</td>
+        <td class="center">{{ d_total_users }}</td>
+        <td class="center">{{ p_total_users }}</td>
+      </tr>
+
+      <tr>
+        <td>Người dùng mới</td>
+        <td class="center">{{ curr_new_users }}</td>
+        <td class="center">{{ prev_new_users }}</td>
+        <td class="center">{{ d_new_users }}</td>
+        <td class="center">{{ p_new_users }}</td>
+      </tr>
+
+      <tr>
+        <td>Lượt dự đoán</td>
+        <td class="center">{{ curr_total_detections }}</td>
+        <td class="center">{{ prev_total_detections }}</td>
+        <td class="center">{{ d_total_detections }}</td>
+        <td class="center">{{ p_total_detections }}</td>
+      </tr>
+
+      <tr>
+        <td>Ticket đang mở</td>
+        <td class="center">{{ curr_open_tickets }}</td>
+        <td class="center">{{ prev_open_tickets }}</td>
+        <td class="center">{{ d_open_tickets }}</td>
+        <td class="center">{{ p_open_tickets }}</td>
+      </tr>
+
+      <tr>
+        <td>Thiết bị offline</td>
+        <td class="center">{{ curr_inactive_devices }}</td>
+        <td class="center">{{ prev_inactive_devices }}</td>
+        <td class="center">{{ d_inactive_devices }}</td>
+        <td class="center">{{ p_inactive_devices }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="h">III. Đánh giá & kiến nghị</div>
+    <ul>
+      {% for x in insights %}
+        <li>{{ x }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="footer">
+    <div class="right">Ngày {{ day }} tháng {{ month }} năm {{ year }}</div>
+    <div class="signature right">
+      <div class="bold">Người lập báo cáo</div>
+      <div class="small">(Ký và ghi rõ họ tên)</div>
+      <div style="height:56px;"></div>
+      <div>_______________________</div>
+    </div>
+  </div>
+</body>
+</html>

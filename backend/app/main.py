@@ -43,6 +43,7 @@ from app.api.v1.routes_dashboard import router as dashboard_router
 from app.api.v1.routes_support_admin import router as support_admin_router
 from app.api.v1.routes_device_types import router as routes_device_types
 from app.api.v1.routes_dataset_admin import router as routes_dataset_admin
+from app.api.v1.routes_reports import router as routes_reports   # 👈 thêm
 
 API_PREFIX = getattr(settings, "API_V1", "/api/v1")
 
@@ -128,6 +129,7 @@ app.include_router(dashboard_router, prefix=API_PREFIX)
 app.include_router(support_admin_router, prefix=API_PREFIX)
 app.include_router(routes_device_types, prefix=API_PREFIX)
 app.include_router(routes_dataset_admin, prefix=API_PREFIX)
+app.include_router(routes_reports,prefix=API_PREFIX)  # 👈 thêm
 
 # ==== Root & tiện ích ====
 @app.get("/")

@@ -1,30 +1,58 @@
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, ForeignKey, Enum
+# app/models/chatbot.py
+import enum
+from sqlalchemy import Column, BigInteger, ForeignKey, DateTime, Enum as SAEnum, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+
 from app.core.database import Base
 
 
+class ChatbotStatus(str, enum.Enum):
+    active = "active"
+    ended = "ended"
+
+
 class Chatbot(Base):
-    __tablename__ = "chatbot"
+    __tablename__ = "chatbots"
 
     chatbot_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=False)
+    user_id = Column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
     end_at = Column(DateTime, nullable=True)
-    status = Column(Enum("active", "ended", name="chatbot_status"), default="active")
+    status = Column(SAEnum(ChatbotStatus), default=ChatbotStatus.active, nullable=False)
 
+    # relationship 2 chiều với Users
     user = relationship("Users", back_populates="chatbots")
-    details = relationship("ChatbotDetail", back_populates="chatbot")
+
+    # relationship 2 chiều với ChatbotDetail
+    details = relationship(
+        "ChatbotDetail",
+        back_populates="chatbot",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class ChatbotDetail(Base):
-    __tablename__ = "chatbot_detail"
+    __tablename__ = "chatbot_details"
 
     detail_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    chatbot_id = Column(BigInteger, ForeignKey("chatbot.chatbot_id"), nullable=False)
-    question = Column(Text)
-    answer = Column(Text)
-    created_at = Column(DateTime, server_default=func.now())
+    chatbot_id = Column(
+        BigInteger,
+        ForeignKey("chatbots.chatbot_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    question = Column(Text, nullable=False)
+    answer = Column(Text, nullable=False)
+
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     chatbot = relationship("Chatbot", back_populates="details")

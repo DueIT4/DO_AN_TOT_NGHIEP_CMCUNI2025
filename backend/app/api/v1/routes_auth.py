@@ -393,3 +393,5 @@ def send_phone_confirm(phone: str = Query(...), db: Session = Depends(get_db)):
     send_sms(phone, f"Xac nhan so dien thoai: {confirm_url}")
 
     return {"ok": True, "message": "Đã gửi lại link xác nhận số điện thoại."}
+
+

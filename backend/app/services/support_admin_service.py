@@ -45,17 +45,20 @@ def list_tickets_admin(
     rows = q.offset(skip).limit(limit).all()
 
     items: List[AdminTicketListItem] = []
+    # app/services/support_admin_service.py
     for ticket, user in rows:
         items.append(
-            AdminTicketListItem(
-                ticket_id=ticket.ticket_id,
-                user_id=ticket.user_id,
-                username=user.username,
-                title=ticket.title,
-                status=ticket.status,
-                created_at=ticket.created_at,
-            )
+        AdminTicketListItem(
+            ticket_id=ticket.ticket_id,
+            user_id=ticket.user_id,
+            username=user.username,
+            title=ticket.title,
+            description=ticket.description,   # 👈 THÊM DÒNG NÀY
+            status=ticket.status,
+            created_at=ticket.created_at,
         )
+    )
+
 
     return AdminTicketList(total=total, items=items)
 

@@ -4,11 +4,13 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+# app/schemas/support_admin.py
 class AdminTicketListItem(BaseModel):
     ticket_id: int
     user_id: int
     username: Optional[str] = None
     title: str
+    description: Optional[str] = None   # 👈 THÊM DÒNG NÀY
     status: str
     created_at: datetime
 

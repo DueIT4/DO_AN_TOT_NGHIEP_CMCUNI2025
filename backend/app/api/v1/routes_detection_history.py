@@ -186,3 +186,78 @@ def export_detection_train(
         raise HTTPException(status_code=400, detail=str(e))
 
     return {"success": True, "saved_files": saved_files}
+@router.get("/me/{detection_id}")
+def my_detection_history_detail(
+    detection_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    # 1) tìm detection
+    det: Detection | None = db.get(Detection, detection_id)
+    if not det:
+        raise HTTPException(status_code=404, detail="Detection không tồn tại")
+
+    # 2) tìm ảnh và check quyền
+    img: Img | None = db.get(Img, det.img_id)
+    if not img:
+        raise HTTPException(status_code=404, detail="Ảnh không tồn tại")
+
+    # user thường chỉ được xem của mình
+    if img.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền xem bản ghi này")
+
+    # 3) lấy disease name (nếu có)
+    disease: Disease | None = db.get(Disease, det.disease_id) if det.disease_id else None
+    disease_name = disease.name if disease and disease.name else "Không xác định"
+
+    # 4) lấy tất cả detections của cùng 1 ảnh (để show bbox list)
+    rows = (
+        db.query(Detection, Disease)
+        .join(Disease, Detection.disease_id == Disease.disease_id, isouter=True)
+        .filter(Detection.img_id == det.img_id)
+        .order_by(Detection.created_at.desc())
+        .all()
+    )
+
+    detections_payload = []
+    for d, dis in rows:
+        name = dis.name if dis and dis.name else "Không xác định"
+        conf = float(d.confidence or 0.0) / 100.0  # DB đang lưu 0..100
+        detections_payload.append(
+            {
+                "detection_id": int(d.detection_id),
+                "class_name": name,
+                "confidence": float(conf),
+                "bbox": d.bbox,  # JSONB
+                "model_version": d.model_version,
+                "created_at": d.created_at,
+                # ✅ dùng field có sẵn để làm "giải thích / hướng dẫn"
+                "description": d.description,
+                "treatment_guideline": d.treatment_guideline,
+            }
+        )
+
+    # 5) payload tổng
+    confidence = float(det.confidence or 0.0) / 100.0
+
+    return {
+        "detection_id": int(det.detection_id),
+        "created_at": det.created_at,
+        "img_id": int(img.img_id),
+        "img_url": img.file_url,
+        "source_type": img.source_type,
+        "device_id": int(img.device_id) if img.device_id is not None else None,
+
+        "disease_name": disease_name,
+        "confidence": float(confidence),
+
+        # ✅ 2 field này FE dùng để hiển thị “Giải thích” và “Khuyến nghị”
+        "description": det.description,
+        "treatment_guideline": det.treatment_guideline,
+
+        # ✅ list detections để hiển thị “Chi tiết phát hiện”
+        "detections": detections_payload,
+    }
+
+
+    
