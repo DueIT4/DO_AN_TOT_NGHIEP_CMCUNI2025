@@ -1,10 +1,10 @@
 # app/services/identity_verify.py
-# Các hàm DEV:
-# - Phone "có thực" nếu match pattern số.
-# - Google id_token: giải mã KHÔNG verify chữ ký, kiểm tra aud == GOOGLE_CLIENT_ID và exp.
-# - Facebook access_token: stub (trả về uid giả nếu token đủ dài).
 
 import re
+import json
+import urllib.parse
+import urllib.request
+
 from typing import Optional, Tuple
 import jwt
 from datetime import datetime, timezone
@@ -25,7 +25,6 @@ def verify_google_id_token(id_token: str) -> Optional[Tuple[str, Optional[str]]]
         return None
 
     try:
-        # Lấy payload, không verify chữ ký (chỉ dùng cho DEV)
         data = jwt.decode(
             id_token,
             options={"verify_signature": False, "verify_exp": False},
@@ -42,11 +41,9 @@ def verify_google_id_token(id_token: str) -> Optional[Tuple[str, Optional[str]]]
     if not aud or not sub:
         return None
 
-    # Kiểm tra aud khớp Client ID bạn để trong .env
     if aud != settings.GOOGLE_CLIENT_ID:
         return None
 
-    # Kiểm tra hạn token (nếu có)
     exp = data.get("exp")
     if exp:
         now = datetime.now(timezone.utc).timestamp()
@@ -64,10 +61,11 @@ def verify_facebook_access_token(access_token: str) -> Optional[str]:
     if not access_token or len(access_token) < 10:
         return None
 
-    # App Access Token (được tạo từ app_id|app_secret)
+    if not settings.FB_APP_ID or not settings.FB_APP_SECRET:
+        return None
+
     app_token = f"{settings.FB_APP_ID}|{settings.FB_APP_SECRET}"
 
-    # API Facebook kiểm tra token hợp lệ
     params = urllib.parse.urlencode({
         "input_token": access_token,
         "access_token": app_token
@@ -85,8 +83,7 @@ def verify_facebook_access_token(access_token: str) -> Optional[str]:
     app_id = info.get("app_id")
     fb_user_id = info.get("user_id")
 
-    # Kiểm tra token có hợp lệ và đúng app_id không
-    if not is_valid or app_id != settings.FB_APP_ID:
+    if not is_valid or str(app_id) != str(settings.FB_APP_ID):
         return None
 
     return str(fb_user_id)

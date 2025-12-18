@@ -1,4 +1,3 @@
-# app/models/notification.py
 from sqlalchemy import Column, BigInteger, String, Text, ForeignKey, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -16,6 +15,9 @@ class Notifications(Base):
 
     sender_id       = Column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
 
+    # NEW: tracking resend
+    resend_of       = Column(BigInteger, ForeignKey("notifications.notification_id", ondelete="SET NULL"), nullable=True)
+
     # User là NGƯỜI NHẬN
     user = relationship(
         "Users",
@@ -28,4 +30,12 @@ class Notifications(Base):
         "Users",
         foreign_keys=[sender_id],
         back_populates="notifications_sent"
+    )
+
+    # Optional: relation to original notification
+    original = relationship(
+        "Notifications",
+        remote_side=[notification_id],
+        foreign_keys=[resend_of],
+        uselist=False
     )

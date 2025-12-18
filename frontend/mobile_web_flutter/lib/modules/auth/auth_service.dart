@@ -39,7 +39,8 @@ class AuthService {
 
   /// Đọc access_token từ response backend, gán vào ApiBase.bearer và lưu
   static Future<void> _setBearerFromResponse(
-      Map<String, dynamic> res) async {
+    Map<String, dynamic> res,
+  ) async {
     final token = res['access_token'] as String?;
     if (token == null || token.isEmpty) {
       throw Exception('Không tìm thấy access_token trong response');
@@ -59,17 +60,18 @@ class AuthService {
   /// Login backend bằng sđt hoặc email + password
   ///
   /// - `identifier`: người dùng nhập sđt hoặc email (1 ô input)
-  /// - Backend của bạn phải chấp nhận field, ví dụ:
-  ///     + nếu BE nhận "username": dùng cả phone/email vào "username"
-  ///     + nếu BE nhận "login": đổi lại key ở đây.
+  /// - Backend đang mong:
+  ///     + nếu là email  -> field "email"
+  ///     + nếu là sđt    -> field "phone"
   static Future<void> loginWithCredentials({
     required String identifier,
     required String password,
   }) async {
-    // TODO: nếu BE của bạn dùng field khác (vd: "phone_or_email"),
-    // thì đổi "username" thành key tương ứng.
+    final trimmed = identifier.trim();
+    final isEmail = trimmed.contains('@');
+
     final body = <String, dynamic>{
-      'username': identifier, // sđt hoặc email đều đưa vào đây
+      if (isEmail) 'email': trimmed else 'phone': trimmed,
       'password': password,
     };
 

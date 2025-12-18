@@ -66,7 +66,7 @@ def list_user_devices(user_id: int, db: Session = Depends(get_db)):
 
 
 # 3) Chi tiết 1 thiết bị (kèm owner + last sensor reading)
-@router.get("/devices/{device_id}", response_model=DeviceDetailOut)
+@router.get("/admin/devices/{device_id}", response_model=DeviceDetailOut)
 def get_device_detail(device_id: int, db: Session = Depends(get_db)):
     device: Device | None = db.get(Device, device_id)
     if not device:

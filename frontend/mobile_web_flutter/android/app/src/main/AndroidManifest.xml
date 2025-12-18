@@ -3,7 +3,7 @@
 
     <application
         android:label="mobile_web_flutter"
-        android:name="${applicationName}"
+        android:name="android.app.Application"
         android:icon="@mipmap/ic_launcher"
 
         android:usesCleartextTraffic="true">

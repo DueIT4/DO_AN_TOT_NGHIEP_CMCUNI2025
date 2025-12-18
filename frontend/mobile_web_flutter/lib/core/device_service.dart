@@ -21,7 +21,7 @@ class DeviceService {
   static Future<Map<String, dynamic>> updateDevice(
       int deviceId, Map<String, dynamic> body) async {
     final res = await ApiBase.putJson(
-      ApiBase.api('/devices/$deviceId'),
+      ApiBase.api('/admin/devices/$deviceId'),
       body,
     );
     return Map<String, dynamic>.from(res as Map);
@@ -29,14 +29,16 @@ class DeviceService {
 
   /// Xoá thiết bị (cần token)
   static Future<void> deleteDevice(int deviceId) async {
-    await ApiBase.deleteJson(ApiBase.api('/devices/$deviceId'));
+    await ApiBase.deleteJson(ApiBase.api('/admin/devices/$deviceId'));
   }
 
   /// Lấy log của 1 thiết bị (device_logs)
   static Future<List<Map<String, dynamic>>> getDeviceLogs(
       int deviceId) async {
-    final res =
-        await ApiBase.getJson(ApiBase.api('/$deviceId/logs'));
+    // ⚠️ Nhớ tạo BE route khớp path này, hoặc chỉnh lại path cho phù hợp
+    final res = await ApiBase.getJson(
+      ApiBase.api('/device-logs/$deviceId/logs'),
+    );
 
     if (res is List) {
       return res
@@ -50,7 +52,6 @@ class DeviceService {
   /// (tuỳ chọn) Lấy danh sách thiết bị theo user
   static Future<List<Map<String, dynamic>>> listDevicesByUser(
       int userId) async {
-    // Nếu backend bạn đang dùng route khác thì sửa path lại cho đúng
     final res = await ApiBase.getJson(
       ApiBase.api('/users/$userId/devices'),
     );
@@ -58,7 +59,4 @@ class DeviceService {
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
   }
-
-
-  
 }

@@ -1,6 +1,7 @@
 // lib/modules/admin/dashboard/admin_dashboard_page.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:html' as html;
 
 import '../../../core/dashboard_service.dart';
 
@@ -14,6 +15,7 @@ class AdminDashboardPage extends StatefulWidget {
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String _range = '7d';
   late Future<DashboardSummary> _future;
+  bool _exporting = false;
 
   @override
   void initState() {
@@ -25,6 +27,45 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     setState(() {
       _future = DashboardService.fetchSummary(range: _range);
     });
+  }
+
+  Future<void> _exportPdf() async {
+    try {
+      setState(() {
+        _exporting = true;
+      });
+
+      // Gọi API lấy PDF bytes
+      final bytes =
+          await DashboardService.exportSummaryPdf(range: _range);
+
+      final blob = html.Blob([bytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', 'report_summary_$_range.pdf')
+        ..click();
+
+      html.Url.revokeObjectUrl(url);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã xuất báo cáo PDF')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi xuất PDF: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _exporting = false;
+        });
+      }
+    }
   }
 
   @override
@@ -72,6 +113,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ),
               const Spacer(),
+              TextButton.icon(
+                onPressed: _exporting ? null : _exportPdf,
+                icon: _exporting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf),
+                label: const Text('Xuất báo cáo (PDF)'),
+              ),
+              const SizedBox(width: 16),
               const Text('Khoảng thời gian:'),
               const SizedBox(width: 8),
               DropdownButton<String>(
@@ -147,7 +200,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Detections over time
               Expanded(
                 flex: 2,
                 child: _CardSection(
@@ -156,7 +208,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ),
               const SizedBox(width: 16),
-              // Top diseases
               Expanded(
                 flex: 1,
                 child: _CardSection(
@@ -169,7 +220,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
           const SizedBox(height: 24),
 
-          // Tickets status + latest lists
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -203,7 +253,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 }
 
-// ====== Widgets phụ ======
+// ====== Widgets phụ (giữ nguyên như cũ) ======
 
 class _StatCard extends StatelessWidget {
   final String title;
@@ -277,8 +327,7 @@ class _CardSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style:
-                    t.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             child,
           ],
@@ -404,8 +453,7 @@ class _TicketsByStatus extends StatelessWidget {
       return const Text('Chưa có ticket trong khoảng này.');
     }
 
-    final total =
-        stats.map((e) => e.count).fold<int>(0, (a, b) => a + b);
+    final total = stats.map((e) => e.count).fold<int>(0, (a, b) => a + b);
 
     return Wrap(
       spacing: 8,
