@@ -1,4 +1,6 @@
 // lib/ui/camera_detection_page.dart
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -17,6 +19,8 @@ class CameraDetectionPage extends StatefulWidget {
 class _CameraDetectionPageState extends State<CameraDetectionPage> {
   final ImagePicker _picker = ImagePicker();
   final ValueNotifier<bool> _loading = ValueNotifier(false);
+  final ValueNotifier<XFile?> _selectedImage =
+      ValueNotifier(null); // Lưu ảnh đã chọn
 
   List<DetectionRecord> _history = const [];
 
@@ -49,6 +53,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
     );
     if (file == null) return;
 
+    _selectedImage.value = file; // Lưu ảnh đã chọn
     _loading.value = true;
     try {
       final record = await DetectionService.analyzeImage(
@@ -119,7 +124,8 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   children: [
-                    _CameraPreviewBox(loading: _loading),
+                    _CameraPreviewBox(
+                        loading: _loading, selectedImage: _selectedImage),
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -127,8 +133,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                           child: ElevatedButton.icon(
                             onPressed: () => _handlePick(ImageSource.camera),
                             style: ElevatedButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               backgroundColor: const Color(0xFF7CCD2B),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
@@ -147,8 +152,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                           child: OutlinedButton.icon(
                             onPressed: () => _handlePick(ImageSource.gallery),
                             style: OutlinedButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -196,7 +200,8 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                               }
 
                               final detail =
-                                  await DetectionService.fetchHistoryDetail(detId);
+                                  await DetectionService.fetchHistoryDetail(
+                                      detId);
 
                               if (!mounted) return;
 
@@ -237,76 +242,114 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
 
 class _CameraPreviewBox extends StatelessWidget {
   final ValueNotifier<bool> loading;
+  final ValueNotifier<XFile?> selectedImage;
 
-  const _CameraPreviewBox({required this.loading});
+  const _CameraPreviewBox({required this.loading, required this.selectedImage});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 220,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF101010), Color(0xFF202020)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: const Center(
-                child: Text(
-                  'Luồng camera trực tiếp sẽ hiển thị tại đây',
-                  style: TextStyle(color: Colors.white70),
-                  textAlign: TextAlign.center,
+    return ValueListenableBuilder<XFile?>(
+      valueListenable: selectedImage,
+      builder: (_, imageFile, __) {
+        return Container(
+          height: 220,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: imageFile == null
+                ? const LinearGradient(
+                    colors: [Color(0xFF101010), Color(0xFF202020)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: imageFile != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: FutureBuilder<Uint8List>(
+                            future: imageFile.readAsBytes(),
+                            builder: (_, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.done) {
+                                if (snapshot.hasData) {
+                                  return Image.memory(
+                                    snapshot.data!,
+                                    fit: BoxFit.cover,
+                                  );
+                                } else if (snapshot.hasError) {
+                                  return Container(
+                                    color: const Color(0xFFE8F4D9),
+                                    child: const Icon(Icons.broken_image,
+                                        size: 40),
+                                  );
+                                }
+                              }
+                              return Container(
+                                color: const Color(0xFF202020),
+                                child: const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+                            },
+                          ),
+                        )
+                      : const Center(
+                          child: Text(
+                            'Tải hoặc chụp ảnh để hiển thị',
+                            style: TextStyle(color: Colors.white70),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                 ),
               ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomRight,
-            child: ValueListenableBuilder(
-              valueListenable: loading,
-              builder: (_, bool isLoading, __) {
-                if (!isLoading) return const SizedBox.shrink();
-                return Container(
-                  margin: const EdgeInsets.all(16),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: ValueListenableBuilder(
+                  valueListenable: loading,
+                  builder: (_, bool isLoading, __) {
+                    if (!isLoading) return const SizedBox.shrink();
+                    return Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Đang phân tích...',
-                        style: TextStyle(color: Colors.white),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Đang phân tích...',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -317,8 +360,11 @@ class _DetectionCard extends StatelessWidget {
 
   const _DetectionCard({required this.record, required this.onTap});
 
-  String _formattedDate() =>
-      DateFormat('dd/MM/yyyy HH:mm').format(record.detectedAt);
+  String _formattedDate() {
+    // Sửa timezone cho Việt Nam (UTC+7)
+    final vietnamTime = record.detectedAt.add(const Duration(hours: 7));
+    return DateFormat('dd/MM/yyyy HH:mm').format(vietnamTime);
+  }
 
   Widget _buildImage() {
     if (record.imageBytes != null) {
@@ -406,8 +452,7 @@ class _DetectionCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     _formattedDate(),
-                    style:
-                        const TextStyle(color: Colors.black54, fontSize: 13),
+                    style: const TextStyle(color: Colors.black54, fontSize: 13),
                   ),
                   const SizedBox(height: 6),
                   Row(

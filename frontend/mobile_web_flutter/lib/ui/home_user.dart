@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 
 import '../core/weather_api.dart';
+import '../core/camera_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/notification.dart' as models;
 import '../services/api_client.dart';
+import '../services/camera_stream_service.dart';
 import 'ai_chat_page.dart';
 import 'notifications_list_page.dart';
 import 'user_settings_page.dart';
+import 'widgets/camera_stream_player.dart';
+import 'home_shell.dart';
 
 class HomeUserPage extends StatefulWidget {
   const HomeUserPage({super.key});
@@ -17,10 +22,14 @@ class HomeUserPage extends StatefulWidget {
 }
 
 class _HomeUserPageState extends State<HomeUserPage> {
-  int _currentIndex = 0; // bottom nav
-
   String? _droicamUrl; // lưu địa chỉ Droicam đã nhập
   final TextEditingController _droicamCtrl = TextEditingController();
+
+  // Camera Stream
+  int? _selectedCameraId;
+  String? _selectedCameraName;
+  bool _cameraLoading = false;
+  String? _selectedCameraStreamUrl;
 
   // Thông báo
   List<models.AppNotification> _notifications = [];
@@ -36,6 +45,7 @@ class _HomeUserPageState extends State<HomeUserPage> {
     super.initState();
     _loadNotifications();
     _loadWeather();
+    _loadSelectedCamera();
   }
 
   @override
@@ -53,7 +63,7 @@ class _HomeUserPageState extends State<HomeUserPage> {
 
     if (success) {
       try {
-        final notifications = (data as List)
+        final notifications = (data)
             .map((json) =>
                 models.AppNotification.fromJson(json as Map<String, dynamic>))
             .toList();
@@ -105,6 +115,40 @@ class _HomeUserPageState extends State<HomeUserPage> {
     }
   }
 
+  Future<void> _loadSelectedCamera() async {
+    setState(() => _cameraLoading = true);
+
+    try {
+      final cameraData = await CameraStreamService.getSelectedCamera();
+
+      if (!mounted) return;
+
+      final deviceId = cameraData['device_id'];
+      if (deviceId == null) {
+        setState(() => _cameraLoading = false);
+        return;
+      }
+
+      // Update provider
+      final provider = context.read<CameraProvider>();
+      await provider.setSelectedCamera(
+        deviceId: deviceId as int,
+        deviceName: cameraData['name']?.toString() ?? 'Camera',
+        streamUrl: cameraData['stream_url']?.toString() ?? '',
+      );
+
+      setState(() {
+        _selectedCameraId = deviceId as int;
+        _selectedCameraName = cameraData['name']?.toString() ?? 'Camera';
+        _selectedCameraStreamUrl = cameraData['stream_url']?.toString() ?? '';
+        _cameraLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _cameraLoading = false);
+    }
+  }
+
   Future<Position> _determinePosition() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -123,7 +167,8 @@ class _HomeUserPageState extends State<HomeUserPage> {
       throw Exception('Quyền vị trí bị từ chối vĩnh viễn');
     }
 
-    return Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    return Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
   }
 
   Future<void> _showDroicamDialog() async {
@@ -152,7 +197,8 @@ class _HomeUserPageState extends State<HomeUserPage> {
                 final url = _droicamCtrl.text.trim();
                 if (url.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Vui lòng nhập địa chỉ Droicam')),
+                    const SnackBar(
+                        content: Text('Vui lòng nhập địa chỉ Droicam')),
                   );
                   return;
                 }
@@ -293,41 +339,122 @@ class _HomeUserPageState extends State<HomeUserPage> {
                   child: LinearProgressIndicator(minHeight: 6),
                 ),
 
-              // ========== CAMERA ==========
-              GestureDetector(
-                onTap: _showDroicamDialog,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: Container(
-                      color: Colors.black,
-                      child: (_droicamUrl == null || _droicamUrl!.isEmpty)
-                          ? Center(
-                              child: Text(
-                                l10n.translate('camera_hint'),
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                            )
-                          : DroicamView(url: _droicamUrl!),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.translate('camera_title'),
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              Row(
-                children: [
-                  const Icon(Icons.circle, size: 10, color: Colors.green),
-                  const SizedBox(width: 4),
-                  Text(l10n.translate('camera_hint')),
-                ],
-              ),
+              // ========== CAMERA STREAM ==========
               const SizedBox(height: 16),
+              Builder(builder: (context) {
+                final cam = context.watch<CameraProvider>();
+                final camId = _selectedCameraId ?? cam.selectedCameraId;
+                final camName = _selectedCameraName ?? cam.selectedCameraName;
+                final camUrl =
+                    _selectedCameraStreamUrl ?? cam.selectedCameraStreamUrl;
+
+                if (camId != null && camName != null) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CameraStreamPlayer(
+                        deviceId: camId,
+                        deviceName: camName,
+                        hlsUrl: camUrl ??
+                            CameraStreamService.buildFullHlsUrl(camId),
+                        onCameraChanged: _loadSelectedCamera,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Camera đang sử dụng',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(color: Colors.grey),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  camName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () =>
+                                HomeShell.maybeOf(context)?.goToTab(2),
+                            icon: const Icon(Icons.swap_horiz, size: 18),
+                            label: const Text('Đổi camera'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                if (_cameraLoading) {
+                  return Column(
+                    children: [
+                      AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Đang tải camera...'),
+                    ],
+                  );
+                }
+
+                return Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3CD),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFFD700)),
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Color(0xFFF57C00)),
+                          SizedBox(width: 8),
+                          Text(
+                            'Chưa có camera nào được chọn',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Vui lòng chọn camera trong trang Devices để xem live stream',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 12),
+                      // Dẫn sang tab Devices để chọn camera
+                      ElevatedButton.icon(
+                        onPressed: () => HomeShell.maybeOf(context)?.goToTab(2),
+                        icon: const Icon(Icons.sensors, size: 18),
+                        label: const Text('Đi tới trang Devices'),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+
+              const SizedBox(height: 24),
 
               // ========== AI CHATBOT ==========
               Container(
@@ -437,15 +564,43 @@ class DroicamView extends StatelessWidget {
 
   const DroicamView({super.key, required this.url});
 
+  bool _isValidUrl(String s) {
+    final u = Uri.tryParse(s);
+    return u != null && u.hasScheme && u.host.isNotEmpty;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Center(
-      child: Text(
-        '${l10n.translate('droicam_configured')}\n$url\n\n'
-        '${l10n.translate('droicam_desc')}',
-        style: const TextStyle(color: Colors.white),
-        textAlign: TextAlign.center,
+
+    if (!_isValidUrl(url)) {
+      return Center(
+        child: Text(
+          '${l10n.translate('droicam_configured')}\n$url\n\n'
+          '${l10n.translate('droicam_desc')}',
+          style: const TextStyle(color: Colors.white),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    // Flutter Web: MJPEG stream hiển thị tốt qua Image.network
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Image.network(
+        url,
+        height: 160,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => Center(
+          child: Text(
+            '${l10n.translate('droicam_configured')}\n$url\n\n'
+            '${l10n.translate('droicam_desc')}',
+            style: const TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+        ),
       ),
     );
   }

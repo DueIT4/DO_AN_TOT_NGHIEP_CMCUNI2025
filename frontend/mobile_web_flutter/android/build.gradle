@@ -1,4 +1,10 @@
 allprojects {
+        ext.flutter = [
+            compileSdkVersion: 35,
+            targetSdkVersion : 35,
+            minSdkVersion    : 23
+        ]
+
     repositories {
         google()
         mavenCentral()
@@ -12,6 +18,34 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
+
+// // Ensure Android library plugins (e.g., geolocator_android) inherit SDK levels
+// subprojects { subproject ->
+//     subproject.plugins.withId("com.android.library") {
+//         if (subproject.hasProperty("android")) {
+//             subproject.android {
+//                 if (it.hasProperty("compileSdk")) {
+//                     compileSdk = 35
+//                 } else if (it.hasProperty("compileSdkVersion")) {
+//                     compileSdkVersion = 35
+//                 }
+//                 if (it.hasProperty("defaultConfig") && defaultConfig != null) {
+//                     if (defaultConfig.hasProperty("minSdk")) {
+//                         minSdk = Math.max((defaultConfig.minSdkVersion?.apiLevel ?: 0), 23)
+//                     } else if (defaultConfig.hasProperty("minSdkVersion")) {
+//                         defaultConfig.minSdkVersion = Math.max((defaultConfig.minSdkVersion?.apiLevel ?: 0), 23)
+//                     }
+//                     if (defaultConfig.hasProperty("targetSdk")) {
+//                         targetSdk = 35
+//                     } else if (defaultConfig.hasProperty("targetSdkVersion")) {
+//                         defaultConfig.targetSdkVersion = 35
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir

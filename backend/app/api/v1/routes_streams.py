@@ -32,6 +32,10 @@ class StopTempIn(BaseModel):
 
 @router.post("/streams/start")
 def start_stream(payload: StartStreamIn, db: Session = Depends(get_db)):
+    """Start/resume streaming for a device.
+    
+    ✅ FIX: Stop old stream nếu RTSP URL thay đổi
+    """
     device = db.get(Device, payload.device_id)
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
@@ -39,10 +43,15 @@ def start_stream(payload: StartStreamIn, db: Session = Depends(get_db)):
     if not rtsp:
         raise HTTPException(status_code=400, detail="Device has no stream URL")
 
+    # ✅ Backend sẽ tự stop stream cũ nếu RTSP URL khác
     hls = stream_service.start_stream(payload.device_id, rtsp)
     if hls is None:
         raise HTTPException(status_code=500, detail="ffmpeg not available or failed to start")
-    return {"hls_url": hls, "running": True}
+    return {
+        "hls_url": hls,
+        "running": True,
+        "message": "Stream started or resumed"
+    }
 
 
 @router.post("/streams/stop")
@@ -55,8 +64,40 @@ def stop_stream(payload: StopStreamIn):
 
 @router.get("/streams/device/{device_id}")
 def get_stream(device_id: int):
+    """Get stream status for a device."""
     running = stream_service.is_running(device_id)
-    return {"running": running, "hls_url": stream_service.hls_url_for(device_id)}
+    info = stream_service.get_stream_info(device_id)
+    
+    return {
+        "running": running,
+        "hls_url": stream_service.hls_url_for(device_id),
+        "info": info
+    }
+
+
+@router.get("/streams/active")
+def list_active_streams():
+    """List all active streams (useful for dashboard)."""
+    streams = stream_service.list_active_streams()
+    return {
+        "active_streams": streams,
+        "count": len(streams)
+    }
+
+
+@router.get("/streams/health/{device_id}")
+def check_stream_health(device_id: int):
+    """Check stream health for a device.
+    
+    Returns health status including:
+    - healthy: bool - overall health status
+    - running: bool - if ffmpeg process is running
+    - error: str | None - error message if unhealthy
+    - hls_exists: bool - if HLS files exist
+    - last_update: float | None - seconds since last segment update
+    """
+    health = stream_service.check_stream_health(device_id)
+    return health
 
 
 @router.post('/streams/start_temp')
@@ -122,6 +163,16 @@ def stop_stream_temp(payload: StopTempIn):
     if not ok:
         raise HTTPException(status_code=404, detail='Stream not running')
     return {"stopped": True}
+
+
+@router.get('/streams/temp/{key}')
+def get_stream_temp(key: str):
+    """Get status of temp stream."""
+    running = stream_service.is_running_temp(key)
+    return {
+        "running": running,
+        "hls_url": stream_service.hls_url_for_temp(key) if running else None
+    }
 
 
 @router.get('/streams/temp/{key}')

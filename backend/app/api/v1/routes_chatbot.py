@@ -182,7 +182,20 @@ def send_message(
     try:
         answer = send_message_to_gemini(payload.question, chat_history)
     except ValueError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e)
+        # Kiểm tra lỗi quota
+        if "429" in error_msg or "quota" in error_msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="Gemini API đã hết quota miễn phí. Vui lòng thử lại sau hoặc liên hệ admin để cập nhật API key."
+            )
+        elif "401" in error_msg or "authentication" in error_msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="API key không hợp lệ. Vui lòng liên hệ admin."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=f"Lỗi AI: {error_msg}")
     
     # Lưu vào database
     detail = save_chat_message(

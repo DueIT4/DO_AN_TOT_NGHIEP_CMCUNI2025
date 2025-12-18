@@ -38,7 +38,19 @@ class ChatbotService {
       return data['answer'] as String? ?? '';
     }
 
-    throw Exception(error.isNotEmpty ? error : 'Lỗi gửi tin nhắn');
+    // Xử lý lỗi có ý nghĩa hơn
+    String errorMessage = error.isNotEmpty ? error : 'Lỗi gửi tin nhắn';
+
+    // Nếu là lỗi quota hoặc API key
+    if (errorMessage.contains('quota') || errorMessage.contains('503')) {
+      errorMessage =
+          '⚠️ Gemini AI hiện đã hết quota miễn phí. Vui lòng thử lại sau hoặc liên hệ admin.';
+    } else if (errorMessage.contains('401') ||
+        errorMessage.contains('authentication')) {
+      errorMessage = '🔑 API key không hợp lệ. Vui lòng liên hệ admin.';
+    }
+
+    throw Exception(errorMessage);
   }
 
   /// Lấy lịch sử chat của session hiện tại
@@ -48,8 +60,9 @@ class ChatbotService {
       return [];
     }
 
-    final (success, data, _) = await ApiClient.getChatbotMessages(_currentChatbotId!);
-    if (success && data is List) {
+    final (success, data, _) =
+        await ApiClient.getChatbotMessages(_currentChatbotId!);
+    if (success) {
       return data.map((item) {
         return {
           'question': (item['question'] ?? '').toString(),
@@ -68,22 +81,19 @@ class ChatbotService {
   /// Lấy danh sách tất cả sessions (chỉ những session có tin nhắn)
   static Future<List<Map<String, dynamic>>> listSessions() async {
     final (success, data, _) = await ApiClient.listChatbotSessions();
-    if (success && data is List) {
-      return data
-          .where((item) {
-            // Chỉ lấy sessions có ít nhất 1 tin nhắn
-            final count = item['details_count'] as int? ?? 0;
-            return count > 0;
-          })
-          .map((item) {
-            return {
-              'chatbot_id': item['chatbot_id'] as int?,
-              'created_at': item['created_at']?.toString() ?? '',
-              'status': item['status']?.toString() ?? '',
-              'details_count': item['details_count'] as int? ?? 0,
-            };
-          })
-          .toList();
+    if (success) {
+      return data.where((item) {
+        // Chỉ lấy sessions có ít nhất 1 tin nhắn
+        final count = item['details_count'] as int? ?? 0;
+        return count > 0;
+      }).map((item) {
+        return {
+          'chatbot_id': item['chatbot_id'] as int?,
+          'created_at': item['created_at']?.toString() ?? '',
+          'status': item['status']?.toString() ?? '',
+          'details_count': item['details_count'] as int? ?? 0,
+        };
+      }).toList();
     }
     return [];
   }
@@ -93,7 +103,7 @@ class ChatbotService {
     final (success, data, _) = await ApiClient.getChatbotSession(chatbotId);
     if (success && data != null) {
       _currentChatbotId = chatbotId;
-      
+
       // Lấy messages từ response
       final messages = data['messages'] as List?;
       if (messages != null) {

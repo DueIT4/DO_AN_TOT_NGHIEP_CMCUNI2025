@@ -51,7 +51,7 @@ class Settings(BaseSettings):
 
     # ===== CORS =====
     CORS_ORIGINS_RAW: str = "*"
-    CORS_ORIGIN_REGEX: str = r"http://localhost:\d+|http://127\.0\.0\.1:\d+"
+    CORS_ORIGIN_REGEX: str = r"http://localhost:\d+|http://127\.0\.0\.1:\d+|http://192\.168\.1\.4:\d+"
 
     @property
     def CORS_ORIGINS(self) -> List[str]:

@@ -97,6 +97,58 @@ def select_camera(
 
 
 # =========================
+# ✅ USER: get selected camera (for home page video stream)
+# GET /devices/me/selected
+# =========================
+@router.get("/me/selected", dependencies=[Depends(get_current_user)])
+def get_selected_camera(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get currently selected camera for the user.
+    
+    Returns:
+        {
+            "device_id": int,
+            "name": str,
+            "stream_url": str,
+            "status": "active" | "inactive",
+            "hls_url": str,  # HLS stream URL
+            "message": str
+        }
+    """
+    # Find camera marked as selected for this user (or status='active')
+    camera = db.query(Device).filter(
+        Device.user_id == current_user.user_id,
+        Device.device_type_id == 1,  # Assuming device_type_id=1 is camera
+        Device.stream_url.isnot(None),
+    ).order_by(
+        Device.updated_at.desc()
+    ).first()
+    
+    if not camera:
+        return {
+            "device_id": None,
+            "name": None,
+            "stream_url": None,
+            "status": None,
+            "hls_url": None,
+            "message": "Không có camera nào được chọn"
+        }
+    
+    hls_url = f"/media/hls/{camera.device_id}/index.m3u8"
+    
+    return {
+        "device_id": camera.device_id,
+        "name": camera.name,
+        "stream_url": camera.stream_url or camera.gateway_stream_id,
+        "status": camera.status,
+        "hls_url": hls_url,
+        "message": "Thành công"
+    }
+
+
+# =========================
 # ✅ ADMIN: list all devices (admin-only)
 # GET /devices/
 # =========================
@@ -214,3 +266,40 @@ def delete_device(
     if not ok:
         raise HTTPException(status_code=404, detail="Không tìm thấy thiết bị")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# =========================
+# ✅ GET stream status for a device
+# GET /devices/{device_id}/stream_status
+# =========================
+@router.get("/{device_id}/stream_status", dependencies=[Depends(get_current_user)])
+def get_device_stream_status(
+    device_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get current stream status for device - useful for UI to show which camera is active.
+    
+    ✅ FIX: Returns HLS URL, status, and auto-switches stream if needed.
+    """
+    d = svc.get_device(db, device_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    if getattr(d, "user_id", None) != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not allowed to view this device")
+
+    # Import stream service để check status
+    from app.services import stream_service
+    
+    stream_running = stream_service.is_running(device_id)
+    stream_info = stream_service.get_stream_info(device_id)
+    
+    return {
+        "device_id": device_id,
+        "device_name": d.name,
+        "stream_url": d.stream_url,
+        "stream_running": stream_running,
+        "hls_url": stream_service.hls_url_for(device_id) if stream_running else None,
+        "stream_info": stream_info
+    }

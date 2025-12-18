@@ -29,7 +29,8 @@ import '../../modules/admin/notifications/admin_notifications_page.dart';
 import '../../modules/admin/history/detection_history_page.dart';
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: WebRoutes.home,
+  //initialLocation: WebRoutes.home,
+  initialLocation: WebRoutes.login,
   routes: [
     // ===== PUBLIC SHELL: navbar giữ nguyên, chỉ child đổi =====
     ShellRoute(

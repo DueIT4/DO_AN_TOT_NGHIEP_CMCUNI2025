@@ -44,7 +44,9 @@ from app.api.v1.routes_support_admin import router as support_admin_router
 from app.api.v1.routes_device_types import router as routes_device_types
 from app.api.v1.routes_dataset_admin import router as routes_dataset_admin
 from app.api.v1.routes_reports import router as routes_reports   # 👈 thêm
+from app.api.v1.routes_auto_detection import router as auto_detection_router  # ✅ NEW
 from app.api.v1.routes_weather import router as weather_router
+from app.api.v1.routes_chatbot import router as chatbot_router
 
 API_PREFIX = getattr(settings, "API_V1", "/api/v1")
 
@@ -75,6 +77,8 @@ DEFAULT_DEV_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:57174",
+    "http://127.0.0.1:57174",
 ]
 
 cors_origins = getattr(settings, "CORS_ORIGINS", None)
@@ -131,12 +135,34 @@ app.include_router(support_admin_router, prefix=API_PREFIX)
 app.include_router(routes_device_types, prefix=API_PREFIX)
 app.include_router(routes_dataset_admin, prefix=API_PREFIX)
 app.include_router(routes_reports,prefix=API_PREFIX)  # 👈 thêm
+app.include_router(auto_detection_router, prefix=API_PREFIX)  # ✅ NEW
 app.include_router(weather_router, prefix=API_PREFIX)
+app.include_router(chatbot_router, prefix=API_PREFIX)
 
 # ==== Root & tiện ích ====
 @app.get("/")
 def root():
     return JSONResponse({"name": getattr(settings, "APP_NAME", "ZestGuard API"), "health": "ok", "docs": "/docs"})
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize scheduler on app startup."""
+    try:
+        from app.services.scheduler_service import start_scheduler
+        start_scheduler()
+        logger.info("✅ Scheduler khởi động thành công")
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi khởi động scheduler: {e}", exc_info=True)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up scheduler on app shutdown."""
+    try:
+        from app.services.scheduler_service import stop_scheduler
+        stop_scheduler()
+        logger.info("✅ Scheduler dừng thành công")
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi dừng scheduler: {e}", exc_info=True)
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():

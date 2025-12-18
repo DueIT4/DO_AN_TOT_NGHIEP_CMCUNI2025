@@ -1,11 +1,26 @@
 pluginManagement {
     def flutterSdkPath = {
-        def properties = new Properties()
-        file("local.properties").withInputStream { properties.load(it) }
-        def flutterSdkPath = properties.getProperty("flutter.sdk")
-        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-        return flutterSdkPath
+        // Priority 1: Try environment variable FLUTTER_ROOT
+        def envFlutterRoot = System.getenv("FLUTTER_ROOT")
+        if (envFlutterRoot) {
+            return envFlutterRoot.replace("\\", "/")
+        }
+        
+        // Priority 2: Read from gradle.properties
+        def gradleProps = new Properties()
+        if (file("gradle.properties").exists()) {
+            file("gradle.properties").withInputStream { gradleProps.load(it) }
+            def sdkFromGradle = gradleProps.getProperty("flutter.sdk")
+            if (sdkFromGradle) {
+                return sdkFromGradle.replace("\\", "/")
+            }
+        }
+        
+        // Priority 3: Hardcode as last resort (D:/DATN/flutter)
+        return "D:/DATN/flutter"
     }()
+
+    println("▶ Flutter SDK Path: $flutterSdkPath")
 
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
