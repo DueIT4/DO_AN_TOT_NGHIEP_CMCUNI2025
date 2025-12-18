@@ -1,26 +1,47 @@
 pluginManagement {
-    def flutterSdkPath = {
-        // Priority 1: Try environment variable FLUTTER_ROOT
-        def envFlutterRoot = System.getenv("FLUTTER_ROOT")
-        if (envFlutterRoot) {
-            return envFlutterRoot.replace("\\", "/")
-        }
-        
-        // Priority 2: Read from gradle.properties
-        def gradleProps = new Properties()
-        if (file("gradle.properties").exists()) {
-            file("gradle.properties").withInputStream { gradleProps.load(it) }
-            def sdkFromGradle = gradleProps.getProperty("flutter.sdk")
-            if (sdkFromGradle) {
-                return sdkFromGradle.replace("\\", "/")
-            }
-        }
-        
-        // Priority 3: Hardcode as last resort (D:/DATN/flutter)
-        return "D:/DATN/flutter"
-    }()
 
-    println("▶ Flutter SDK Path: $flutterSdkPath")
+// --- Normalize local.properties safely ---
+    def lpFile = file("local.properties")
+    if (lpFile.exists()) {
+        def t = lpFile.getText("UTF-8")
+        def lines = t.readLines()
+        def out = lines.collect { line ->
+            def trimmed = line.trim()
+            if (trimmed.startsWith("sdk.dir=") || trimmed.startsWith("flutter.sdk=")) {
+                def idx = line.indexOf("=")
+                if (idx > -1) {
+                    def key = line.substring(0, idx + 1)
+                    def value = line.substring(idx + 1).trim()
+
+                    // Normalize slashes
+                    value = value.replace('\\', '/').replaceAll('/{2,}', '/')
+
+                    // Escape Windows drive colon: D:/... -> D\:/...
+                    value = value.replaceFirst(/^([A-Za-z]):\//, "\$1\\:/")
+
+                    return key + value
+                }
+            }
+            return line
+        }.join("\n")
+
+        if (out != t) {
+            lpFile.write(out + "\n", "UTF-8")
+        }
+    }
+
+//    // -------------------------------------------------------------------
+
+    def localProperties = new Properties()
+    def localPropertiesFile = file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.withInputStream { stream ->
+            localProperties.load(stream)
+        }
+    }
+
+    def flutterSdkPath = localProperties.getProperty("flutter.sdk")
+    assert flutterSdkPath != null : "flutter.sdk not set in local.properties"
 
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
@@ -34,9 +55,7 @@ pluginManagement {
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
     id "com.android.application" version "8.1.0" apply false
-    // START: FlutterFire Configuration
     id "com.google.gms.google-services" version "4.3.15" apply false
-    // END: FlutterFire Configuration
     id "org.jetbrains.kotlin.android" version "1.8.22" apply false
 }
 
