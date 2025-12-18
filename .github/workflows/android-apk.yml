@@ -31,11 +31,13 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      - name: Build debug APK (verbose gradle)
+        run: |
+          cd android
+          ./gradlew :app:assembleDebug --stacktrace --info
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: frontend/mobile_web_flutter/build/app/outputs/flutter-apk/app-debug.apk
+          path: frontend/mobile_web_flutter/android/app/build/outputs/apk/debug/app-debug.apk
