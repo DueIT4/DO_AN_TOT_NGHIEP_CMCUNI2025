@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_web_flutter/core/detection_history_service.dart';
+import 'package:mobile_web_flutter/services/admin/detection_history_service.dart';
 import 'package:mobile_web_flutter/core/api_base.dart';
 import 'dart:html' as html; // chỉ dùng cho Flutter Web
+import 'package:mobile_web_flutter/models/admin/detection_history_models.dart';
 
 import 'package:mobile_web_flutter/core/toast.dart'; // ✅ toast
 

@@ -1,46 +1,9 @@
-// lib/core/admin_me_service.dart
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import 'package:mobile_web_flutter/core/api_base.dart';
-
-class AdminUserMe {
-  final int userId;
-  final String? username;
-  final String? phone;
-  final String? email;
-  final String? address;
-  final String? roleType;
-  final String? status;
-
-  // ✅ avatar
-  final String? avtUrl;
-
-  AdminUserMe({
-    required this.userId,
-    this.username,
-    this.phone,
-    this.email,
-    this.address,
-    this.roleType,
-    this.status,
-    this.avtUrl,
-  });
-
-  factory AdminUserMe.fromJson(Map<String, dynamic> json) {
-    return AdminUserMe(
-      userId: (json['user_id'] as num).toInt(),
-      username: json['username'] as String?,
-      phone: json['phone'] as String?,
-      email: json['email'] as String?,
-      address: json['address'] as String?,
-      roleType: json['role_type'] as String?,
-      status: json['status'] as String?,
-      avtUrl: json['avt_url'] as String?, // ✅ parse đúng key backend
-    );
-  }
-}
+import 'package:mobile_web_flutter/models/admin/admin_user_me.dart';
 
 class AdminMeService {
   final http.Client _client;
@@ -62,7 +25,9 @@ class AdminMeService {
     final res = await _client.get(uri, headers: _headers());
 
     if (res.statusCode ~/ 100 != 2) {
-      throw Exception('Lỗi lấy thông tin cá nhân (HTTP ${res.statusCode}): ${res.body}');
+      throw Exception(
+        'Lỗi lấy thông tin cá nhân (HTTP ${res.statusCode}): ${res.body}',
+      );
     }
 
     final Map<String, dynamic> data =
@@ -92,7 +57,9 @@ class AdminMeService {
     );
 
     if (res.statusCode ~/ 100 != 2) {
-      throw Exception('Lỗi cập nhật thông tin (HTTP ${res.statusCode}): ${res.body}');
+      throw Exception(
+        'Lỗi cập nhật thông tin (HTTP ${res.statusCode}): ${res.body}',
+      );
     }
 
     final Map<String, dynamic> data =
@@ -105,7 +72,8 @@ class AdminMeService {
     required Uint8List bytes,
     required String filename,
   }) async {
-    final uri = Uri.parse('${ApiBase.baseURL}${ApiBase.api('/me/update_avatar')}');
+    final uri =
+        Uri.parse('${ApiBase.baseURL}${ApiBase.api('/me/update_avatar')}');
 
     final req = http.MultipartRequest('POST', uri);
 

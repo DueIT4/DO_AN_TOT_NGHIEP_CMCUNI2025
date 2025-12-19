@@ -82,3 +82,7 @@ class ResetPasswordIn(BaseModel):
 class VerifyResetOTPIn(BaseModel):
     contact: str
     otp: str
+class RegisterEmailIn(BaseModel):
+    username: str = Field(..., min_length=1)
+    email: EmailStr
+    password: str = Field(..., min_length=6)

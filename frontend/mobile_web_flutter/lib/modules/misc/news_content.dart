@@ -1,8 +1,7 @@
-// lib/modules/misc/news_content.dart
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class NewsContent extends StatefulWidget {
@@ -13,74 +12,221 @@ class NewsContent extends StatefulWidget {
 }
 
 class _NewsContentState extends State<NewsContent> {
-  bool _loading = true;
-  String? _error;
+  bool _loading = true; // loading "hard" (khi chưa có data nào)
+  String? _banner; // thông báo dạng banner (không che list)
   List<Map<String, dynamic>> _articles = [];
 
   // 🔑 API KEY tin tức
   static const String _apiKey = '3f5dbba4289b4bf68dcbbdd80468c064';
 
+  // Cache key (localStorage trên Web)
+  static const String _cacheKey = 'agri_news_cache_v2';
+
+  // ❌ Chặn BBC (cả bbc.com, bbc.co.uk, m.bbc..., bbcvietnamese...)
+  static const List<String> _blockedDomains = [
+    'bbc.com',
+    'bbc.co.uk',
+    'bbcvietnamese.com',
+  ];
+
   @override
   void initState() {
     super.initState();
-    _loadNews();
+    _bootstrap();
   }
 
-  Future<void> _loadNews() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  /// ✅ Mở trang: đọc cache trước (hiện ngay), rồi mới fetch cập nhật
+  Future<void> _bootstrap() async {
+    final cached = await _loadCache();
+    if (!mounted) return;
 
+    if (cached.isNotEmpty) {
+      setState(() {
+        _articles = cached;
+        _loading = false; // có tin hiện ngay
+        _banner = 'Đang hiển thị tin đã lưu, đang cập nhật tin mới...';
+      });
+    }
+
+    // luôn cố gắng cập nhật tin mới
+    await _loadNews();
+  }
+
+  Future<void> _saveCache(List<Map<String, dynamic>> articles) async {
     try {
-      // Ưu tiên tìm tin nông nghiệp tiếng Việt
-      final agriVi = await _fetchNews(
-        query:
-            '"nông nghiệp" OR "nông dân" OR "trồng trọt" OR "cây trồng" OR "nông sản"',
-        language: 'vi',
-      );
-      if (agriVi.isNotEmpty) {
-        setState(() {
-          _articles = agriVi;
-          _loading = false;
-        });
-        return;
-      }
-
-      // Nếu không có → tìm toàn cầu
-      final agriGlobal =
-          await _fetchNews(query: 'agriculture OR farming OR crops');
-      if (agriGlobal.isNotEmpty) {
-        setState(() {
-          _articles = agriGlobal;
-          _loading = false;
-        });
-        return;
-      }
-
-      // Nếu không có gì → fallback
-      setState(() {
-        _articles = _defaultArticles();
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _articles = _defaultArticles();
-        _loading = false;
-        _error = 'Đang hiển thị dữ liệu dự phòng do lỗi API.';
-      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, jsonEncode(articles));
+    } catch (_) {
+      // ignore cache error on web storage
     }
   }
 
+  Future<List<Map<String, dynamic>>> _loadCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cacheKey);
+      if (raw == null || raw.isEmpty) return [];
+      final List decoded = jsonDecode(raw);
+      return decoded.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _loadNews() async {
+    // Nếu hiện đang có dữ liệu rồi thì chỉ hiện banner "đang cập nhật"
+    if (mounted && _articles.isNotEmpty) {
+      setState(() {
+        _banner = 'Đang cập nhật tin mới...';
+      });
+    } else {
+      setState(() {
+        _loading = true;
+        _banner = null;
+      });
+    }
+
+    try {
+      // Tier A: tin nông nghiệp tiếng Việt (hẹp)
+      final a = await _fetchNews(
+        query:
+            '"nông nghiệp" OR "nông dân" OR "trồng trọt" OR "cây trồng" OR "nông sản"',
+        language: 'vi',
+        excludeDomains: _blockedDomains,
+      );
+
+      if (a.isNotEmpty) {
+        await _saveCache(a);
+        if (!mounted) return;
+        setState(() {
+          _articles = a;
+          _loading = false;
+          _banner = null;
+        });
+        return;
+      }
+
+      // Tier B: tiếng Việt (rộng hơn để đỡ rỗng)
+      final b = await _fetchNews(
+        query:
+            '"nông nghiệp" OR "nông sản" OR "khuyến nông" OR "giá nông sản" OR "hạn mặn" OR "sâu bệnh" OR "phân bón"',
+        language: 'vi',
+        excludeDomains: _blockedDomains,
+      );
+
+      if (b.isNotEmpty) {
+        await _saveCache(b);
+        if (!mounted) return;
+        setState(() {
+          _articles = b;
+          _loading = false;
+          _banner = null;
+        });
+        return;
+      }
+
+      // Tier C: tiếng Anh (nông nghiệp toàn cầu)
+      final c = await _fetchNews(
+        query: 'agriculture OR farming OR crops OR livestock',
+        language: 'en',
+        excludeDomains: _blockedDomains,
+      );
+
+      if (c.isNotEmpty) {
+        await _saveCache(c);
+        if (!mounted) return;
+        setState(() {
+          _articles = c;
+          _loading = false;
+          _banner = null;
+        });
+        return;
+      }
+
+      // Tier D: query siêu rộng (vẫn chặn BBC) - để tránh rỗng
+      final d = await _fetchNews(
+        query:
+            'agriculture OR farming OR crops OR "nông nghiệp" OR "nông sản"',
+        excludeDomains: _blockedDomains,
+      );
+
+      if (d.isNotEmpty) {
+        await _saveCache(d);
+        if (!mounted) return;
+        setState(() {
+          _articles = d;
+          _loading = false;
+          _banner = null;
+        });
+        return;
+      }
+
+      // Tier E: cache
+      final cached = await _loadCache();
+      if (cached.isNotEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _articles = cached;
+          _loading = false;
+          _banner =
+              'Nguồn hiện tại tạm thời không có bài phù hợp. Đang hiển thị tin đã lưu.';
+        });
+        return;
+      }
+
+      // Tier F: default
+      if (!mounted) return;
+      setState(() {
+        _articles = _defaultArticles();
+        _loading = false;
+        _banner = 'Đang hiển thị dữ liệu dự phòng.';
+      });
+    } catch (_) {
+      // Nếu lỗi: ưu tiên cache trước, không che list
+      final cached = await _loadCache();
+      if (!mounted) return;
+
+      if (cached.isNotEmpty) {
+        setState(() {
+          _articles = cached;
+          _loading = false;
+          _banner = 'Lỗi API. Đang hiển thị tin đã lưu.';
+        });
+      } else {
+        setState(() {
+          _articles = _defaultArticles();
+          _loading = false;
+          _banner = 'Lỗi API. Đang hiển thị dữ liệu dự phòng.';
+        });
+      }
+    }
+  }
+
+  /// Fetch NewsAPI: encode query đúng + excludeDomains + timeout
   Future<List<Map<String, dynamic>>> _fetchNews({
     required String query,
     String? language,
+    List<String>? excludeDomains,
   }) async {
-    final url =
-        'https://newsapi.org/v2/everything?q=$query&pageSize=10&sortBy=publishedAt&apiKey=$_apiKey'
-        '${language != null ? '&language=$language' : ''}';
+    final params = <String, String>{
+      'q': query,
+      'pageSize': '10',
+      'sortBy': 'publishedAt',
+      'apiKey': _apiKey,
+    };
+    if (language != null) params['language'] = language;
+    if (excludeDomains != null && excludeDomains.isNotEmpty) {
+      params['excludeDomains'] = excludeDomains.join(',');
+    }
 
-    final res = await http.get(Uri.parse(url));
+    final uri = Uri.https('newsapi.org', '/v2/everything', params);
+
+    final res = await http
+        .get(uri)
+        .timeout(const Duration(seconds: 8), onTimeout: () {
+      // timeout => coi như rỗng
+      return http.Response('{"status":"error"}', 408);
+    });
 
     if (res.statusCode != 200) return [];
 
@@ -89,7 +235,22 @@ class _NewsContentState extends State<NewsContent> {
 
     final List items = data['articles'] ?? [];
 
-    return items.map<Map<String, dynamic>>((a) {
+    bool isBBC(dynamic a) {
+      final url = (a['url'] ?? '').toString().toLowerCase();
+      final src = (a['source']?['name'] ?? '').toString().toLowerCase();
+      final host = Uri.tryParse(url)?.host.toLowerCase() ?? '';
+      // chặn bằng host + từ khóa bbc
+      if (src.contains('bbc')) return true;
+      if (url.contains('bbc.')) return true;
+      if (host.contains('bbc.')) return true;
+      if (host.contains('bbcvietnamese')) return true;
+      return false;
+    }
+
+    // ✅ Map + lọc BBC lần nữa cho chắc
+    return items
+        .where((a) => !isBBC(a))
+        .map<Map<String, dynamic>>((a) {
       return {
         'title': a['title'] ?? '(Không có tiêu đề)',
         'description': a['description'] ?? '',
@@ -104,29 +265,27 @@ class _NewsContentState extends State<NewsContent> {
   List<Map<String, dynamic>> _defaultArticles() {
     return [
       {
-        'title': 'Xu hướng nông nghiệp thông minh tại Việt Nam 2025',
-        'description':
-            'AI, IoT và chuyển đổi số đang thay đổi hệ thống sản xuất nông nghiệp.',
+        'title': 'Xu hướng nông nghiệp thông minh tại Việt Nam',
+        'description': 'AI, IoT và chuyển đổi số đang thay đổi sản xuất nông nghiệp.',
         'url': '',
         'imageUrl': null,
-        'source': 'Tổng hợp',
+        'source': 'Dữ liệu dự phòng',
         'publishedAt': '2025-01-01T08:00:00Z',
       },
       {
         'title': 'Giải pháp tiết kiệm nước mùa khô',
-        'description':
-            'Ứng dụng kỹ thuật tưới nhỏ giọt giúp giảm chi phí 30%.',
+        'description': 'Ứng dụng tưới nhỏ giọt giúp giảm chi phí và ổn định năng suất.',
         'url': '',
         'imageUrl': null,
-        'source': 'Khuyến Nông',
+        'source': 'Dữ liệu dự phòng',
         'publishedAt': '2025-01-02T09:00:00Z',
       },
       {
-        'title': 'Ứng dụng QR & blockchain trong truy xuất nguồn gốc',
-        'description': 'Nâng cao sự minh bạch của chuỗi cung ứng nông sản.',
+        'title': 'Truy xuất nguồn gốc bằng QR trong nông sản',
+        'description': 'Tăng minh bạch chuỗi cung ứng và niềm tin người tiêu dùng.',
         'url': '',
         'imageUrl': null,
-        'source': 'Nông Nghiệp Số',
+        'source': 'Dữ liệu dự phòng',
         'publishedAt': '2025-01-03T10:00:00Z',
       },
     ];
@@ -169,32 +328,54 @@ class _NewsContentState extends State<NewsContent> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-            if (_loading)
+            // ✅ Banner thông báo (không che list)
+            if (_banner != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Card(
+                  color: Colors.orange.shade50,
+                  child: ListTile(
+                    leading: Icon(Icons.info_outline,
+                        color: Colors.orange.shade800),
+                    title: Text(
+                      _banner!,
+                      style: TextStyle(color: Colors.orange.shade900),
+                    ),
+                    trailing: TextButton.icon(
+                      onPressed: _loadNews,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Thử lại'),
+                    ),
+                  ),
+                ),
+              ),
+
+            // ✅ Loading chỉ khi chưa có data
+            if (_loading && _articles.isEmpty)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(48),
                   child: CircularProgressIndicator(),
                 ),
               )
-            else if (_error != null)
+            else if (_articles.isEmpty)
               Center(
                 child: Column(
                   children: [
-                    Icon(Icons.error_outline,
-                        size: 64, color: Colors.orange.shade400),
+                    Icon(Icons.inbox_outlined,
+                        size: 64, color: Colors.grey.shade400),
                     const SizedBox(height: 12),
                     Text(
-                      _error!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.orange.shade800),
+                      'Chưa có dữ liệu để hiển thị.',
+                      style: TextStyle(color: Colors.grey.shade700),
                     ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
                       onPressed: _loadNews,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Thử lại'),
+                      label: const Text('Tải lại'),
                     ),
                   ],
                 ),
@@ -209,15 +390,14 @@ class _NewsContentState extends State<NewsContent> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _articles.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: 12),
-                      itemBuilder: (_, i) =>
-                          _NewsCard(article: _articles[i], formatTime: _formatTime),
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (_, i) => _NewsCard(
+                        article: _articles[i],
+                        formatTime: _formatTime,
+                      ),
                     ),
                   ),
-
                   if (isWide) const SizedBox(width: 24),
-
                   if (isWide) const Expanded(flex: 1, child: _SidebarLinks()),
                 ],
               ),
@@ -238,11 +418,11 @@ class _NewsCard extends StatelessWidget {
   });
 
   Future<void> _openUrl() async {
-    final link = article['url'] ?? '';
+    final link = (article['url'] ?? '').toString();
     if (link.isEmpty) return;
     final uri = Uri.parse(link);
     if (await canLaunchUrl(uri)) {
-      launchUrl(uri, mode: LaunchMode.externalApplication);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -271,7 +451,6 @@ class _NewsCard extends StatelessWidget {
                   ),
                 ),
               ),
-
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -288,19 +467,22 @@ class _NewsCard extends StatelessWidget {
                     ),
                   const SizedBox(height: 4),
                   Text(
-                    article['title'] ?? '',
+                    (article['title'] ?? '').toString(),
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    article['description'] ?? '',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-                  ),
+                  if ((article['description'] ?? '').toString().isNotEmpty)
+                    Text(
+                      (article['description'] ?? '').toString(),
+                      style:
+                          TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                    ),
                   const SizedBox(height: 8),
                   Text(
-                    formatTime(article['publishedAt']),
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    formatTime((article['publishedAt'] ?? '').toString()),
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.grey.shade500),
                   ),
                 ],
               ),

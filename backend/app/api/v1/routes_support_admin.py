@@ -3,6 +3,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session
+from fastapi import UploadFile, File
+import os, uuid
 
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
@@ -94,3 +96,20 @@ def change_ticket_status(
         return update_ticket_status(db, ticket_id, status=status)
     except TicketNotFoundError:
         raise HTTPException(status_code=404, detail="Ticket không tồn tại")
+@router.post("/uploads")
+def upload_support_attachment(file: UploadFile = File(...)):
+    # thư mục lưu
+    upload_dir = "uploads/support"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # đặt tên file an toàn + tránh trùng
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    safe_name = f"{uuid.uuid4().hex}{ext}"
+    path = os.path.join(upload_dir, safe_name)
+
+    # lưu file
+    with open(path, "wb") as f:
+        f.write(file.file.read())
+
+    # trả về đường dẫn public (frontend đang ghép baseURL + raw)
+    return {"attachment_url": f"/{path.replace(os.sep, '/')}"}

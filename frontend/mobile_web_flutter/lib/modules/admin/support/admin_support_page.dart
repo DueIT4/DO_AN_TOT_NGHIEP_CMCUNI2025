@@ -1,8 +1,12 @@
 // lib/modules/admin/support/admin_support_page.dart
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
-import 'package:mobile_web_flutter/core/admin_ticket_service.dart';
+import 'package:mobile_web_flutter/services/admin/admin_ticket_service.dart';
 import 'package:mobile_web_flutter/core/api_base.dart';
+import 'package:mobile_web_flutter/models/admin/detection_history_models.dart';
+import 'package:mobile_web_flutter/models/admin/admin_ticket_models.dart';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 
 class AdminSupportPage extends StatefulWidget {
   const AdminSupportPage({super.key});
@@ -14,6 +18,10 @@ class AdminSupportPage extends StatefulWidget {
 class _AdminSupportPageState extends State<AdminSupportPage> {
   final TextEditingController _searchCtrl = TextEditingController();
   final TextEditingController _replyCtrl = TextEditingController();
+  PlatformFile? _pickedFile;
+  Uint8List? _pickedBytes;
+  bool _uploadingFile = false;
+  String? _attachmentUrl;
 
   String? _statusFilter; // null, 'processing', 'processed'
   int _page = 1;
@@ -206,21 +214,77 @@ Widget _compactDropdown({
       if (mounted) setState(() => _loadingDetail = false);
     }
   }
+Future<void> _pickFile() async {
+  final res = await FilePicker.platform.pickFiles(withData: true);
+  if (res == null || res.files.isEmpty) return;
+
+  final f = res.files.first;
+  if (f.bytes == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Không đọc được file.')),
+    );
+    return;
+  }
+
+  setState(() {
+    _pickedFile = f;
+    _pickedBytes = f.bytes!;
+    _attachmentUrl = null;
+  });
+}
+
+void _clearFile() {
+  setState(() {
+    _pickedFile = null;
+    _pickedBytes = null;
+    _attachmentUrl = null;
+  });
+}
+
+Future<String?> _ensureUpload() async {
+  if (_attachmentUrl != null && _attachmentUrl!.isNotEmpty) return _attachmentUrl;
+  if (_pickedBytes == null || _pickedFile == null) return null;
+
+  setState(() => _uploadingFile = true);
+  try {
+    final url = await AdminTicketService.uploadSupportAttachment(
+      bytes: _pickedBytes!,
+      filename: _pickedFile!.name,
+    );
+    if (!mounted) return null;
+    setState(() => _attachmentUrl = url);
+    return url;
+  } finally {
+    if (mounted) setState(() => _uploadingFile = false);
+  }
+}
 
   Future<void> _sendReply() async {
     final detail = _ticketDetail;
     if (detail == null) return;
 
     final text = _replyCtrl.text.trim();
-    if (text.isEmpty) return;
+    final hasFile = _pickedFile != null && _pickedBytes != null;
+
+    if (text.isEmpty && !hasFile) return;
 
     setState(() => _sending = true);
 
-    try {
+        try {
+      String? attachmentUrl;
+      if (hasFile) {
+        attachmentUrl = await _ensureUpload();
+      }
+
+      // backend bắt buộc message không rỗng → nếu chỉ gửi file thì gửi placeholder
+      final payloadMessage = text.isEmpty ? '(Đính kèm)' : text;
+
       final msg = await AdminTicketService.sendAdminMessage(
         ticketId: detail.ticketId,
-        message: text,
+        message: payloadMessage,
+        attachmentUrl: attachmentUrl,
       );
+
       if (!mounted) return;
 
       setState(() {
@@ -236,6 +300,8 @@ Widget _compactDropdown({
         );
         _replyCtrl.clear();
       });
+
+      _clearFile();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -442,7 +508,9 @@ Widget _compactDropdown({
                                               ),
                                             ),
                                             const SizedBox(width: 10),
-                                            _statusChip(t.status),
+                                             _statusChip(t.status),
+
+
                                           ],
                                         ),
                                       ),
@@ -612,13 +680,13 @@ Widget _compactDropdown({
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Mô tả ban đầu',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                          // const Text(
+                          //   'Mô tả ban đầu',
+                          //   style: TextStyle(
+                          //     fontSize: 12,
+                          //     fontWeight: FontWeight.w800,
+                          //   ),
+                          // ),
                           const SizedBox(height: 6),
                           Text(
                             desc,
@@ -630,18 +698,29 @@ Widget _compactDropdown({
                   }
 
                   // các index còn lại là message
-                  final m = detail.messages[index - 1];
+ // các index còn lại là message
+final m = detail.messages[index - 1];
 
-                  final sender = (m.senderName ?? '').toLowerCase();
-                  final isAdmin =
-                      sender.isEmpty || sender.contains('admin');
+final senderRaw = (m.senderName ?? '').trim();
+final sender = senderRaw.toLowerCase();
 
-                  final align = isAdmin
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft;
-                  final bubble = isAdmin
-                      ? Colors.green.shade50
-                      : Colors.grey.shade100;
+// ✅ Chỉ KHÁCH HÀNG nằm bên trái, còn lại (admin/support/support_admin) bên phải
+final isCustomer =
+    sender.contains('user') ||
+    sender.contains('khách') ||
+    sender.contains('khach') ||
+    sender.contains('người dùng') ||
+    sender.contains('nguoi dung') ||
+    (detail.username != null &&
+        detail.username!.trim().isNotEmpty &&
+        senderRaw == detail.username!.trim());
+
+final align = isCustomer ? Alignment.centerLeft : Alignment.centerRight;
+final bubble = isCustomer ? Colors.grey.shade100 : Colors.green.shade50;
+final cross = isCustomer ? CrossAxisAlignment.start : CrossAxisAlignment.end;
+
+final displayName = m.senderName ?? (isCustomer ? 'Khách hàng' : 'Nhân viên');
+
 
                   return Container(
                     alignment: align,
@@ -663,13 +742,10 @@ Widget _compactDropdown({
                             vertical: 10,
                           ),
                           child: Column(
-                            crossAxisAlignment: isAdmin
-                                ? CrossAxisAlignment.end
-                                : CrossAxisAlignment.start,
+                          crossAxisAlignment: cross,
                             children: [
                               Text(
-                                m.senderName ??
-                                    (isAdmin ? 'Admin' : 'Người dùng'),
+                              displayName,
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
@@ -742,48 +818,64 @@ Widget _compactDropdown({
           ),
         ),
         child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _replyCtrl,
-                minLines: 1,
-                maxLines: 4,
-                decoration: _pillInput(
-                  hint: 'Nhập nội dung trả lời...',
-                  icon: Icons.chat_bubble_outline,
+        children: [
+          IconButton.filledTonal(
+            tooltip: 'Đính kèm file',
+            onPressed: (_sending || _uploadingFile) ? null : _pickFile,
+            icon: _uploadingFile
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.attach_file_rounded),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_pickedFile != null) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Chip(
+                      label: Text(_pickedFile!.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      onDeleted: (_sending || _uploadingFile) ? null : _clearFile,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+                TextField(
+                  controller: _replyCtrl,
+                  minLines: 1,
+                  maxLines: 4,
+                  decoration: _pillInput(
+                    hint: 'Nhập nội dung trả lời...',
+                    icon: Icons.chat_bubble_outline,
+                  ),
+                  onSubmitted: (_) {
+                    if (!_sending && !_uploadingFile) _sendReply();
+                  },
                 ),
-                onSubmitted: (_) {
-                  if (!_sending) _sendReply();
-                },
-              ),
+              ],
             ),
-            const SizedBox(width: 10),
-            FilledButton.icon(
-              onPressed: _sending ? null : _sendReply,
-              icon: _sending
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.send, size: 18),
-              label: const Text('Gửi'),
-              style: FilledButton.styleFrom(
-                backgroundColor: _green,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton.icon(
+            onPressed: (_sending || _uploadingFile) ? null : _sendReply,
+            icon: _sending
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.send, size: 18),
+            label: const Text('Gửi'),
+            style: FilledButton.styleFrom(
+              backgroundColor: _green,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
-          ],
-        ),
+          ),
+        ],
+      )
+
       ),
     ],
   );

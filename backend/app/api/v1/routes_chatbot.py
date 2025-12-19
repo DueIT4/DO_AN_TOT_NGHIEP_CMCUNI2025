@@ -67,10 +67,10 @@ def list_chatbot_sessions(
     if status_filter:
         query = query.filter(Chatbot.status == status_filter)
     
-    chatbots = query.order_by(Chatbot.created_at.desc()).all()
+    chatbot = query.order_by(Chatbot.created_at.desc()).all()
     
     result = []
-    for cb in chatbots:
+    for cb in chatbot:
         count = db.query(func.count(ChatbotDetail.detail_id)).filter(
             ChatbotDetail.chatbot_id == cb.chatbot_id
         ).scalar()

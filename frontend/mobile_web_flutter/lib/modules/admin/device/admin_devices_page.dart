@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_web_flutter/core/device_service.dart';
-import 'package:mobile_web_flutter/core/user_service.dart';
-import 'package:mobile_web_flutter/core/device_type_service.dart';
+import 'package:mobile_web_flutter/services/admin/device_service.dart';
+import 'package:mobile_web_flutter/services/admin/user_service.dart';
+import 'package:mobile_web_flutter/services/admin/device_type_service.dart';
 import 'package:mobile_web_flutter/core/toast.dart';
+import 'package:mobile_web_flutter/core/role_ui.dart';
 
 class AdminDevicesPage extends StatefulWidget {
   const AdminDevicesPage({super.key});
@@ -353,26 +354,26 @@ class _AdminDevicesPageState extends State<AdminDevicesPage> {
     );
   }
 Widget _buildRoleChip(String? roleType) {
-  final r = (roleType ?? '').toLowerCase();
-
-  // chỉ 2 trạng thái màu: admin/support_admin nổi nhẹ, còn lại xám
-  final bool isHigh = (r == 'admin' || r == 'support_admin');
-  final bg = isHigh ? Colors.green.shade50 : Colors.grey.shade100;
-  final fg = isHigh ? Colors.green.shade800 : Colors.grey.shade800;
+  final bg = roleBgColor(roleType);
+  final fg = roleFgColor(roleType);
 
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration: BoxDecoration(
       color: bg,
       borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: Colors.black.withOpacity(0.06)),
     ),
     child: Text(
-      (roleType == null || roleType.trim().isEmpty) ? '-' : roleType,
-      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg),
+      roleLabelVi(roleType), // ✅ đổi label
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: fg,
+      ),
     ),
   );
 }
+
 
 
   Widget _buildDevicesCard(BuildContext context) {
@@ -610,6 +611,8 @@ Widget _buildRoleChip(String? roleType) {
 
 // ===================== DIALOG THÊM / SỬA THIẾT BỊ =====================
 
+// ===================== DIALOG THÊM / SỬA THIẾT BỊ (UI IMPROVED) =====================
+
 class _DeviceDialog extends StatefulWidget {
   final Map<String, dynamic>? device;
   final int? ownerUserId;
@@ -667,10 +670,68 @@ class _DeviceDialogState extends State<_DeviceDialog> {
     super.dispose();
   }
 
+  InputDecoration _decoration(
+    BuildContext context, {
+    required String label,
+    String? hint,
+    IconData? icon,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: icon == null
+          ? null
+          : Icon(icon, size: 18, color: scheme.onSurfaceVariant),
+      filled: true,
+      fillColor: scheme.surfaceContainerHighest.withOpacity(0.35),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.black.withOpacity(0.06)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.black.withOpacity(0.06)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: scheme.primary.withOpacity(0.55), width: 1.3),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+    );
+  }
+
+  Widget _sectionTitle(BuildContext context, String text) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            height: 8,
+            width: 8,
+            decoration: BoxDecoration(
+              color: scheme.primary.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
     setState(() => _saving = true);
 
+    // ✅ giữ nguyên keys/logic, chỉ UI
     final body = <String, dynamic>{
       "name": _name.text.trim(),
       "serial_no": _serial.text.trim(),
@@ -713,101 +774,219 @@ class _DeviceDialogState extends State<_DeviceDialog> {
     final scheme = Theme.of(context).colorScheme;
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      title: Row(
-        children: [
-          Icon(isEdit ? Icons.edit_rounded : Icons.add_circle_outline_rounded, color: scheme.primary),
-          const SizedBox(width: 10),
-          Text(isEdit ? 'Sửa thiết bị' : 'Thêm thiết bị'),
-        ],
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      titlePadding: EdgeInsets.zero,
+      contentPadding: const EdgeInsets.fromLTRB(18, 14, 18, 4),
+      actionsPadding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
+
+      // ✅ Header đẹp + đồng bộ style trang
+      title: Container(
+        padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scheme.primary.withOpacity(0.10),
+              scheme.tertiary.withOpacity(0.10),
+            ],
+          ),
+          border: Border(
+            bottom: BorderSide(color: Colors.black.withOpacity(0.06)),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                color: scheme.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                isEdit ? Icons.edit_rounded : Icons.add_circle_outline_rounded,
+                color: scheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isEdit ? 'Sửa thiết bị' : 'Thêm thiết bị',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isEdit
+                        ? 'Cập nhật thông tin thiết bị'
+                        : 'Nhập thông tin để tạo thiết bị mới',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Đóng',
+              onPressed: _saving ? null : () => Navigator.pop(context, false),
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ),
       ),
+
       content: Form(
         key: _form,
         child: SizedBox(
-          width: 440,
+          width: 520,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                _sectionTitle(context, 'Thông tin cơ bản'),
                 TextFormField(
                   controller: _name,
-                  decoration: const InputDecoration(
-                    labelText: 'Tên thiết bị',
-                    border: OutlineInputBorder(),
+                  textInputAction: TextInputAction.next,
+                  decoration: _decoration(
+                    context,
+                    label: 'Tên thiết bị',
+                    hint: 'VD: Camera cổng A',
+                    icon: Icons.devices_other_rounded,
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Không được để trống' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _serial,
-                  decoration: const InputDecoration(
-                    labelText: 'Serial',
-                    border: OutlineInputBorder(),
+                  textInputAction: TextInputAction.next,
+                  decoration: _decoration(
+                    context,
+                    label: 'Serial',
+                    hint: 'VD: SN-001-ABC',
+                    icon: Icons.confirmation_number_rounded,
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Không được để trống' : null,
                 ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  value: _selectedDeviceTypeId,
-                  items: widget.deviceTypes.map((dt) {
-                    final id = dt['device_type_id'] as int;
-                    final name = (dt['device_type_name'] ?? 'Loại #$id').toString();
-                    return DropdownMenuItem<int>(
-                      value: id,
-                      child: Text(name),
-                    );
-                  }).toList(),
-                  onChanged: (val) => setState(() => _selectedDeviceTypeId = val),
-                  decoration: const InputDecoration(
-                    labelText: 'Loại thiết bị',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (val) => (val == null || val == 0) ? 'Vui lòng chọn loại thiết bị' : null,
+
+                const SizedBox(height: 16),
+                _sectionTitle(context, 'Phân loại & trạng thái'),
+
+                // ✅ 2 cột gọn gàng (desktop/web), nhỏ quá thì vẫn ổn nhờ layout co giãn
+                LayoutBuilder(
+                  builder: (context, c) {
+                    final isNarrow = c.maxWidth < 460;
+                    final children = <Widget>[
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          value: _selectedDeviceTypeId,
+                          isExpanded: true,
+                          items: widget.deviceTypes.map((dt) {
+                            final id = dt['device_type_id'] as int;
+                            final name = (dt['device_type_name'] ?? 'Loại #$id').toString();
+                            return DropdownMenuItem<int>(
+                              value: id,
+                              child: Text(name, overflow: TextOverflow.ellipsis),
+                            );
+                          }).toList(),
+                          onChanged: (val) => setState(() => _selectedDeviceTypeId = val),
+                          decoration: _decoration(
+                            context,
+                            label: 'Loại thiết bị',
+                            icon: Icons.category_rounded,
+                          ),
+                          validator: (val) => (val == null || val == 0) ? 'Vui lòng chọn loại thiết bị' : null,
+                        ),
+                      ),
+                      SizedBox(width: isNarrow ? 0 : 12, height: isNarrow ? 12 : 0),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _statusValue,
+                          isExpanded: true,
+                          items: _statusOptions
+                              .map((opt) => DropdownMenuItem<String>(
+                                    value: opt['value'],
+                                    child: Text(opt['label']!),
+                                  ))
+                              .toList(),
+                          onChanged: (val) => setState(() => _statusValue = val ?? 'active'),
+                          decoration: _decoration(
+                            context,
+                            label: 'Trạng thái',
+                            icon: Icons.toggle_on_rounded,
+                          ),
+                        ),
+                      ),
+                    ];
+
+                    return isNarrow
+                        ? Column(children: children.map((w) => w).toList())
+                        : Row(children: children);
+                  },
                 ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: _statusValue,
-                  items: _statusOptions
-                      .map((opt) => DropdownMenuItem<String>(
-                            value: opt['value'],
-                            child: Text(opt['label']!),
-                          ))
-                      .toList(),
-                  onChanged: (val) => setState(() => _statusValue = val ?? 'active'),
-                  decoration: const InputDecoration(
-                    labelText: 'Trạng thái',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
+
+                const SizedBox(height: 16),
+                _sectionTitle(context, 'Vị trí'),
+
                 TextFormField(
                   controller: _location,
-                  decoration: const InputDecoration(
-                    labelText: 'Vị trí lắp đặt',
-                    border: OutlineInputBorder(),
+                  textInputAction: TextInputAction.done,
+                  decoration: _decoration(
+                    context,
+                    label: 'Vị trí lắp đặt',
+                    hint: 'VD: Tầng 1 - Khu vực lễ tân',
+                    icon: Icons.place_rounded,
                   ),
                 ),
+
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Mẹo: Điền Serial dễ nhận diện để quản lý nhanh hơn.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 10),
               ],
             ),
           ),
         ),
       ),
+
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.pop(context, false),
           child: const Text('Hủy'),
         ),
-        FilledButton(
+        FilledButton.icon(
           onPressed: _saving ? null : _submit,
+          icon: _saving
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(isEdit ? Icons.save_rounded : Icons.add_rounded, size: 18),
+          label: Text(isEdit ? 'Lưu thay đổi' : 'Tạo mới'),
           style: FilledButton.styleFrom(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
-          child: _saving
-              ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(isEdit ? 'Lưu thay đổi' : 'Tạo mới'),
         ),
       ],
     );
   }
 }
+
+
+

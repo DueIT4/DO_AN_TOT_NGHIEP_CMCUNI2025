@@ -13,7 +13,7 @@ class ChatbotStatus(str, enum.Enum):
 
 
 class Chatbot(Base):
-    __tablename__ = "chatbots"
+    __tablename__ = "chatbot"
 
     chatbot_id = Column(BigInteger, primary_key=True, autoincrement=True)
     user_id = Column(
@@ -28,7 +28,7 @@ class Chatbot(Base):
     status = Column(SAEnum(ChatbotStatus), default=ChatbotStatus.active, nullable=False)
 
     # relationship 2 chiều với Users
-    user = relationship("Users", back_populates="chatbots")
+    user = relationship("Users", back_populates="chatbot")
 
     # relationship 2 chiều với ChatbotDetail
     details = relationship(
@@ -40,12 +40,12 @@ class Chatbot(Base):
 
 
 class ChatbotDetail(Base):
-    __tablename__ = "chatbot_details"
+    __tablename__ = "chatbot_detail"
 
     detail_id = Column(BigInteger, primary_key=True, autoincrement=True)
     chatbot_id = Column(
         BigInteger,
-        ForeignKey("chatbots.chatbot_id", ondelete="CASCADE"),
+        ForeignKey("chatbot.chatbot_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

@@ -40,6 +40,22 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     super.dispose();
   }
 
+  // ================== VALIDATE ĐỊNH DẠNG EMAIL / SĐT ==================
+
+  bool _isValidEmail(String s) {
+    final v = s.trim();
+    // regex email đủ dùng cho form (không quá khó tính)
+    return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v);
+  }
+
+  bool _isValidPhone(String s) {
+    final v = s.trim();
+    // Chấp nhận:
+    // - 0xxxxxxxxx (10-11 số, ví dụ VN hay 10 số)
+    // - +84xxxxxxxxx
+    return RegExp(r'^(0\d{9,10}|\+84\d{9,10})$').hasMatch(v);
+  }
+
   // ================== BƯỚC 1: GỬI YÊU CẦU QUÊN MẬT KHẨU ==================
   Future<void> _submitStep1() async {
     if (!_formKeyStep1.currentState!.validate()) return;
@@ -61,7 +77,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       }
 
       final res = await ApiBase.postJson(
-        ApiBase.api('/auth/forgot-password'),
+        ApiBase.api('/auth/forgot-password-otp'),
         body,
       );
 
@@ -89,26 +105,32 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     });
 
     try {
-      final code = _codeCtrl.text.trim(); // token
+      final contact = _identifierCtrl.text.trim();
+      final otp = _codeCtrl.text.trim();
       final newPassword = _passwordCtrl.text.trim();
 
-      final body = {
-        'token': code,
-        'new_password': newPassword,
-      };
+      // 1) verify otp -> lấy reset_token
+      final verifyRes = await ApiBase.postJson(
+        ApiBase.api('/auth/verify-reset-otp'),
+        {'contact': contact, 'otp': otp},
+      );
 
+      final resetToken = verifyRes['reset_token'] as String?;
+      if (resetToken == null || resetToken.isEmpty) {
+        throw Exception('Không lấy được reset_token');
+      }
+
+      // 2) reset password
       final res = await ApiBase.postJson(
         ApiBase.api('/auth/reset-password'),
-        body,
+        {'token': resetToken, 'new_password': newPassword},
       );
 
       if (!mounted) return;
       setState(() {
-        _info = (res['message'] as String?) ??
-            'Đổi mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới.';
+        _info = (res['message'] as String?) ?? 'Đổi mật khẩu thành công.';
       });
 
-      // ✅ điều hướng chuẩn web
       Future.delayed(const Duration(seconds: 1), () {
         if (!mounted) return;
         context.go(WebRoutes.login);
@@ -185,6 +207,20 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                               if (v == null || v.trim().isEmpty) {
                                 return 'Vui lòng nhập email hoặc số điện thoại';
                               }
+
+                              final input = v.trim();
+
+                              // ✅ Chặn sai định dạng
+                              if (input.contains('@')) {
+                                if (!_isValidEmail(input)) {
+                                  return 'Email không đúng định dạng';
+                                }
+                              } else {
+                                if (!_isValidPhone(input)) {
+                                  return 'Số điện thoại không đúng định dạng';
+                                }
+                              }
+
                               return null;
                             },
                           ),

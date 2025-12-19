@@ -66,14 +66,19 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
+    # ===== Weather =====
     OPENWEATHER_API_KEY: str = ""
     OPENWEATHER_BASE_URL: str = "https://api.openweathermap.org/data/2.5"
+
+    # ===== News (ADD) =====
+    NEWS_API_KEY: str = ""  # ✅ thêm để đọc từ .env
+    NEWSAPI_BASE_URL: str = "https://newsapi.org/v2"  # ✅ base url cho NewsAPI
+
 
 settings = Settings()
 
 # Debug (khuyên: chỉ bật khi dev)
-print(">>> Raw DATABASE_URL from env:", settings.DATABASE_URL)
-print(">>> Final DB URL used:", settings.db_url)
-print(">>> GEMINI_MODEL:", settings.GEMINI_MODEL)
-import os
-print("DATABASE_URL =", os.getenv("DATABASE_URL"))
+# print(">>> Raw DATABASE_URL from env:", settings.DATABASE_URL)
+# print(">>> Final DB URL used:", settings.db_url)
+# print(">>> GEMINI_MODEL:", settings.GEMINI_MODEL)
+# print(">>> NEWS_API_KEY loaded:", "YES" if bool(settings.NEWS_API_KEY) else "NO")

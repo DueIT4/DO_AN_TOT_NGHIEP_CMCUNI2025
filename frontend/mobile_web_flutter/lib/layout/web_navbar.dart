@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/api_base.dart';
-import '../core/user_service.dart';
+import '../services/admin/user_service.dart';
 import '../src/routes/web_routes.dart';
 
 class WebNavbar extends StatefulWidget {
@@ -23,7 +23,10 @@ class WebNavbar extends StatefulWidget {
 }
 
 class _WebNavbarState extends State<WebNavbar> {
-  bool _isAdmin = false;
+  /// ✅ Có quyền thấy nút "Quản lý" không?
+  /// - admin, support, support_admin: true
+  /// - viewer / chưa login: false
+  bool _canManage = false;
 
   bool get _legacyMode => widget.currentIndex != null && widget.onItemTap != null;
 
@@ -35,18 +38,23 @@ class _WebNavbarState extends State<WebNavbar> {
 
   Future<void> _checkUser() async {
     final hasToken =
-        ApiBase.bearerToken != null && ApiBase.bearerToken!.isNotEmpty;
+        ApiBase.bearerToken != null && ApiBase.bearerToken!.trim().isNotEmpty;
 
     if (!hasToken) {
-      if (mounted) setState(() => _isAdmin = false);
+      if (mounted) setState(() => _canManage = false);
       return;
     }
 
     try {
-      final ok = await UserService.isAdmin();
-      if (mounted) setState(() => _isAdmin = ok);
+      final role = await UserService.getRoleType();
+      final r = (role ?? '').toLowerCase();
+
+      // ✅ Hiển thị cho 3 role trừ viewer
+      final ok = (r == 'admin' || r == 'support' || r == 'support_admin');
+
+      if (mounted) setState(() => _canManage = ok);
     } catch (_) {
-      if (mounted) setState(() => _isAdmin = false);
+      if (mounted) setState(() => _canManage = false);
     }
   }
 
@@ -137,19 +145,13 @@ class _WebNavbarState extends State<WebNavbar> {
                 active: current == 2,
                 onTap: () => _tapIndex(context, 2),
               ),
-              if (_isAdmin)
+
+              // ✅ Nút "Quản lý" cho admin/support/support_admin
+              if (_canManage)
                 FilledButton.icon(
-                  onPressed: () {
-                    if (_legacyMode) {
-                      // nếu đang legacy mode, vẫn cho đi admin bằng navigator stack cũ
-                      // nhưng tốt nhất là chuyển sang go_router hết.
-                      context.go(WebRoutes.adminDashboard);
-                    } else {
-                      context.go(WebRoutes.adminDashboard);
-                    }
-                  },
-                  icon: const Icon(Icons.admin_panel_settings, size: 18),
-                  label: const Text('Admin'),
+                  onPressed: () => context.go(WebRoutes.adminDashboard),
+                  icon: const Icon(Icons.manage_accounts, size: 18),
+                  label: const Text('Quản lý'),
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.green.shade700,
                   ),

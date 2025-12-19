@@ -1,10 +1,3 @@
-// lib/core/dashboard_service.dart
-import 'dart:convert';
-import 'dart:typed_data';
-import 'package:http/http.dart' as http;
-
-import 'api_base.dart';
-
 class DetectionTimePoint {
   final DateTime date;
   final int count;
@@ -149,106 +142,31 @@ class DashboardSummary {
       detectionsOverTime:
           (json['detections_over_time'] as List<dynamic>? ?? [])
               .map((e) => DetectionTimePoint.fromJson(
-                  Map<String, dynamic>.from(e as Map)))
+                    Map<String, dynamic>.from(e as Map),
+                  ))
               .toList(),
       topDiseases: (json['top_diseases'] as List<dynamic>? ?? [])
-          .map(
-              (e) => DiseaseStat.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map((e) => DiseaseStat.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
       totalTickets: json['total_tickets'] as int? ?? 0,
       openTickets: json['open_tickets'] as int? ?? 0,
       ticketsByStatus:
           (json['tickets_by_status'] as List<dynamic>? ?? [])
               .map((e) => TicketStatusStat.fromJson(
-                  Map<String, dynamic>.from(e as Map)))
+                    Map<String, dynamic>.from(e as Map),
+                  ))
               .toList(),
       recentDetections:
           (json['recent_detections'] as List<dynamic>? ?? [])
               .map((e) => RecentDetectionItem.fromJson(
-                  Map<String, dynamic>.from(e as Map)))
+                    Map<String, dynamic>.from(e as Map),
+                  ))
               .toList(),
       recentTickets: (json['recent_tickets'] as List<dynamic>? ?? [])
           .map((e) => RecentTicketItem.fromJson(
-              Map<String, dynamic>.from(e as Map)))
+                Map<String, dynamic>.from(e as Map),
+              ))
           .toList(),
     );
-  }
-}
-
-class DashboardService {
-  /// range: '7d' | '30d' | '90d'
-  static Future<DashboardSummary> fetchSummary({String range = '7d'}) async {
-    final params = <String, String>{
-      'range': range,
-    };
-
-    final query = Uri(queryParameters: params).query;
-
-    final res = await ApiBase.getJson(
-      ApiBase.api('/admin/dashboard?$query'),
-    );
-
-    final map = Map<String, dynamic>.from(res as Map);
-    return DashboardSummary.fromJson(map);
-  }
-
-  /// ADMIN: GET /api/v1/admin/dashboard/export?range=
-  /// Xuất báo cáo dashboard dạng CSV (nếu bạn vẫn muốn giữ)
-  static Future<String> exportDashboardCsv({String range = '7d'}) async {
-    final params = <String, String>{
-      'range': range,
-    };
-
-    final query = Uri(queryParameters: params).query;
-
-    final uri = Uri.parse(
-      '${ApiBase.baseURL}${ApiBase.api('/admin/dashboard/export?$query')}',
-    );
-
-    final token = ApiBase.bearer;
-    final headers = <String, String>{
-      'Accept': 'text/csv',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-
-    final resp = await http.get(uri, headers: headers);
-
-    if ((resp.statusCode ~/ 100) != 2) {
-      throw Exception(
-        'Xuất báo cáo dashboard (CSV) thất bại (${resp.statusCode}): ${resp.body}',
-      );
-    }
-
-    return utf8.decode(resp.bodyBytes);
-  }
-
-  /// ADMIN: GET /api/v1/admin/reports/summary?range=
-  /// Xuất báo cáo tổng quan dạng PDF
-  static Future<Uint8List> exportSummaryPdf({String range = '7d'}) async {
-    final params = <String, String>{
-      'range': range,
-    };
-
-    final query = Uri(queryParameters: params).query;
-
-    final uri = Uri.parse(
-      '${ApiBase.baseURL}${ApiBase.api('/admin/reports/summary?$query')}',
-    );
-
-    final token = ApiBase.bearer;
-    final headers = <String, String>{
-      'Accept': 'application/pdf',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-
-    final resp = await http.get(uri, headers: headers);
-
-    if ((resp.statusCode ~/ 100) != 2) {
-      throw Exception(
-        'Xuất báo cáo PDF thất bại (${resp.statusCode}): ${resp.body}',
-      );
-    }
-
-    return resp.bodyBytes;
   }
 }

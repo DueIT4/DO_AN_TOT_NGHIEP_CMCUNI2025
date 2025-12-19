@@ -2,7 +2,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'package:mobile_web_flutter/core/admin_me_service.dart';
+import 'package:mobile_web_flutter/models/admin/admin_user_me.dart';
+import 'package:mobile_web_flutter/services/admin/admin_me_service.dart';
 import 'package:mobile_web_flutter/core/api_base.dart';
 import 'package:mobile_web_flutter/core/toast.dart';
 
@@ -182,7 +183,12 @@ class _AdminProfileDialogState extends State<AdminProfileDialog> {
   @override
   Widget build(BuildContext context) {
     final avt = _user?.avtUrl;
-    final fullAvtUrl = (avt != null && avt.isNotEmpty) ? '${ApiBase.baseURL}$avt' : null;
+
+    // cache-bust để đổi avatar xong thấy ngay
+    final fullAvtUrl = (avt != null && avt.isNotEmpty)
+        ? '${ApiBase.baseURL}$avt?v=${DateTime.now().millisecondsSinceEpoch}'
+        : null;
+
     final avatarProvider = fullAvtUrl != null ? NetworkImage(fullAvtUrl) : null;
 
     return AlertDialog(
@@ -330,8 +336,7 @@ class _AdminProfileDialogState extends State<AdminProfileDialog> {
                                 labelText: 'Nhập lại mật khẩu mới',
                                 suffixIcon: IconButton(
                                   onPressed: () => setState(() => _showConfirm = !_showConfirm),
-                                  icon:
-                                      Icon(_showConfirm ? Icons.visibility_off : Icons.visibility),
+                                  icon: Icon(_showConfirm ? Icons.visibility_off : Icons.visibility),
                                 ),
                               ),
                               validator: (v) {

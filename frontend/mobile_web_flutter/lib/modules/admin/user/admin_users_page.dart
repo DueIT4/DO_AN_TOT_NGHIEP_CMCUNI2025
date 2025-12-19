@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_web_flutter/core/admin_user_service.dart';
+import 'package:mobile_web_flutter/services/admin/admin_user_service.dart';
 import 'package:mobile_web_flutter/core/toast.dart';
+import 'package:mobile_web_flutter/core/role_ui.dart';
 
 class AdminUsersPage extends StatefulWidget {
   const AdminUsersPage({super.key});
@@ -230,30 +231,9 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     );
   }
 
-  Widget _buildRoleChip(String? roleType) {
-    final r = (roleType ?? '').toLowerCase();
-    Color bg;
-    Color fg;
-
-    switch (r) {
-      case 'admin':
-        bg = Colors.deepPurple.shade50;
-        fg = Colors.deepPurple.shade700;
-        break;
-      case 'support_admin':
-        bg = Colors.blue.shade50;
-        fg = Colors.blue.shade700;
-        break;
-      case 'support':
-        bg = Colors.teal.shade50;
-        fg = Colors.teal.shade700;
-        break;
-      case 'viewer':
-      default:
-        bg = Colors.grey.shade100;
-        fg = Colors.grey.shade900;
-        break;
-    }
+    Widget _buildRoleChip(String? roleType) {
+    final bg = roleBgColor(roleType);
+    final fg = roleFgColor(roleType);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -262,7 +242,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        roleType ?? '-',
+        roleLabelVi(roleType), // ✅ đổi label
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w500,
@@ -271,6 +251,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -507,6 +488,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
 }
 
 /// Dialog form thêm / sửa user
+/// Dialog form thêm / sửa user (UI IMPROVED - giữ nguyên logic)
 class _UserFormDialog extends StatefulWidget {
   final String title;
   final Map<String, dynamic>? initialUser;
@@ -548,10 +530,10 @@ class _UserFormDialogState extends State<_UserFormDialog> {
   };
 
   static const List<Map<String, String>> _roleOptions = [
-    {'value': 'viewer', 'label': 'Viewer'},
-    {'value': 'support', 'label': 'Support'},
-    {'value': 'support_admin', 'label': 'Support Admin'},
-    {'value': 'admin', 'label': 'Admin'},
+    {'value': 'viewer', 'label': 'Khách hàng'},
+    {'value': 'support', 'label': 'Nhân viên'},
+    {'value': 'support_admin', 'label': 'Quản trị hỗ trợ'},
+    {'value': 'admin', 'label': 'Quản trị viên'},
   ];
 
   // status
@@ -583,18 +565,14 @@ class _UserFormDialogState extends State<_UserFormDialog> {
     } else {
       _roleValue = 'viewer';
     }
-    if (!_roleIdMap.containsKey(_roleValue)) {
-      _roleValue = 'viewer';
-    }
+    if (!_roleIdMap.containsKey(_roleValue)) _roleValue = 'viewer';
 
     if (widget.initialUser != null && widget.initialUser!['status'] != null) {
       _statusValue = (widget.initialUser!['status'] as String).toLowerCase();
     } else {
       _statusValue = 'active';
     }
-    if (!_statusOptions.any((o) => o['value'] == _statusValue)) {
-      _statusValue = 'active';
-    }
+    if (!_statusOptions.any((o) => o['value'] == _statusValue)) _statusValue = 'active';
   }
 
   @override
@@ -607,6 +585,59 @@ class _UserFormDialogState extends State<_UserFormDialog> {
     super.dispose();
   }
 
+  InputDecoration _decoration(
+    BuildContext context, {
+    required String label,
+    String? hint,
+    IconData? icon,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: icon == null ? null : Icon(icon, size: 18, color: scheme.onSurfaceVariant),
+      filled: true,
+      fillColor: scheme.surfaceContainerHighest.withOpacity(0.35),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.black.withOpacity(0.06)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.black.withOpacity(0.06)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: scheme.primary.withOpacity(0.55), width: 1.3),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+    );
+  }
+
+  Widget _sectionTitle(BuildContext context, String text) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            height: 8,
+            width: 8,
+            decoration: BoxDecoration(
+              color: scheme.primary.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -615,15 +646,12 @@ class _UserFormDialogState extends State<_UserFormDialog> {
       _error = null;
     });
 
+    // ✅ giữ nguyên logic/keys
     final String username = _usernameCtrl.text.trim();
     final String phone = _phoneCtrl.text.trim();
-    final String? email =
-        _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim();
-    final String? address =
-        _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim();
-    final String? password =
-        _passwordCtrl.text.isEmpty ? null : _passwordCtrl.text;
-
+    final String? email = _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim();
+    final String? address = _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim();
+    final String? password = _passwordCtrl.text.isEmpty ? null : _passwordCtrl.text;
     final int? roleId = _roleIdMap[_roleValue];
 
     final data = <String, dynamic>{
@@ -641,157 +669,293 @@ class _UserFormDialogState extends State<_UserFormDialog> {
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {
-      setState(() {
-        _error = '$e';
-      });
+      setState(() => _error = '$e');
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return AlertDialog(
-      title: Text(widget.title),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      titlePadding: EdgeInsets.zero,
+      contentPadding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+      actionsPadding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
+
+      // ✅ Header gradient + icon + subtitle
+      title: Container(
+        padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scheme.primary.withOpacity(0.10),
+              scheme.tertiary.withOpacity(0.10),
+            ],
+          ),
+          border: Border(
+            bottom: BorderSide(color: Colors.black.withOpacity(0.06)),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                color: scheme.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                _isEdit ? Icons.manage_accounts_rounded : Icons.person_add_alt_1_rounded,
+                color: scheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _isEdit ? 'Cập nhật thông tin & phân quyền' : 'Tạo tài khoản và phân quyền',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Đóng',
+              onPressed: _loading ? null : () => Navigator.pop(context, false),
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ),
+      ),
+
       content: SizedBox(
-        width: 420,
+        width: 520,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                _sectionTitle(context, 'Thông tin tài khoản'),
+
                 TextFormField(
                   controller: _usernameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Tên đăng nhập',
+                  textInputAction: TextInputAction.next,
+                  decoration: _decoration(
+                    context,
+                    label: 'Tên đăng nhập',
+                    hint: 'VD: nguyenvana',
+                    icon: Icons.person_rounded,
                   ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Bắt buộc';
-                    }
-                    return null;
-                  },
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _phoneCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Số điện thoại',
+                  textInputAction: TextInputAction.next,
+                  keyboardType: TextInputType.phone,
+                  decoration: _decoration(
+                    context,
+                    label: 'Số điện thoại (tuỳ chọn)',
+                    hint: 'VD: 09xxxxxxxx',
+                    icon: Icons.phone_rounded,
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Bắt buộc';
-                    }
+                    final value = (v ?? '').trim();
+                    if (value.isEmpty) return null; // ✅ cho phép null/empty
+
+                    // ✅ chỉ cho số, dài 9-11 (tuỳ bạn chỉnh)
+                    final ok = RegExp(r'^\d{9,11}$').hasMatch(value);
+                    if (!ok) return 'SĐT không hợp lệ (chỉ gồm số, 9–11 ký tự)';
                     return null;
                   },
                 ),
+
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: _emailCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Email (tuỳ chọn)',
-                  ),
+              TextFormField(
+                controller: _emailCtrl,
+                textInputAction: TextInputAction.next,
+                keyboardType: TextInputType.emailAddress,
+                decoration: _decoration(
+                  context,
+                  label: 'Email (tuỳ chọn)',
+                  hint: 'VD: user@email.com',
+                  icon: Icons.email_rounded,
                 ),
+                validator: (v) {
+                  final value = (v ?? '').trim();
+
+                  final ok = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value);
+                  if (!ok) return 'Email không đúng định dạng';
+                  return null;
+                },
+              ),
+
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _addressCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Địa chỉ (tuỳ chọn)',
-                  ),
+                  textInputAction: TextInputAction.next,
                   maxLines: 2,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: _roleValue,
-                  items: _roleOptions
-                      .map(
-                        (opt) => DropdownMenuItem<String>(
-                          value: opt['value'],
-                          child: Text(opt['label']!),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (val) {
-                    if (val == null) return;
-                    setState(() {
-                      _roleValue = val;
-                    });
-                  },
-                  decoration: const InputDecoration(
-                    labelText: 'Vai trò',
+                  decoration: _decoration(
+                    context,
+                    label: 'Địa chỉ (tuỳ chọn)',
+                    hint: 'VD: 12 Nguyễn Trãi, Q.1',
+                    icon: Icons.location_on_rounded,
                   ),
                 ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: _statusValue,
-                  items: _statusOptions
-                      .map(
-                        (opt) => DropdownMenuItem<String>(
-                          value: opt['value'],
-                          child: Text(opt['label']!),
+
+                const SizedBox(height: 16),
+                _sectionTitle(context, 'Phân quyền & trạng thái'),
+
+                LayoutBuilder(
+                  builder: (context, c) {
+                    final isNarrow = c.maxWidth < 460;
+
+                    final role = Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _roleValue,
+                        isExpanded: true,
+                        items: _roleOptions
+                            .map((opt) => DropdownMenuItem<String>(
+                                  value: opt['value'],
+                                  child: Text(opt['label']!, overflow: TextOverflow.ellipsis),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val == null) return;
+                          setState(() => _roleValue = val);
+                        },
+                        decoration: _decoration(
+                          context,
+                          label: 'Vai trò',
+                          icon: Icons.badge_rounded,
                         ),
-                      )
-                      .toList(),
-                  onChanged: (val) {
-                    if (val == null) return;
-                    setState(() {
-                      _statusValue = val;
-                    });
+                      ),
+                    );
+
+                    final status = Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _statusValue,
+                        isExpanded: true,
+                        items: _statusOptions
+                            .map((opt) => DropdownMenuItem<String>(
+                                  value: opt['value'],
+                                  child: Text(opt['label']!),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val == null) return;
+                          setState(() => _statusValue = val);
+                        },
+                        decoration: _decoration(
+                          context,
+                          label: 'Trạng thái',
+                          icon: Icons.toggle_on_rounded,
+                        ),
+                      ),
+                    );
+
+                    return isNarrow
+                        ? Column(
+                            children: [
+                              role,
+                              const SizedBox(height: 12),
+                              status,
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              role,
+                              const SizedBox(width: 12),
+                              status,
+                            ],
+                          );
                   },
-                  decoration: const InputDecoration(
-                    labelText: 'Trạng thái',
-                  ),
                 ),
-                const SizedBox(height: 12),
+
+                const SizedBox(height: 16),
+                _sectionTitle(context, 'Bảo mật'),
+
                 TextFormField(
                   controller: _passwordCtrl,
-                  decoration: InputDecoration(
-                    labelText: _isEdit
-                        ? 'Mật khẩu mới (để trống nếu không đổi)'
-                        : 'Mật khẩu',
-                  ),
                   obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  decoration: _decoration(
+                    context,
+                    label: _isEdit ? 'Mật khẩu mới (để trống nếu không đổi)' : 'Mật khẩu',
+                    icon: Icons.lock_rounded,
+                  ),
                   validator: (v) {
-                    if (!_isEdit) {
-                      if (v == null || v.isEmpty) {
-                        return 'Bắt buộc';
-                      }
-                    }
+                    if (!_isEdit && (v == null || v.isEmpty)) return 'Bắt buộc';
                     return null;
                   },
                 ),
+
                 if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _error!,
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withOpacity(0.18)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.error_outline, size: 18, color: Colors.red),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(color: Colors.red, fontSize: 12),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
+
+                const SizedBox(height: 6),
               ],
             ),
           ),
         ),
       ),
+
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.pop(context, false),
           child: const Text('Hủy'),
         ),
-        FilledButton(
+        FilledButton.icon(
           onPressed: _loading ? null : _handleSubmit,
-          child: _loading
-              ? const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Lưu'),
+          icon: _loading
+              ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.save_rounded, size: 18),
+          label: Text(_isEdit ? 'Lưu thay đổi' : 'Tạo mới'),
+          style: FilledButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
         ),
       ],
     );

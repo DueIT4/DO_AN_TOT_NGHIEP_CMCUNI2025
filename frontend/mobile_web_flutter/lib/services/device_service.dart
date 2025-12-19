@@ -39,9 +39,12 @@ class DeviceService {
   // =========================
   // ✅ USER APIs
   // =========================
-
+bool get _hasToken =>
+    ApiClient.authToken != null && ApiClient.authToken!.isNotEmpty;
   /// ✅ GET /devices/me
   static Future<List<dynamic>> fetchMyDevices({String? q}) async {
+      if (ApiClient.authToken == null || ApiClient.authToken!.isEmpty) return [];
+
     final qp = <String, String>{};
     if (q != null && q.trim().isNotEmpty) qp['q'] = q.trim();
 

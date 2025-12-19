@@ -26,7 +26,7 @@ class UserCreate(BaseModel):
 class UserOut(BaseModel):
     user_id: int
     username: str
-    phone: str
+    phone: Optional[str] = None
     email: Optional[str] = None
     avt_url: Optional[str] = None
     address: Optional[str] = None

@@ -9,9 +9,10 @@ from app.core.database import Base
 
 
 class Provider(str, enum.Enum):
+    sdt = "sdt"
     gg = "gg"
     fb = "fb"
-    sdt = "sdt"
+    email = "email"   # ✅ thêm
 
 
 class AuthAccount(Base):

@@ -1,10 +1,12 @@
-# app/utils/weather_mapper.py
 from datetime import datetime, date
 
 
-def _title_case_vi(s: str) -> str:
-    parts = [p for p in (s or "").split(" ") if p]
-    return " ".join([p[0].upper() + p[1:] if len(p) > 1 else p.upper() for p in parts])
+def _sentence_case_vi(s: str) -> str:
+    # Chuẩn hoá khoảng trắng + chỉ viết hoa ký tự đầu tiên của cả chuỗi
+    s = " ".join([p for p in (s or "").strip().split() if p])
+    if not s:
+        return s
+    return s[0].upper() + s[1:]
 
 
 def _map_icon(main: str) -> str:
@@ -28,7 +30,9 @@ def map_weather_from_api(current: dict, forecast: dict) -> dict:
     location = f"{current.get('name','Không rõ')}, {current.get('sys',{}).get('country','')}".strip()
     temp = round(current.get("main", {}).get("temp", 0))
     feels_like = round(current.get("main", {}).get("feels_like", temp))
-    description = _title_case_vi(str((current.get("weather") or [{}])[0].get("description", "")))
+
+    # ✅ Chỉ viết hoa chữ đầu của cả cụm
+    description = _sentence_case_vi(str((current.get("weather") or [{}])[0].get("description", "")))
 
     humidity = round(current.get("main", {}).get("humidity", 0))
     wind_ms = float(current.get("wind", {}).get("speed", 0.0))
@@ -40,16 +44,20 @@ def map_weather_from_api(current: dict, forecast: dict) -> dict:
     weather_main = str((current.get("weather") or [{}])[0].get("main", ""))
     icon = _map_icon(weather_main)
 
+    # Gom forecast theo ngày (lấy high/low)
     daily = {}
     for item in (forecast.get("list") or []):
         dt_txt = str(item.get("dt_txt", ""))
         if not dt_txt:
             continue
+
         d = dt_txt.split(" ")[0]  # yyyy-mm-dd
         tmax = float(item.get("main", {}).get("temp_max", 0))
         tmin = float(item.get("main", {}).get("temp_min", 0))
         main = str((item.get("weather") or [{}])[0].get("main", ""))
-        desc = str((item.get("weather") or [{}])[0].get("description", ""))
+
+        # ✅ forecast desc cũng sentence-case
+        desc = _sentence_case_vi(str((item.get("weather") or [{}])[0].get("description", "")))
 
         if d not in daily:
             daily[d] = {"high": tmax, "low": tmin, "main": main, "desc": desc}

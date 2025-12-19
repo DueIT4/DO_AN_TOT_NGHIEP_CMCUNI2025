@@ -1,4 +1,3 @@
-# app/api/v1/routes_weather.py
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 
@@ -23,7 +22,6 @@ async def get_weather(
 
     current_url = f"{base}/weather"
     forecast_url = f"{base}/forecast"
-
     params = {"lat": lat, "lon": lon, "appid": key, "units": units, "lang": lang}
 
     try:
@@ -35,8 +33,7 @@ async def get_weather(
         if fc_res.status_code != 200:
             raise HTTPException(status_code=fc_res.status_code, detail=fc_res.text)
 
-        mapped = map_weather_from_api(cur_res.json(), fc_res.json())
-        return mapped
+        return map_weather_from_api(cur_res.json(), fc_res.json())
 
     except httpx.RequestError as e:
         raise HTTPException(status_code=502, detail=f"OpenWeather request failed: {e}")

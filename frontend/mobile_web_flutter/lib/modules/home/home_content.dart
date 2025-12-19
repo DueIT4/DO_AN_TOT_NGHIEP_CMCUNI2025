@@ -9,7 +9,7 @@ class HomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 900;
-  
+
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -43,7 +43,7 @@ class HomeContent extends StatelessWidget {
                   alignment: WrapAlignment.center,
                   children: [
                     FilledButton.icon(
-                  onPressed: () => context.go(WebRoutes.detect),
+                      onPressed: () => context.go(WebRoutes.detect),
                       icon: const Icon(Icons.camera_alt),
                       label: const Text('Dùng thử chẩn đoán'),
                     ),
@@ -91,67 +91,67 @@ class HomeContent extends StatelessWidget {
                               ),
                             ),
                             Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  // Ảnh demo ứng dụng: chỉ ảnh, không khung gì cả
-ClipRRect(
-  borderRadius: BorderRadius.circular(16),
-  child: Image.asset(
-    'assets/images/zestguard_intro.jpg',
-    width: isWide ? 900 : double.infinity,
-    fit: BoxFit.cover,
-  ),
-),
-const SizedBox(height: 24),
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min, // ✅ tránh Column "ăn" full height
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    // Ảnh demo ứng dụng: chỉ ảnh, không khung gì cả
+                                    // ✅ THAY THẾ ẢNH BẰNG MOCK (KHÔNG CẦN ASSET)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: _HeroMockImage(isWide: isWide),
+                                    ),
+                                    const SizedBox(height: 24),
 
-Text(
-  'ZestGuard',
-  style: TextStyle(
-    fontSize: 28,
-    fontWeight: FontWeight.bold,
-    color: Colors.green.shade900,
-  ),
-),
-const SizedBox(height: 8),
-Text(
-  'Chẩn đoán bệnh cây trồng\nbằng AI thông minh',
-  textAlign: TextAlign.center,
-  style: TextStyle(
-    fontSize: 16,
-    color: Colors.green.shade700,
-    height: 1.5,
-  ),
-),
-const SizedBox(height: 24),
-
-Row(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: [
-    _AppStoreBadge(
-      icon: Icons.android,
-      label: 'Tải trên CH Play',
-      color: Colors.green,
-      onTap: () async {
-        const url =
-            'https://play.google.com/store/apps/details?id=com.yourcompany.zestguard';
-        await launchUrl(Uri.parse(url));
-
-
-                                        },
+                                    Text(
+                                      'ZestGuard',
+                                      style: TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green.shade900,
                                       ),
-                                      // 👇 Bỏ iOS (không dùng nữa)
-                                      // const SizedBox(width: 16),
-                                      // _AppStoreBadge(
-                                      //   icon: Icons.apple,
-                                      //   label: 'iOS',
-                                      //   color: Colors.black87,
-                                      // ),
-                                    ],
-                                  ),
-                                ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Chẩn đoán bệnh cây trồng\nbằng AI thông minh',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.green.shade700,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 24),
+
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        _AppStoreBadge(
+                                          icon: Icons.android,
+                                          label: 'Tải trên CH Play',
+                                          color: Colors.green,
+                                          onTap: () async {
+                                            const url =
+                                                'https://play.google.com/store/apps/details?id=com.yourcompany.zestguard';
+                                            await launchUrl(Uri.parse(url));
+                                          },
+                                        ),
+                                        // 👇 Bỏ iOS (không dùng nữa)
+                                        // const SizedBox(width: 16),
+                                        // _AppStoreBadge(
+                                        //   icon: Icons.apple,
+                                        //   label: 'iOS',
+                                        //   color: Colors.black87,
+                                        // ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
+
                           ],
                         ),
                       ),
@@ -214,7 +214,7 @@ Row(
                         ),
                         _FeatureCard(
                           icon: Icons.support_agent,
-                          title: 'Kết nối chuyên gia',
+                          title: 'Kết nối hỗ trợ',
                           desc: 'Tư vấn nhanh khi cần hỗ trợ.',
                         ),
                       ],
@@ -308,6 +308,267 @@ class _AppStoreBadge extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+//  HERO MOCK "IMAGE" (thay cho Image.asset)
+// ============================================================================
+class _HeroMockImage extends StatelessWidget {
+  final bool isWide;
+
+  const _HeroMockImage({required this.isWide});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = isWide ? 900.0 : double.infinity;
+
+    return SizedBox(
+      width: width,
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.85),
+                Colors.green.shade50.withOpacity(0.9),
+                Colors.lightGreen.shade100.withOpacity(0.75),
+              ],
+            ),
+            border: Border.all(
+              color: Colors.green.shade200.withOpacity(0.7),
+              width: 1,
+            ),
+          ),
+          child: Stack(
+            children: [
+              // faint leaves
+              Positioned(
+                left: -30,
+                top: -30,
+                child: Icon(
+                  Icons.eco,
+                  size: 140,
+                  color: Colors.green.shade200.withOpacity(0.25),
+                ),
+              ),
+              Positioned(
+                right: -20,
+                bottom: -20,
+                child: Icon(
+                  Icons.local_florist,
+                  size: 160,
+                  color: Colors.green.shade200.withOpacity(0.22),
+                ),
+              ),
+
+              // center "phone" mock
+              Align(
+                alignment: Alignment.center,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _PhoneCardMock(
+                        title: "Chụp ảnh lá",
+                        subtitle: "AI nhận diện bệnh",
+                        icon: Icons.camera_alt,
+                        accent: Colors.green.shade700,
+                      ),
+                      const SizedBox(width: 18),
+                      _PhoneCardMock(
+                        title: "Kết quả rõ ràng",
+                        subtitle: "Gợi ý xử lý an toàn",
+                        icon: Icons.health_and_safety,
+                        accent: Colors.lightGreen.shade800,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // bottom label
+              Positioned(
+                left: 14,
+                bottom: 12,
+                child: Row(
+                  children: [
+                    Icon(Icons.verified, size: 18, color: Colors.green.shade700),
+                    const SizedBox(width: 6),
+                    
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhoneCardMock extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color accent;
+
+  const _PhoneCardMock({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: AspectRatio(
+        aspectRatio: 9 / 16,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.black.withOpacity(0.08)),
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+                color: Colors.black.withOpacity(0.08),
+              )
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // top status bar mock
+                Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(Icons.wifi, size: 16, color: Colors.black.withOpacity(0.35)),
+                    const SizedBox(width: 6),
+                    Icon(Icons.battery_full, size: 16, color: Colors.black.withOpacity(0.35)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // hero icon
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: accent, size: 26),
+                ),
+                const SizedBox(height: 12),
+
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black.withOpacity(0.85),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: Colors.black.withOpacity(0.6),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // mock image area
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.green.shade50,
+                          Colors.green.shade100.withOpacity(0.7),
+                          Colors.white,
+                        ],
+                      ),
+                      border: Border.all(color: Colors.black.withOpacity(0.06)),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.image_outlined,
+                        size: 42,
+                        color: Colors.black.withOpacity(0.25),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // mock buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: accent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            "Phân tích",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.more_horiz,
+                        color: Colors.black.withOpacity(0.45),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

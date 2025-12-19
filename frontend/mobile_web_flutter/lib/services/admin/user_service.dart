@@ -1,4 +1,4 @@
-import 'api_base.dart';
+import 'package:mobile_web_flutter/core/api_base.dart';
 
 /// Service để quản lý thông tin user hiện tại
 class UserService {
@@ -6,16 +6,20 @@ class UserService {
   static DateTime? _lastFetch;
 
   /// Lấy thông tin user hiện tại từ API
-  static Future<Map<String, dynamic>?> getCurrentUser({bool forceRefresh = false}) async {
-    // Kiểm tra token
-    if (ApiBase.bearerToken == null || ApiBase.bearerToken!.isEmpty) {
+  static Future<Map<String, dynamic>?> getCurrentUser({
+    bool forceRefresh = false,
+  }) async {
+    // Kiểm tra token (thống nhất với các service khác: ApiBase.bearer)
+    final token = ApiBase.bearer;
+    if (token == null || token.isEmpty) {
       _currentUser = null;
+      _lastFetch = null;
       return null;
     }
 
     // Cache trong 5 phút trừ khi force refresh
-    if (!forceRefresh && 
-        _currentUser != null && 
+    if (!forceRefresh &&
+        _currentUser != null &&
         _lastFetch != null &&
         DateTime.now().difference(_lastFetch!).inMinutes < 5) {
       return _currentUser;
@@ -23,9 +27,11 @@ class UserService {
 
     try {
       final userData = await ApiBase.getJson(ApiBase.api('/me/get_me'));
-      _currentUser = userData;
+
+      // Đảm bảo kiểu Map<String, dynamic> để các hàm dưới truy cập key an toàn
+      _currentUser = Map<String, dynamic>.from(userData as Map);
       _lastFetch = DateTime.now();
-      return userData;
+      return _currentUser;
     } catch (e) {
       // Nếu lỗi 401, clear cache
       if (e.toString().contains('401')) {
@@ -63,10 +69,8 @@ class UserService {
     _lastFetch = null;
   }
 
-   /// Lấy danh sách tất cả user (cho trang admin)
+  /// Lấy danh sách tất cả user (cho trang admin)
   static Future<List<Map<String, dynamic>>> listUsers() async {
-    // Nếu backend bạn là /admin/users thì để như dưới,
-    // nếu là route khác thì đổi path cho đúng.
     final res = await ApiBase.getJson(ApiBase.api('/users'));
 
     return (res as List)

@@ -1,115 +1,11 @@
-// lib/core/admin_ticket_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'dart:typed_data';
 
-import 'api_base.dart';
-
-class AdminTicketItem {
-  final int ticketId;
-  final int userId;
-  final String? username;
-  final String title;
-  final String status;
-  final DateTime createdAt;
-
-  AdminTicketItem({
-    required this.ticketId,
-    required this.userId,
-    required this.username,
-    required this.title,
-    required this.status,
-    required this.createdAt,
-  });
-
-  factory AdminTicketItem.fromJson(Map<String, dynamic> json) {
-    return AdminTicketItem(
-      ticketId: json['ticket_id'] as int,
-      userId: json['user_id'] as int,
-      username: json['username'] as String?,
-      title: json['title'] as String,
-      status: json['status'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
-    );
-  }
-}
-
-class AdminTicketListResult {
-  final int total;
-  final List<AdminTicketItem> items;
-
-  AdminTicketListResult({required this.total, required this.items});
-}
-
-class AdminSupportMessage {
-  final int messageId;
-  final int ticketId;
-  final int? senderId;
-  final String? senderName;
-  final String message;
-  final String? attachmentUrl;
-  final DateTime createdAt;
-
-  AdminSupportMessage({
-    required this.messageId,
-    required this.ticketId,
-    this.senderId,
-    this.senderName,
-    required this.message,
-    this.attachmentUrl,
-    required this.createdAt,
-  });
-
-  factory AdminSupportMessage.fromJson(Map<String, dynamic> json) {
-    return AdminSupportMessage(
-      messageId: json['message_id'] as int,
-      ticketId: json['ticket_id'] as int,
-      senderId: json['sender_id'] as int?,
-      senderName: json['sender_name'] as String?,
-      message: json['message'] as String,
-      attachmentUrl: json['attachment_url'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-    );
-  }
-}
-
-class AdminTicketDetail {
-  final int ticketId;
-  final int userId;
-  final String? username;
-  final String title;
-  final String? description;
-  final String status;
-  final DateTime createdAt;
-  final List<AdminSupportMessage> messages;
-
-  AdminTicketDetail({
-    required this.ticketId,
-    required this.userId,
-    required this.username,
-    required this.title,
-    required this.description,
-    required this.status,
-    required this.createdAt,
-    required this.messages,
-  });
-
-  factory AdminTicketDetail.fromJson(Map<String, dynamic> json) {
-    final msgs = (json['messages'] as List<dynamic>)
-        .map((e) => AdminSupportMessage.fromJson(e as Map<String, dynamic>))
-        .toList();
-
-    return AdminTicketDetail(
-      ticketId: json['ticket_id'] as int,
-      userId: json['user_id'] as int,
-      username: json['username'] as String?,
-      title: json['title'] as String,
-      description: json['description'] as String?,
-      status: json['status'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      messages: msgs,
-    );
-  }
-}
+import 'package:mobile_web_flutter/core/api_base.dart';
+import 'package:mobile_web_flutter/models/admin/admin_ticket_models.dart';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 
 class AdminTicketService {
   /// GET /support/admin/tickets
@@ -213,4 +109,36 @@ class AdminTicketService {
     final map = jsonDecode(resp.body) as Map<String, dynamic>;
     return AdminTicketDetail.fromJson(map);
   }
+  static Future<String> uploadSupportAttachment({
+  required Uint8List bytes,
+  required String filename,
+}) async {
+  final uri = Uri.parse(
+    '${ApiBase.baseURL}${ApiBase.api('/support/admin/uploads')}',
+  );
+
+  final token = ApiBase.bearer;
+  final req = http.MultipartRequest('POST', uri);
+
+  if (token != null && token.isNotEmpty) {
+    req.headers['Authorization'] = 'Bearer $token';
+  }
+
+  req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+
+  final streamed = await req.send();
+  final resp = await http.Response.fromStream(streamed);
+
+  if (resp.statusCode ~/ 100 != 2) {
+    throw Exception('Upload thất bại (${resp.statusCode}): ${resp.body}');
+  }
+
+  final map = jsonDecode(resp.body) as Map<String, dynamic>;
+  final url = (map['attachment_url'] ?? '').toString();
+  if (url.isEmpty) {
+    throw Exception('Upload OK nhưng thiếu attachment_url: ${resp.body}');
+  }
+  return url;
+}
+
 }

@@ -2,28 +2,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-import 'api_base.dart';
-
-class AdminUserSearchResult {
-  final int total;
-  final List<Map<String, dynamic>> items;
-
-  AdminUserSearchResult({
-    required this.total,
-    required this.items,
-  });
-
-  factory AdminUserSearchResult.fromJson(Map<String, dynamic> json) {
-    final list = (json['items'] as List<dynamic>? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
-
-    return AdminUserSearchResult(
-      total: json['total'] as int? ?? 0,
-      items: list,
-    );
-  }
-}
+import 'package:mobile_web_flutter/core/api_base.dart';
+import 'package:mobile_web_flutter/models/admin/admin_user_search_result.dart'; // <- thêm dòng này
 
 class AdminUserService {
   static final http.Client _client = http.Client();
@@ -47,9 +27,7 @@ class AdminUserService {
     };
     final query = Uri(queryParameters: params).query;
 
-    final res =
-        await ApiBase.getJson(ApiBase.api('/users/search?$query'));
-
+    final res = await ApiBase.getJson(ApiBase.api('/users/search?$query'));
     final map = Map<String, dynamic>.from(res as Map);
     return AdminUserSearchResult.fromJson(map);
   }

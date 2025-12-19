@@ -1,5 +1,5 @@
 // lib/modules/auth/auth_service.dart
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
@@ -9,6 +9,24 @@ import '../../core/api_base.dart';
 
 /// Key dùng để lưu access_token trong SharedPreferences / localStorage
 const String _kBearerKey = 'access_token';
+
+/// Exception chuẩn hoá lỗi auth để UI hiển thị rõ ràng (không lòi lỗi API)
+class AuthException implements Exception {
+  final String message;
+  final int? statusCode;
+  final String? code; // code từ backend nếu có
+  final Object? original;
+
+  AuthException(
+    this.message, {
+    this.statusCode,
+    this.code,
+    this.original,
+  });
+
+  @override
+  String toString() => message; // ✅ UI dùng '$e' sẽ ra message sạch
+}
 
 class AuthService {
   static final _fa = FirebaseAuth.instance;
@@ -43,7 +61,7 @@ class AuthService {
   ) async {
     final token = res['access_token'] as String?;
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy access_token trong response');
+      throw AuthException('Không tìm thấy access_token trong response');
     }
     ApiBase.bearer = token;
     await _saveBearer(token);
@@ -53,6 +71,95 @@ class AuthService {
   static bool get isLoggedIn {
     final token = ApiBase.bearer;
     return token != null && token.isNotEmpty;
+  }
+
+  // ================== CHUẨN HOÁ LỖI (KHÔNG LÒI API) ==================
+
+  /// Cố gắng rút statusCode + payload message/code từ mọi kiểu error (Dio/http/custom)
+  static AuthException _mapAuthError(Object e) {
+    if (e is AuthException) return e;
+
+    int? status;
+    String? backendMessage;
+    String? backendCode;
+
+    // ✅ Tránh phụ thuộc Dio bằng cách đọc "dynamic" (nếu e là DioException thì vẫn có response/statusCode/data)
+    try {
+      final dynamic err = e;
+
+      // status code
+      status = err?.response?.statusCode as int?;
+
+      // response data (thường là Map hoặc String)
+      final dynamic data = err?.response?.data;
+
+      if (data is Map) {
+        final map = Map<String, dynamic>.from(data);
+        backendMessage = (map['message'] ?? map['error'] ?? map['detail'])?.toString();
+        backendCode = (map['code'] ?? map['error_code'])?.toString();
+      } else if (data is String) {
+        backendMessage = data;
+      }
+    } catch (_) {
+      // ignore parsing errors
+    }
+
+    // ✅ Nếu backend đã trả message rõ -> ưu tiên dùng
+    if (backendMessage != null && backendMessage.trim().isNotEmpty) {
+      return AuthException(
+        backendMessage.trim(),
+        statusCode: status,
+        code: backendCode,
+        original: e,
+      );
+    }
+
+    // ✅ Nếu chưa lấy được payload -> map theo status hoặc text
+    final lower = e.toString().toLowerCase();
+
+    // Mạng / timeout
+    if (lower.contains('socket') ||
+        lower.contains('network') ||
+        lower.contains('connection') ||
+        lower.contains('timed out') ||
+        lower.contains('timeout')) {
+      return AuthException('Không có kết nối mạng. Vui lòng thử lại.', statusCode: status, original: e);
+    }
+
+    // Map theo HTTP status phổ biến
+    switch (status) {
+      case 400:
+        return AuthException('Dữ liệu gửi lên không hợp lệ.', statusCode: status, original: e);
+      case 401:
+        // Nếu BE không phân biệt, dùng message chung cho chắc
+        return AuthException('Sai mật khẩu hoặc tài khoản không tồn tại.', statusCode: status, original: e);
+      case 403:
+        return AuthException('Tài khoản không có quyền truy cập.', statusCode: status, original: e);
+      case 404:
+        return AuthException('Tài khoản chưa đăng ký.', statusCode: status, original: e);
+      case 409:
+        return AuthException('Tài khoản đã tồn tại hoặc xung đột dữ liệu.', statusCode: status, original: e);
+      case 422:
+        return AuthException('Thông tin đăng nhập không hợp lệ.', statusCode: status, original: e);
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        return AuthException('Máy chủ đang bận. Vui lòng thử lại sau.', statusCode: status, original: e);
+    }
+
+    // Nếu error string có chứa 401/404... nhưng không parse được status
+    if (lower.contains('401')) {
+      return AuthException('Sai mật khẩu hoặc tài khoản không tồn tại.', statusCode: 401, original: e);
+    }
+    if (lower.contains('404')) {
+      return AuthException('Tài khoản chưa đăng ký.', statusCode: 404, original: e);
+    }
+    if (lower.contains('422')) {
+      return AuthException('Thông tin đăng nhập không hợp lệ.', statusCode: 422, original: e);
+    }
+
+    return AuthException('Đăng nhập thất bại. Vui lòng thử lại.', statusCode: status, original: e);
   }
 
   // ======================= LOGIN BẰNG SĐT / EMAIL =======================
@@ -75,14 +182,23 @@ class AuthService {
       'password': password,
     };
 
-    final res = await ApiBase.postJson(
-      ApiBase.api('/auth/login'),
-      body,
-    );
+    try {
+      final res = await ApiBase.postJson(
+        ApiBase.api('/auth/login'),
+        body,
+      );
 
-    // res là dynamic, ép sang Map
-    final map = Map<String, dynamic>.from(res as Map);
-    await _setBearerFromResponse(map);
+      // res là dynamic, ép sang Map
+      final map = Map<String, dynamic>.from(res as Map);
+      await _setBearerFromResponse(map);
+    } catch (e) {
+      if (kDebugMode) {
+        // log dev để debug, nhưng UI vẫn hiển thị message sạch
+        // ignore: avoid_print
+        print('[AuthService] loginWithCredentials error: $e');
+      }
+      throw _mapAuthError(e);
+    }
   }
 
   // ============================ GOOGLE LOGIN ============================
@@ -107,7 +223,7 @@ class AuthService {
         final g = GoogleSignIn(scopes: const ['email', 'profile']);
         final gUser = await g.signIn();
         if (gUser == null) {
-          throw Exception('Người dùng huỷ Google Sign-In');
+          throw AuthException('Bạn đã huỷ đăng nhập Google.');
         }
         final gAuth = await gUser.authentication;
         idToken = gAuth.idToken;
@@ -120,7 +236,7 @@ class AuthService {
       }
 
       if (idToken == null) {
-        throw Exception('Không lấy được Google ID token');
+        throw AuthException('Không lấy được Google ID token.');
       }
 
       // Gửi token lên backend để verify & tạo JWT
@@ -134,7 +250,11 @@ class AuthService {
       final map = Map<String, dynamic>.from(res as Map);
       await _setBearerFromResponse(map);
     } catch (e) {
-      rethrow;
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('[AuthService] loginWithGoogle error: $e');
+      }
+      throw _mapAuthError(e);
     }
   }
 
@@ -158,7 +278,7 @@ class AuthService {
           permissions: ['email'],
         );
         if (fRes.accessToken == null) {
-          throw Exception('Người dùng huỷ Facebook Login');
+          throw AuthException('Bạn đã huỷ đăng nhập Facebook.');
         }
         fbAccessToken = fRes.accessToken!.tokenString;
 
@@ -167,7 +287,7 @@ class AuthService {
       }
 
       if (fbAccessToken == null) {
-        throw Exception('Không lấy được Facebook access token');
+        throw AuthException('Không lấy được Facebook access token.');
       }
 
       // Gửi token lên backend để verify & tạo JWT
@@ -181,7 +301,11 @@ class AuthService {
       final map = Map<String, dynamic>.from(res as Map);
       await _setBearerFromResponse(map);
     } catch (e) {
-      rethrow;
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('[AuthService] loginWithFacebook error: $e');
+      }
+      throw _mapAuthError(e);
     }
   }
 

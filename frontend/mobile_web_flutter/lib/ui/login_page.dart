@@ -8,6 +8,7 @@ import '../services/api_client.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'home_shell.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -59,11 +60,17 @@ class _LoginPageState extends State<LoginPage> {
       );
       setState(() => _loading = false);
       if (ok) {
-        _showSnack(l10n.translate('register_success'));
-        // 👉 Sau khi đăng ký thành công, chuyển luôn sang home_user
-        if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/home_user');
-      } else {
+      _showSnack('Đăng ký thành công. Vui lòng kiểm tra email để xác nhận, sau đó đăng nhập.');
+      if (!mounted) return;
+      setState(() {
+        _isRegister = false;      // ✅ quay về form đăng nhập
+        _agree = false;
+        _passCtrl.clear();
+        _repassCtrl.clear();
+        // _identityCtrl giữ lại email để user khỏi nhập lại (tuỳ bạn)
+      });
+    }
+ else {
         _showSnack(msg);
       }
     } else {
@@ -86,38 +93,51 @@ class _LoginPageState extends State<LoginPage> {
       }
     }
   }
-  Future<void> _handleGoogle() async {
-    try {
-      final googleSignIn = GoogleSignIn(scopes: ['email', 'profile', 'openid']);
-      final account = await googleSignIn.signIn();
-      if (account == null) return; // user cancel
 
-      final auth = await account.authentication;
-      final idToken = auth.idToken;                        // 🔁 dùng idToken
-      if (idToken == null) {
-        _showSnack('Không lấy được idToken từ Google');
-        return;
-      }
+Future<void> _handleGoogle() async {
+  try {
+    final googleSignIn = GoogleSignIn(
+      scopes: const ['email', 'openid'],
 
-      setState(() => _loading = true);
-      final res = await ApiClient.loginWithGoogle(idToken); // 🔁 truyền idToken
-      setState(() => _loading = false);
+      // ✅ Web: cần clientId
+      clientId: kIsWeb
+          ? '273639086728-e4feis81rvsstgodqb0nmne6q5i99s6q.apps.googleusercontent.com'
+          : null,
 
-      final bool ok = res.$1;
-      final String tokenOrMsg = res.$2;
+      // ✅ Android/iOS (sau này): để lấy idToken gửi backend verify
+      serverClientId: !kIsWeb
+          ? '273639086728-e4feis81rvsstgodqb0nmne6q5i99s6q.apps.googleusercontent.com'
+          : null,
+    );
 
-      if (ok) {
-        _showSnack(
-            'Google OK: ${tokenOrMsg.substring(0, tokenOrMsg.length > 12 ? 12 : tokenOrMsg.length)}...');
-        if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/home_user'); // 👈
-      } else {
-        _showSnack(tokenOrMsg);
-      }
-    } catch (e) {
-      _showSnack('Google lỗi: $e');
+    final account = await googleSignIn.signIn();
+    if (account == null) return;
+
+    final auth = await account.authentication;
+    final idToken = auth.idToken;
+    if (idToken == null) {
+      _showSnack('Không lấy được idToken từ Google');
+      return;
     }
+
+    setState(() => _loading = true);
+    final res = await ApiClient.loginWithGoogle(idToken);
+    setState(() => _loading = false);
+
+    final ok = res.$1;
+    final tokenOrMsg = res.$2;
+
+    if (ok) {
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/home_user');
+    } else {
+      _showSnack(tokenOrMsg);
+    }
+  } catch (e) {
+    _showSnack('Google lỗi: $e');
   }
+}
+
 
 
   Future<void> _handleFacebook() async {

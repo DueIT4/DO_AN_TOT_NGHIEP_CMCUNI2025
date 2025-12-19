@@ -60,11 +60,15 @@ class DetectionService {
   // =========================
   // ✅ LIST HISTORY: GET /detection-history/me
   // =========================
+  bool get _hasToken =>
+    ApiClient.authToken != null && ApiClient.authToken!.isNotEmpty;
   static Future<List<DetectionRecord>> fetchHistory({
     int skip = 0,
     int limit = 50,
     String? search,
   }) async {
+      if (ApiClient.authToken == null || ApiClient.authToken!.isEmpty) return [];
+
     final qp = <String, String>{
       'skip': '$skip',
       'limit': '$limit',

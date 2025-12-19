@@ -4,6 +4,27 @@ import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:http/http.dart' as http;
 
+/// Exception HTTP chuẩn để FE đọc được statusCode + body
+/// (AuthService._mapAuthError của bạn sẽ map 401/403 tốt hơn)
+class ApiHttpException implements Exception {
+  final int statusCode;
+  final String method;
+  final String path;
+  final Object? data; // Map/String/null
+  final String rawBody;
+
+  ApiHttpException({
+    required this.statusCode,
+    required this.method,
+    required this.path,
+    required this.rawBody,
+    this.data,
+  });
+
+  @override
+  String toString() => '$method $path => $statusCode: $rawBody';
+}
+
 class ApiBase {
   // ========================
   // 🔗 URL CƠ SỞ (baseURL)
@@ -35,10 +56,15 @@ class ApiBase {
   static String? get bearer => _bearer;
   static String? get bearerToken => _bearer;
 
-  static Map<String, String> _headers() => {
-        'Content-Type': 'application/json',
-        if (_bearer != null) 'Authorization': 'Bearer $_bearer',
-      };
+  static Map<String, String> _headers() {
+    final t = _bearer;
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      // ✅ Chỉ gửi Authorization khi token thật sự có giá trị
+      if (t != null && t.trim().isNotEmpty) 'Authorization': 'Bearer $t',
+    };
+  }
 
   // ========================
   // 🧩 Helpers
@@ -50,7 +76,21 @@ class ApiBase {
 
   static void _ensure2xx(http.Response r, String method, String path) {
     if (r.statusCode ~/ 100 != 2) {
-      throw Exception('$method $path => ${r.statusCode}: ${r.body}');
+      Object? parsed;
+      try {
+        parsed = _decodeBody(r);
+      } catch (_) {
+        parsed = null;
+      }
+
+      // ✅ Ném exception có statusCode + body để FE map chuẩn (401/403/500…)
+      throw ApiHttpException(
+        statusCode: r.statusCode,
+        method: method,
+        path: path,
+        rawBody: r.body,
+        data: parsed,
+      );
     }
   }
 
@@ -93,7 +133,7 @@ class ApiBase {
   }
 
   // ========================
-  // 🩹 PATCH JSON  ✅ (THÊM MỚI)
+  // 🩹 PATCH JSON
   // ========================
   static Future<dynamic> patchJson(String path, Map<String, dynamic> body) async {
     final url = Uri.parse('$baseURL$path');

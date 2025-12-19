@@ -59,84 +59,119 @@ class ApiClient {
   // REGISTER (BE: POST /auth/register/phone)
   // body: {username, phone, password}
   // =========================
-  static Future<(bool, String)> register({
-    required String name, // username
-    required String identity, // phone
-    required String password,
-  }) async {
-    final phone = identity.trim();
-    if (phone.isEmpty || !RegExp(r'^\d{6,}$').hasMatch(phone)) {
-      return (false, 'Vui lòng nhập SĐT hợp lệ để đăng ký');
-    }
+static Future<(bool, String)> register({
+  required String name,      // username
+  required String identity,  // phone/email
+  required String password,
+}) async {
+  final username = name.trim();
+  final input = identity.trim();
 
-    final uri = ApiBase.uri('/auth/register/phone');
-
-    try {
-      final resp = await http
-          .post(
-            uri,
-            headers: authHeaders(),
-            body: jsonEncode({
-              'username': name.trim(),
-              'phone': phone,
-              'password': password,
-            }),
-          )
-          .timeout(const Duration(seconds: 20));
-
-      if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        final data = _safeJson(resp.body);
-        final msg = (data?['message'] ?? 'Đăng ký thành công').toString();
-        return (true, msg);
-      } else {
-        return (false, _extractDetail(resp.body));
-      }
-    } on TimeoutException {
-      return (false, 'Hết thời gian kết nối máy chủ');
-    } catch (e) {
-      return (false, 'Lỗi kết nối: $e');
-    }
+  if (username.length < 2) {
+    return (false, 'Username phải có ít nhất 2 ký tự');
   }
+  if (password.trim().length < 6) {
+    return (false, 'Mật khẩu phải có ít nhất 6 ký tự');
+  }
+  if (input.isEmpty) {
+    return (false, 'Vui lòng nhập email hoặc số điện thoại');
+  }
+
+  final isEmail = input.contains('@');
+
+  // Validate đơn giản
+  if (isEmail) {
+    final okEmail = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(input);
+    if (!okEmail) return (false, 'Email không hợp lệ');
+  } else {
+    // SĐT VN: 10-11 số, bắt đầu 0 (bạn có thể nới lỏng tuỳ yêu cầu)
+    final okPhone = RegExp(r'^0\d{9,10}$').hasMatch(input);
+    if (!okPhone) return (false, 'Vui lòng nhập SĐT hợp lệ để đăng ký');
+  }
+
+  final uri = ApiBase.uri(isEmail ? '/auth/register/email' : '/auth/register/phone');
+
+  final body = <String, dynamic>{
+    'username': username,
+    'password': password,
+    if (isEmail) 'email': input.toLowerCase() else 'phone': input,
+  };
+
+  try {
+    final resp = await http
+        .post(
+          uri,
+          headers: authHeaders(),
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 20));
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final data = _safeJson(resp.body);
+      final msg = (data?['message'] ?? 'Đăng ký thành công').toString();
+      return (true, msg);
+    } else {
+      return (false, _extractDetail(resp.body));
+    }
+  } on TimeoutException {
+    return (false, 'Hết thời gian kết nối máy chủ');
+  } catch (e) {
+    return (false, 'Lỗi kết nối: $e');
+  }
+}
 
   // =========================
   // LOGIN PHONE (BE: POST /auth/login/phone)
   // body: {phone, password}
   // =========================
   static Future<(bool, String)> login({
-    required String identity, // phone
-    required String password,
-  }) async {
-    final phone = identity.trim();
-    final uri = ApiBase.uri('/auth/login/phone');
-    if (kDebugMode) debugPrint('LOGIN URI = $uri');
+  required String identity, // phone hoặc email
+  required String password,
+}) async {
+  final id = identity.trim();
+  final isEmail = id.contains('@');
 
-    try {
-      final resp = await http
-          .post(
-            uri,
-            headers: authHeaders(),
-            body: jsonEncode({'phone': phone, 'password': password}),
-          )
-          .timeout(const Duration(seconds: 20));
+  final uri = isEmail
+      ? ApiBase.uri('/auth/login')        // ✅ email/phone chung
+      : ApiBase.uri('/auth/login/phone'); // ✅ phone-only
 
-      if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        final data = _safeJson(resp.body);
-        final token =
-            (data?['access_token'] ?? data?['token'] ?? '').toString();
-        if (token.isEmpty) {
-          return (false, 'Đăng nhập thành công nhưng không nhận token');
-        }
-        await setAuthToken(token);
-        return (true, token);
-      } else {
-        return (false, _extractDetail(resp.body));
+  if (kDebugMode) debugPrint('LOGIN URI = $uri');
+
+  final body = <String, dynamic>{
+    'password': password,
+    if (isEmail) 'email': id.toLowerCase(),
+    if (!isEmail) 'phone': id,
+  };
+
+  try {
+    final resp = await http
+        .post(
+          uri,
+          headers: authHeaders(), // nhớ có Content-Type json trong authHeaders()
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 20));
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final data = _safeJson(resp.body);
+      final token = (data?['access_token'] ?? data?['token'] ?? '').toString();
+
+      if (token.isEmpty) {
+        return (false, 'Đăng nhập thành công nhưng không nhận token');
       }
-    } on TimeoutException {
-      return (false, 'Hết thời gian kết nối máy chủ');
-    } catch (e) {
-      return (false, 'Lỗi kết nối: $e');
+
+      await setAuthToken(token); // ✅ lưu token để gọi /my /me
+      return (true, token);
+    } else {
+      return (false, _extractDetail(resp.body));
     }
+  } on TimeoutException {
+    return (false, 'Hết thời gian kết nối máy chủ');
+  } catch (e) {
+    return (false, 'Lỗi kết nối: $e');
   }
+}
+
 
   // =========================
   // GOOGLE LOGIN (BE: POST /auth/login/google)

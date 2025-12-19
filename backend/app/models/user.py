@@ -64,7 +64,7 @@ class Users(Base):
     support_tickets = relationship("SupportTicket", back_populates="user")
     support_messages = relationship("SupportMessage", back_populates="sender")
     user_settings = relationship("UserSettings", back_populates="user", uselist=False)
-    chatbots = relationship("Chatbot", back_populates="user")
+    chatbot = relationship("Chatbot", back_populates="user")
     auth_accounts = relationship("AuthAccount", back_populates="user")
 
     # 👇 THÊM PROPERTY NÀY

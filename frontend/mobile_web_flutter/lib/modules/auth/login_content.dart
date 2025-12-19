@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../src/routes/web_routes.dart';
-import '../../core/user_service.dart';
+import '../../services/admin/user_service.dart';
 import '../auth/auth_service.dart';
 
 /// Gradient chủ đạo cho login (đồng bộ với màu seed 0xFF2F6D3A)
