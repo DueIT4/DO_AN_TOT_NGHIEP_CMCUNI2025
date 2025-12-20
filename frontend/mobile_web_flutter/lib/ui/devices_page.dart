@@ -229,6 +229,9 @@ class _DevicesPageState extends State<DevicesPage> {
         streamUrl: device.streamUrl ?? '',
       );
 
+      // Reload danh sách thiết bị để trạng thái active/inactive phản ánh đúng từ backend
+      await _loadDevices();
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Đang sử dụng camera: ${device.name}')),
@@ -365,9 +368,14 @@ class _DevicesPageState extends State<DevicesPage> {
                       ),
                     ),
                   ..._visibleDevices.map((device) {
+                    // Ưu tiên ID từ CameraProvider để phản ánh đổi camera ngay lập tức
+                    final providerSelectedId =
+                        context.watch<CameraProvider>().selectedCameraId;
+                    final effectiveSelectedId =
+                        providerSelectedId ?? _selectedCameraId;
                     final isSelected =
                         device.category == DeviceCategory.camera &&
-                            device.deviceId == _selectedCameraId;
+                            device.deviceId == effectiveSelectedId;
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -590,26 +598,28 @@ class _DeviceCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                if (device.latestImageUrl != null &&
-                    device.latestImageUrl!.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      device.latestImageUrl!,
-                      height: 120,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 120,
-                        color: const Color(0xFFE8F4D9),
-                        child: const Center(child: Icon(Icons.broken_image)),
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
+            // Ảnh preview cần nằm dưới Row để tránh lỗi size vô hạn
+            if (device.latestImageUrl != null &&
+                device.latestImageUrl!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  height: 120,
+                  width: double.infinity,
+                  child: Image.network(
+                    device.latestImageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFFE8F4D9),
+                      child: const Center(child: Icon(Icons.broken_image)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             if (!isCamera) ...[
               Row(

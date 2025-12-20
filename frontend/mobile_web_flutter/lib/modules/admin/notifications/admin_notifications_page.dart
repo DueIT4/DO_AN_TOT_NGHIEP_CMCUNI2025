@@ -147,15 +147,20 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Card(
             elevation: 1.5,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             clipBehavior: Clip.antiAlias,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withOpacity(0.8),
                   child: Row(
                     children: [
                       const SizedBox(width: 8),
@@ -172,7 +177,8 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
                         child: TextField(
                           controller: _searchCtrl,
                           decoration: InputDecoration(
-                            hintText: 'Tìm theo ID, tiêu đề, nội dung, user, email...',
+                            hintText:
+                                'Tìm theo ID, tiêu đề, nội dung, user, email...',
                             prefixIcon: const Icon(Icons.search),
                             suffixIcon: _query.isEmpty
                                 ? null
@@ -208,7 +214,8 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
                 const Divider(height: 1),
 
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: FutureBuilder<List<Map<String, dynamic>>>(
                     future: _future,
                     builder: (context, snap) {
@@ -234,10 +241,13 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
                       final filtered = q.isEmpty
                           ? items
                           : items.where((n) {
-                              final id = '${n['notification_id'] ?? ''}'.toLowerCase();
+                              final id =
+                                  '${n['notification_id'] ?? ''}'.toLowerCase();
                               final title = '${n['title'] ?? ''}'.toLowerCase();
-                              final desc = '${n['description'] ?? ''}'.toLowerCase();
-                              final username = '${n['username'] ?? ''}'.toLowerCase();
+                              final desc =
+                                  '${n['description'] ?? ''}'.toLowerCase();
+                              final username =
+                                  '${n['username'] ?? ''}'.toLowerCase();
                               final email = '${n['email'] ?? ''}'.toLowerCase();
                               return id.contains(q) ||
                                   title.contains(q) ||
@@ -274,12 +284,14 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
                               final title = n['title'] ?? '';
                               final username = n['username'] ?? '';
                               final email = n['email'] ?? '';
-                              final createdAt = _formatDate(n['created_at'] as String?);
+                              final createdAt =
+                                  _formatDate(n['created_at'] as String?);
                               final readAt = n['read_at'] as String?;
 
-                              final receiver = (email is String && email.isNotEmpty)
-                                  ? '$username ($email)'
-                                  : username;
+                              final receiver =
+                                  (email is String && email.isNotEmpty)
+                                      ? '$username ($email)'
+                                      : username;
 
                               return DataRow(
                                 cells: [
@@ -320,7 +332,8 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
                                           onPressed: () => _showDetail(n),
                                         ),
                                         IconButton(
-                                          tooltip: 'Gửi lại (tạo thông báo mới)',
+                                          tooltip:
+                                              'Gửi lại (tạo thông báo mới)',
                                           icon: const Icon(
                                             Icons.send,
                                             size: 18,
@@ -511,8 +524,7 @@ class _NotificationResendDialog extends StatefulWidget {
       _NotificationResendDialogState();
 }
 
-class _NotificationResendDialogState
-    extends State<_NotificationResendDialog> {
+class _NotificationResendDialogState extends State<_NotificationResendDialog> {
   final _userIdsText = TextEditingController();
   bool _sendAll = true;
   bool _saving = false;

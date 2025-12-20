@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 import '../core/weather_api.dart';
 import '../core/camera_provider.dart';
+import '../core/api_base_app.dart';
 import '../l10n/app_localizations.dart';
 import '../models/notification.dart' as models;
 import '../services/api_client.dart';
@@ -45,6 +49,13 @@ class _HomeUserPageState extends State<HomeUserPage> {
     super.initState();
     _loadNotifications();
     _loadWeather();
+    _loadSelectedCamera();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload camera when CameraProvider changes (e.g., user selected new camera on Devices page)
     _loadSelectedCamera();
   }
 
@@ -93,7 +104,23 @@ class _HomeUserPageState extends State<HomeUserPage> {
     });
 
     try {
-      final pos = await _determinePosition();
+      Position? pos;
+      try {
+        pos = await _determinePosition();
+      } catch (e) {
+        // Web không hỗ trợ location - dùng location mặc định (Hà Nội)
+        if (!mounted) return;
+        final data = await WeatherApi.getWeather(
+          lat: 21.0285,
+          lon: 105.8542,
+          lang: 'vi',
+        );
+        setState(() {
+          _weather = data;
+          _weatherLoading = false;
+        });
+        return;
+      }
 
       final data = await WeatherApi.getWeather(
         lat: pos.latitude,
@@ -343,22 +370,28 @@ class _HomeUserPageState extends State<HomeUserPage> {
               const SizedBox(height: 16),
               Builder(builder: (context) {
                 final cam = context.watch<CameraProvider>();
-                final camId = _selectedCameraId ?? cam.selectedCameraId;
-                final camName = _selectedCameraName ?? cam.selectedCameraName;
+                // Ưu tiên giá trị từ Provider (cập nhật ngay sau khi đổi camera),
+                // fallback sang state đã load từ server nếu Provider chưa có.
+                final camId = cam.selectedCameraId ?? _selectedCameraId;
+                final camName = cam.selectedCameraName ?? _selectedCameraName;
                 final camUrl =
-                    _selectedCameraStreamUrl ?? cam.selectedCameraStreamUrl;
+                    cam.selectedCameraStreamUrl ?? _selectedCameraStreamUrl;
 
                 if (camId != null && camName != null) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CameraStreamPlayer(
-                        deviceId: camId,
-                        deviceName: camName,
-                        hlsUrl: camUrl ??
-                            CameraStreamService.buildFullHlsUrl(camId),
-                        onCameraChanged: _loadSelectedCamera,
-                      ),
+                      // Nếu URL là MJPEG (DroidCam) → dùng DroicamView để convert thành HLS
+                      if (camUrl != null && _looksLikeMjpeg(camUrl))
+                        DroicamView(url: camUrl!)
+                      else
+                        CameraStreamPlayer(
+                          deviceId: camId,
+                          deviceName: camName,
+                          hlsUrl: camUrl ??
+                              CameraStreamService.buildFullHlsUrl(camId),
+                          onCameraChanged: _loadSelectedCamera,
+                        ),
                       const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -558,11 +591,80 @@ class _HomeUserPageState extends State<HomeUserPage> {
   }
 }
 
-// ================= DROICAM VIEW (bản mobile – placeholder) =================
-class DroicamView extends StatelessWidget {
-  final String url;
+// ================= DROICAM VIEW - Sử dụng HLS stream =================
+/// Hiển thị DroidCam video stream.
+/// Trên web, MJPEG (Image.network) có vấn đề liên tục reconnect.
+/// Giải pháp: Dùng HLS (HTTP Live Streaming) thông qua ffmpeg conversion
+/// hoặc phát trực tiếp qua CameraStreamPlayer với VideoPlayer plugin.
+class DroicamView extends StatefulWidget {
+  final String url; // URL MJPEG của DroidCam
 
   const DroicamView({super.key, required this.url});
+
+  @override
+  State<DroicamView> createState() => _DroicamViewState();
+}
+
+class _DroicamViewState extends State<DroicamView> {
+  String _hlsUrl = ''; // Initialize with empty string
+  String? _errorMsg;
+  bool _isLoading = true;
+  int _retryCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeHls();
+  }
+
+  Future<void> _initializeHls() async {
+    // Tạo HLS URL từ MJPEG URL bằng cách gọi backend API
+    // Backend sẽ convert MJPEG -> HLS bằng ffmpeg
+    try {
+      final mjpegUrl = Uri.encodeComponent(widget.url);
+      final uri =
+          Uri.parse('${ApiBase.host}/api/v1/stream/hls?mjpeg_url=$mjpegUrl');
+
+      final resp = await http
+          .get(uri, headers: ApiClient.authHeaders())
+          .timeout(const Duration(seconds: 30));
+
+      if (!mounted) return;
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final hlsUrl = data['hls_url']?.toString();
+        if (hlsUrl != null && hlsUrl.isNotEmpty) {
+          setState(() {
+            _hlsUrl = hlsUrl;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+      // Nếu backend đang khởi tạo (503) → thử lại vài lần
+      if (resp.statusCode == 503 && _retryCount < 5) {
+        _retryCount += 1;
+        await Future.delayed(const Duration(seconds: 3));
+        if (!mounted) return;
+        setState(() {
+          _isLoading = true;
+          _errorMsg = null;
+        });
+        return _initializeHls();
+      }
+      setState(() {
+        _errorMsg = 'Không thể tạo HLS stream (${resp.statusCode})';
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMsg = 'Lỗi khởi tạo stream: $e';
+        _isLoading = false;
+      });
+    }
+  }
 
   bool _isValidUrl(String s) {
     final u = Uri.tryParse(s);
@@ -571,39 +673,94 @@ class DroicamView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-
-    if (!_isValidUrl(url)) {
-      return Center(
-        child: Text(
-          '${l10n.translate('droicam_configured')}\n$url\n\n'
-          '${l10n.translate('droicam_desc')}',
-          style: const TextStyle(color: Colors.white),
-          textAlign: TextAlign.center,
+    if (!_isValidUrl(widget.url)) {
+      return Container(
+        height: 160,
+        color: Colors.grey[800],
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white54, size: 32),
+              const SizedBox(height: 12),
+              const Text(
+                'URL DroidCam không hợp lệ',
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  widget.url,
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    // Flutter Web: MJPEG stream hiển thị tốt qua Image.network
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Image.network(
-        url,
+    if (_isLoading || _hlsUrl.isEmpty) {
+      return Container(
         height: 160,
-        width: double.infinity,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, __, ___) => Center(
-          child: Text(
-            '${l10n.translate('droicam_configured')}\n$url\n\n'
-            '${l10n.translate('droicam_desc')}',
-            style: const TextStyle(color: Colors.white),
-            textAlign: TextAlign.center,
+        color: Colors.grey[800],
+        child: const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Color(0xFF7CCD2B),
+            ),
           ),
         ),
+      );
+    }
+
+    if (_errorMsg != null) {
+      return Container(
+        height: 160,
+        color: Colors.grey[800],
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.videocam_off, color: Colors.white54, size: 32),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  _errorMsg ?? 'Lỗi kết nối camera',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    // Dùng CameraStreamPlayer với HLS URL để phát video
+    // Tránh vấn đề setState() trong errorBuilder của Image.network
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: CameraStreamPlayer(
+        deviceId: 0, // Dummy ID cho DroidCam
+        deviceName: 'DroidCam',
+        hlsUrl: _hlsUrl,
       ),
     );
   }
+}
+
+// Nhận diện nhanh URL MJPEG (ví dụ DroidCam: :4747/video)
+bool _looksLikeMjpeg(String url) {
+  final s = url.toLowerCase();
+  return s.contains(":4747/video") ||
+      s.endsWith("/video") ||
+      s.contains("mjpeg") ||
+      s.contains("mjpg");
 }
 
 // ======================= WIDGET PHỤ =======================

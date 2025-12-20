@@ -114,8 +114,7 @@ class _NewsContentState extends State<NewsContent> {
       },
       {
         'title': 'Giải pháp tiết kiệm nước mùa khô',
-        'description':
-            'Ứng dụng kỹ thuật tưới nhỏ giọt giúp giảm chi phí 30%.',
+        'description': 'Ứng dụng kỹ thuật tưới nhỏ giọt giúp giảm chi phí 30%.',
         'url': '',
         'imageUrl': null,
         'source': 'Khuyến Nông',
@@ -158,8 +157,7 @@ class _NewsContentState extends State<NewsContent> {
           children: [
             Row(
               children: [
-                Icon(Icons.agriculture,
-                    size: 32, color: Colors.green.shade700),
+                Icon(Icons.agriculture, size: 32, color: Colors.green.shade700),
                 const SizedBox(width: 12),
                 Text(
                   'Tin tức nông nghiệp',
@@ -170,7 +168,6 @@ class _NewsContentState extends State<NewsContent> {
               ],
             ),
             const SizedBox(height: 24),
-
             if (_loading)
               const Center(
                 child: Padding(
@@ -209,15 +206,12 @@ class _NewsContentState extends State<NewsContent> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _articles.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: 12),
-                      itemBuilder: (_, i) =>
-                          _NewsCard(article: _articles[i], formatTime: _formatTime),
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (_, i) => _NewsCard(
+                          article: _articles[i], formatTime: _formatTime),
                     ),
                   ),
-
                   if (isWide) const SizedBox(width: 24),
-
                   if (isWide) const Expanded(flex: 1, child: _SidebarLinks()),
                 ],
               ),
@@ -262,7 +256,7 @@ class _NewsCard extends StatelessWidget {
               AspectRatio(
                 aspectRatio: 16 / 9,
                 child: Image.network(
-                  imageUrl!,
+                  imageUrl,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
                     height: 200,
@@ -271,7 +265,6 @@ class _NewsCard extends StatelessWidget {
                   ),
                 ),
               ),
-
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(

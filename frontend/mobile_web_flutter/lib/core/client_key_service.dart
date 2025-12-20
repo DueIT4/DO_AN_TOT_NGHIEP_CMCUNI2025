@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 
 class ClientKeyService {
   static const _storageKey = 'client_key';
-  static final _uuid = const Uuid();
+  static const _uuid = Uuid();
 
   static String getClientKey() {
     final storage = html.window.localStorage;

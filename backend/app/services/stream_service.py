@@ -94,6 +94,8 @@ def start_stream(device_id: int, rtsp_url: str) -> Optional[str]:
             "6",
             "-hls_flags",
             "independent_segments+append_list",
+            "-hls_segment_filename",
+            "segment_%03d.ts",
             "index.m3u8",
         ]
 
@@ -165,6 +167,8 @@ def start_stream_temp(key: str, rtsp_url: str) -> Optional[str]:
             "6",
             "-hls_flags",
             "independent_segments+append_list",
+            "-hls_segment_filename",
+            "segment_%03d.ts",
             "index.m3u8",
         ]
 

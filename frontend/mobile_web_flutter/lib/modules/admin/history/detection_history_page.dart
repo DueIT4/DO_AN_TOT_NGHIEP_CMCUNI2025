@@ -236,7 +236,7 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   color: Theme.of(context)
                       .colorScheme
-                      .surfaceVariant
+                      .surfaceContainerHighest
                       .withOpacity(0.8),
                   child: Row(
                     children: [
@@ -255,9 +255,7 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                           icon: const Icon(Icons.download, size: 20),
                         ),
                       ),
-
                       const SizedBox(width: 12),
-
                       SizedBox(
                         width: 260,
                         child: TextField(
@@ -277,7 +275,6 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                         ),
                       ),
                       const SizedBox(width: 8),
-
                       FilledButton(
                         onPressed: _loading
                             ? null
@@ -292,10 +289,10 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                         child: const Icon(Icons.search, size: 20),
                       ),
                       const SizedBox(width: 8),
-
                       IconButton(
                         tooltip: 'Tải lại',
-                        onPressed: _loading ? null : () => _fetch(page: _currentPage),
+                        onPressed:
+                            _loading ? null : () => _fetch(page: _currentPage),
                         icon: const Icon(Icons.refresh),
                       ),
                     ],
@@ -330,15 +327,12 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: items.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 1),
+                          separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final it = items[index];
-                            final userLabel = [
-                              it.username,
-                              it.email,
-                              it.phone
-                            ].where((x) => x != null && x!.isNotEmpty).join(' • ');
+                            final userLabel = [it.username, it.email, it.phone]
+                                .where((x) => x != null && x.isNotEmpty)
+                                .join(' • ');
 
                             return ListTile(
                               leading: _buildThumb(it),
@@ -374,7 +368,9 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                                       color: Colors.green,
                                       size: 20,
                                     ),
-                                    onPressed: _loading ? null : () => _onExportTrain(it),
+                                    onPressed: _loading
+                                        ? null
+                                        : () => _onExportTrain(it),
                                   ),
                                   IconButton(
                                     tooltip: 'Xoá',
@@ -383,7 +379,8 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                                       color: Colors.red,
                                       size: 18,
                                     ),
-                                    onPressed: _loading ? null : () => _onDelete(it),
+                                    onPressed:
+                                        _loading ? null : () => _onDelete(it),
                                   ),
                                 ],
                               ),
@@ -407,9 +404,10 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                                   icon: const Icon(Icons.chevron_left),
                                 ),
                                 IconButton(
-                                  onPressed: _currentPage < totalPages && !_loading
-                                      ? () => _fetch(page: _currentPage + 1)
-                                      : null,
+                                  onPressed:
+                                      _currentPage < totalPages && !_loading
+                                          ? () => _fetch(page: _currentPage + 1)
+                                          : null,
                                   icon: const Icon(Icons.chevron_right),
                                 ),
                               ],

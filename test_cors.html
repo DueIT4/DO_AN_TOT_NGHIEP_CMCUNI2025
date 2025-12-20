@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test CORS - Streams API</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 50px auto; 
+            padding: 20px;
+        }
+        button { 
+            padding: 10px 20px; 
+            font-size: 16px; 
+            margin: 10px 5px;
+            cursor: pointer;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        pre { 
+            background: #f4f4f4; 
+            padding: 15px; 
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test CORS - Streams API</h1>
+    
+    <div>
+        <button onclick="testStartStream()">▶️ Test Start Stream (Device 19)</button>
+        <button onclick="testGetStream()">📊 Test Get Stream Status</button>
+        <button onclick="testOptions()">🔍 Test OPTIONS (CORS Preflight)</button>
+    </div>
+    
+    <h2>📋 Kết quả:</h2>
+    <div id="result"></div>
+    
+    <script>
+        const BASE_URL = 'http://localhost:8000/api/v1';
+        const DEVICE_ID = 19;
+        
+        function log(message, isError = false) {
+            const resultDiv = document.getElementById('result');
+            const p = document.createElement('p');
+            p.className = isError ? 'error' : 'success';
+            p.textContent = message;
+            resultDiv.appendChild(p);
+        }
+        
+        function logJSON(data) {
+            const resultDiv = document.getElementById('result');
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(data, null, 2);
+            resultDiv.appendChild(pre);
+        }
+        
+        function clearResults() {
+            document.getElementById('result').innerHTML = '';
+        }
+        
+        async function testStartStream() {
+            clearResults();
+            log('🔄 Đang gọi POST /streams/start...');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/streams/start`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ device_id: DEVICE_ID })
+                });
+                
+                log(`✅ Status: ${response.status} ${response.statusText}`);
+                
+                const data = await response.json();
+                logJSON(data);
+                
+                if (response.ok) {
+                    log('✅ SUCCESS: Stream started!', false);
+                } else {
+                    log(`❌ ERROR: ${data.message || data.detail}`, true);
+                }
+                
+            } catch (error) {
+                log(`❌ FETCH ERROR: ${error.message}`, true);
+                console.error('Detailed error:', error);
+            }
+        }
+        
+        async function testGetStream() {
+            clearResults();
+            log('🔄 Đang gọi GET /streams/device/19...');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/streams/device/${DEVICE_ID}`);
+                
+                log(`✅ Status: ${response.status} ${response.statusText}`);
+                
+                const data = await response.json();
+                logJSON(data);
+                
+            } catch (error) {
+                log(`❌ FETCH ERROR: ${error.message}`, true);
+                console.error('Detailed error:', error);
+            }
+        }
+        
+        async function testOptions() {
+            clearResults();
+            log('🔄 Đang gọi OPTIONS /streams/start (CORS preflight)...');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/streams/start`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'content-type',
+                        'Origin': window.location.origin
+                    }
+                });
+                
+                log(`✅ Status: ${response.status} ${response.statusText}`);
+                
+                // Log CORS headers
+                const corsHeaders = {};
+                response.headers.forEach((value, key) => {
+                    if (key.toLowerCase().includes('access-control')) {
+                        corsHeaders[key] = value;
+                    }
+                });
+                
+                log('CORS Headers:');
+                logJSON(corsHeaders);
+                
+            } catch (error) {
+                log(`❌ FETCH ERROR: ${error.message}`, true);
+                console.error('Detailed error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

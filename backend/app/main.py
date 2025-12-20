@@ -47,6 +47,8 @@ from app.api.v1.routes_reports import router as routes_reports   # 👈 thêm
 from app.api.v1.routes_auto_detection import router as auto_detection_router  # ✅ NEW
 from app.api.v1.routes_weather import router as weather_router
 from app.api.v1.routes_chatbot import router as chatbot_router
+from app.api.v1.routes_stream import router as stream_router  # ✅ MJPEG → HLS conversion
+from app.api.v1.routes_streams import router as streams_router  # ✅ Stream management (devices)
 
 API_PREFIX = getattr(settings, "API_V1", "/api/v1")
 
@@ -67,6 +69,14 @@ app = FastAPI(
     openapi_tags=tags_metadata,
 )
 
+# ==== Middleware để log requests (Debug) ====
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"📨 {request.method} {request.url.path}")
+    response = await call_next(request)
+    logger.info(f"📤 {request.method} {request.url.path} → {response.status_code}")
+    return response
+
 # ==== Middlewares ====
 # ⚠️ Dev: KHÔNG dùng "*" nếu allow_credentials=True (browser sẽ chặn CORS)
 # Hãy whitelist origin của Flutter Web dev server (port có thể thay đổi)
@@ -84,9 +94,17 @@ DEFAULT_DEV_ORIGINS = [
 cors_origins = getattr(settings, "CORS_ORIGINS", None)
 cors_origin_regex = getattr(settings, "CORS_ORIGIN_REGEX", None)
 
-# Nếu settings.CORS_ORIGINS không set hoặc để ["*"] thì dùng danh sách dev ở trên
+# Nếu settings.CORS_ORIGINS không set hoặc để "*" thì dùng danh sách dev ở trên
 if not cors_origins or cors_origins == ["*"] or cors_origins == "*":
     cors_origins = DEFAULT_DEV_ORIGINS
+
+# Flutter Web dev server thường chạy localhost với port ngẫu nhiên.
+# Cho phép bất kỳ port localhost khi ở môi trường dev bằng regex.
+if not cors_origin_regex and getattr(settings, "APP_ENV", "dev") != "prod":
+    cors_origin_regex = r"https?://(localhost|127\\.0\\.0\\.1):\\d+"
+
+logger.info(f"🌐 CORS Origins: {cors_origins}")
+logger.info(f"🌐 CORS Regex: {cors_origin_regex}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -95,6 +113,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1024)
@@ -138,6 +157,10 @@ app.include_router(routes_reports,prefix=API_PREFIX)  # 👈 thêm
 app.include_router(auto_detection_router, prefix=API_PREFIX)  # ✅ NEW
 app.include_router(weather_router, prefix=API_PREFIX)
 app.include_router(chatbot_router, prefix=API_PREFIX)
+app.include_router(stream_router, prefix=API_PREFIX)  # ✅ MJPEG → HLS conversion
+app.include_router(streams_router, prefix=API_PREFIX)  # ✅ Stream management
+
+logger.info(f"✅ Routers loaded. Streams router registered at: {API_PREFIX}/streams")
 
 # ==== Root & tiện ích ====
 @app.get("/")

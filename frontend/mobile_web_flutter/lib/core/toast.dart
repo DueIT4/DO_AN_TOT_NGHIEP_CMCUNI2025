@@ -10,7 +10,6 @@ class AppToast {
     Duration duration = const Duration(seconds: 2),
   }) {
     final overlay = Overlay.of(context);
-    if (overlay == null) return;
 
     final theme = Theme.of(context);
 

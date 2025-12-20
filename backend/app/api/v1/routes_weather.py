@@ -15,8 +15,18 @@ async def get_weather(
     lang: str = Query("vi"),
     units: str = Query("metric"),
 ):
-    if not settings.OPENWEATHER_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing OPENWEATHER_API_KEY in .env")
+    # Nếu chưa config API key, trả về dữ liệu placeholder
+    if not settings.OPENWEATHER_API_KEY or not settings.OPENWEATHER_API_KEY.strip():
+        return {
+            "current": {
+                "temp": "--",
+                "feels_like": "--",
+                "humidity": "--",
+                "weather": [{"main": "Unknown", "description": "API key not configured"}],
+                "wind_speed": "--",
+            },
+            "forecast": [],
+        }
 
     base = settings.OPENWEATHER_BASE_URL.rstrip("/")
     key = settings.OPENWEATHER_API_KEY
@@ -28,15 +38,39 @@ async def get_weather(
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            cur_res, fc_res = await client.get(current_url, params=params), await client.get(forecast_url, params=params)
+            cur_res = await client.get(current_url, params=params)
+            fc_res = await client.get(forecast_url, params=params)
 
         if cur_res.status_code != 200:
-            raise HTTPException(status_code=cur_res.status_code, detail=cur_res.text)
+            # Log error nhưng không crash - trả về dữ liệu placeholder
+            print(f"OpenWeather current error: {cur_res.status_code} {cur_res.text}")
+            return {
+                "current": {
+                    "temp": "--",
+                    "feels_like": "--",
+                    "humidity": "--",
+                    "weather": [{"main": "Error", "description": f"HTTP {cur_res.status_code}"}],
+                    "wind_speed": "--",
+                },
+                "forecast": [],
+            }
+        
         if fc_res.status_code != 200:
-            raise HTTPException(status_code=fc_res.status_code, detail=fc_res.text)
+            print(f"OpenWeather forecast error: {fc_res.status_code} {fc_res.text}")
 
-        mapped = map_weather_from_api(cur_res.json(), fc_res.json())
+        mapped = map_weather_from_api(cur_res.json(), fc_res.json() if fc_res.status_code == 200 else {"list": []})
         return mapped
 
     except httpx.RequestError as e:
-        raise HTTPException(status_code=502, detail=f"OpenWeather request failed: {e}")
+        print(f"OpenWeather request error: {e}")
+        # Không crash - trả về dữ liệu placeholder
+        return {
+            "current": {
+                "temp": "--",
+                "feels_like": "--",
+                "humidity": "--",
+                "weather": [{"main": "Offline", "description": "Network error"}],
+                "wind_speed": "--",
+            },
+            "forecast": [],
+        }

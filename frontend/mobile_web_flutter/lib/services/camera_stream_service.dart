@@ -69,44 +69,76 @@ class CameraStreamService {
     }
   }
 
-  // POST /streams/start
+  // POST /streams/start (with retry logic)
   static Future<Map<String, dynamic>> startStream(int deviceId) async {
     final uri = ApiBase.uri('/streams/start');
-    try {
-      final resp = await http
-          .post(
-            uri,
-            headers: {
-              ...ApiClient.authHeaders(),
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode({'device_id': deviceId}),
-          )
-          .timeout(const Duration(seconds: 20));
 
-      if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        final data = jsonDecode(resp.body);
-        return data is Map<String, dynamic> ? data : <String, dynamic>{};
+    // Retry up to 3 times with exponential backoff
+    int retries = 3;
+    Duration delay = const Duration(seconds: 1);
+
+    for (int attempt = 0; attempt < retries; attempt++) {
+      try {
+        final resp = await http
+            .post(
+              uri,
+              headers: {
+                ...ApiClient.authHeaders(),
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: jsonEncode({'device_id': deviceId}),
+            )
+            .timeout(const Duration(seconds: 20));
+
+        if (resp.statusCode >= 200 && resp.statusCode < 300) {
+          final data = jsonDecode(resp.body);
+          return data is Map<String, dynamic> ? data : <String, dynamic>{};
+        }
+
+        // If 404 and not last attempt, retry after delay
+        if (resp.statusCode == 404 && attempt < retries - 1) {
+          await Future.delayed(delay);
+          delay *= 2; // exponential backoff
+          continue;
+        }
+
+        return {
+          'hls_url': null,
+          'running': false,
+          'message': 'Không thể khởi động stream (${resp.statusCode})',
+        };
+      } on TimeoutException {
+        if (attempt < retries - 1) {
+          await Future.delayed(delay);
+          delay *= 2;
+          continue;
+        }
+        return {
+          'hls_url': null,
+          'running': false,
+          'message': 'Hết thời gian kết nối máy chủ',
+        };
+      } catch (e) {
+        if (attempt < retries - 1) {
+          await Future.delayed(delay);
+          delay *= 2;
+          continue;
+        }
+        return {
+          'hls_url': null,
+          'running': false,
+          'message': 'Lỗi kết nối: $e',
+        };
       }
-      return {
-        'hls_url': null,
-        'running': false,
-        'message': 'Không thể khởi động stream (${resp.statusCode})',
-      };
-    } on TimeoutException {
-      return {
-        'hls_url': null,
-        'running': false,
-        'message': 'Hết thời gian kết nối máy chủ',
-      };
-    } catch (e) {
-      return {
-        'hls_url': null,
-        'running': false,
-        'message': 'Lỗi kết nối: $e',
-      };
     }
+
+    // Should never reach here, but just in case
+    return {
+      'hls_url': null,
+      'running': false,
+      'message': 'Không thể khởi động stream sau nhiều lần thử',
+    };
   }
 
   // POST /streams/stop

@@ -211,7 +211,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
   }
 
   void _openLanguageSheet() {
-    final locales = LanguageService.supportedLocales;
+    const locales = LanguageService.supportedLocales;
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -275,32 +275,31 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
   }
 
   Future<void> _pickAvatar(ImageSource source) async {
-  final file = await _avatarPicker.pickImage(
-    source: source,
-    imageQuality: 85,
-    maxWidth: 1024,
-  );
-  if (file == null) return;
-
-  setState(() => _avatarUploading = true);
-
-  try {
-    final updated = await UserService.uploadAvatar(file); // ✅ await ở ngoài
-
-    if (!mounted) return;
-    setState(() {
-      _profileFuture = Future.value(updated); // ✅ setState sync
-    });
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Không thể cập nhật avatar: $e')),
+    final file = await _avatarPicker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1024,
     );
-  } finally {
-    if (mounted) setState(() => _avatarUploading = false);
-  }
-}
+    if (file == null) return;
 
+    setState(() => _avatarUploading = true);
+
+    try {
+      final updated = await UserService.uploadAvatar(file); // ✅ await ở ngoài
+
+      if (!mounted) return;
+      setState(() {
+        _profileFuture = Future.value(updated); // ✅ setState sync
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể cập nhật avatar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _avatarUploading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -366,7 +365,9 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                           child: Column(
                             children: [
                               GestureDetector(
-                                onTap: _avatarUploading ? null : _showAvatarActions,
+                                onTap: _avatarUploading
+                                    ? null
+                                    : _showAvatarActions,
                                 child: SizedBox(
                                   width: 120,
                                   height: 120,
@@ -375,14 +376,16 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                                     children: [
                                       CircleAvatar(
                                         radius: 56,
-                                        backgroundImage: profile.avatarUrl.isNotEmpty
+                                        backgroundImage: profile
+                                                .avatarUrl.isNotEmpty
                                             ? NetworkImage(profile.avatarUrl)
                                             : null,
+                                        backgroundColor:
+                                            const Color(0xFF7CCD2B),
                                         child: profile.avatarUrl.isEmpty
                                             ? const Icon(Icons.person,
                                                 size: 48, color: Colors.white)
                                             : null,
-                                        backgroundColor: const Color(0xFF7CCD2B),
                                       ),
                                       Positioned(
                                         bottom: 8,
@@ -391,7 +394,8 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                                           padding: const EdgeInsets.all(6),
                                           decoration: BoxDecoration(
                                             color: Colors.white,
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
                                           ),
                                           child: const Icon(
                                             Icons.camera_alt_outlined,
@@ -403,7 +407,8 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                                       if (_avatarUploading)
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: Colors.black.withOpacity(0.4),
+                                            color:
+                                                Colors.black.withOpacity(0.4),
                                             shape: BoxShape.circle,
                                           ),
                                           width: 112,
@@ -441,26 +446,25 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                           ),
                         ),
                         const SizedBox(height: 24),
-
                         _SettingTile(
                           icon: Icons.edit_outlined,
                           label: l10n.translate('edit_info'),
-                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          trailing:
+                              const Icon(Icons.arrow_forward_ios, size: 16),
                           onTap: () => _openEditSheet(profile),
                         ),
                         const SizedBox(height: 12),
-
                         _SettingTile(
                           icon: Icons.language_outlined,
                           label: l10n.translate('language'),
                           trailing: Text(
-                            LanguageService.instance.displayName(_currentLanguageCode),
+                            LanguageService.instance
+                                .displayName(_currentLanguageCode),
                             style: const TextStyle(color: Colors.black54),
                           ),
                           onTap: _openLanguageSheet,
                         ),
                         const SizedBox(height: 12),
-
                         _SettingTile(
                           icon: Icons.notifications_none,
                           label: l10n.translate('notifications'),
@@ -482,20 +486,20 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-
                         _SettingTile(
                           icon: Icons.support_agent_outlined,
                           label: 'Hỗ trợ',
-                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          trailing:
+                              const Icon(Icons.arrow_forward_ios, size: 16),
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const SupportListPage()),
+                              MaterialPageRoute(
+                                  builder: (_) => const SupportListPage()),
                             );
                           },
                         ),
                         const SizedBox(height: 12),
-
                         _SettingTile(
                           icon: Icons.logout,
                           label: l10n.translate('logout'),
@@ -503,7 +507,6 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                           iconColor: Colors.red,
                           onTap: _handleLogout,
                         ),
-
                         const SizedBox(height: 32),
                       ],
                     ),

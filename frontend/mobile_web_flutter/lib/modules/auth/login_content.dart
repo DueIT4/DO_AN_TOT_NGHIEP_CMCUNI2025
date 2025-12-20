@@ -128,7 +128,6 @@ class _LoginContentState extends State<LoginContent> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
                   Text(
                     'Welcome Admin',
                     textAlign: TextAlign.center,
@@ -147,7 +146,6 @@ class _LoginContentState extends State<LoginContent> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
                   if (returnTo != null && returnTo.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -157,7 +155,6 @@ class _LoginContentState extends State<LoginContent> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-
                   TextFormField(
                     controller: _accountCtrl,
                     decoration: const InputDecoration(
@@ -175,7 +172,6 @@ class _LoginContentState extends State<LoginContent> {
                     },
                   ),
                   const SizedBox(height: 12),
-
                   TextFormField(
                     controller: _passCtrl,
                     obscureText: _obscurePassword,
@@ -187,7 +183,9 @@ class _LoginContentState extends State<LoginContent> {
                       ),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() {
@@ -204,7 +202,6 @@ class _LoginContentState extends State<LoginContent> {
                     },
                   ),
                   const SizedBox(height: 8),
-
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -220,7 +217,6 @@ class _LoginContentState extends State<LoginContent> {
                     ),
                   ),
                   const SizedBox(height: 8),
-
                   if (_error != null) ...[
                     Text(
                       _error!,
@@ -231,7 +227,6 @@ class _LoginContentState extends State<LoginContent> {
                     ),
                     const SizedBox(height: 12),
                   ],
-
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -266,10 +261,11 @@ class _LoginContentState extends State<LoginContent> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : Row(
+                                : const Row(
                                     mainAxisSize: MainAxisSize.min,
-                                    children: const [
-                                      Icon(Icons.login_rounded, color: Colors.white),
+                                    children: [
+                                      Icon(Icons.login_rounded,
+                                          color: Colors.white),
                                       SizedBox(width: 8),
                                       Text(
                                         'Đăng nhập',

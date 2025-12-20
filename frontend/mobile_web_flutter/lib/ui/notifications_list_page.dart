@@ -32,8 +32,9 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
 
     if (success) {
       try {
-        final notifications = (data as List)
-            .map((json) => models.AppNotification.fromJson(json as Map<String, dynamic>))
+        final notifications = (data)
+            .map((json) =>
+                models.AppNotification.fromJson(json as Map<String, dynamic>))
             .toList();
         setState(() {
           _notifications = notifications;

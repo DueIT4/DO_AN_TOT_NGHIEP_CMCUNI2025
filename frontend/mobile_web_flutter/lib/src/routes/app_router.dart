@@ -60,7 +60,7 @@ final GoRouter appRouter = GoRouter(
     // ===== Routes riêng =====
     GoRoute(
       path: WebRoutes.detect,
-      builder: (context, state) => DetectWebPage(),
+      builder: (context, state) => const DetectWebPage(),
     ),
     GoRoute(
       path: WebRoutes.login,

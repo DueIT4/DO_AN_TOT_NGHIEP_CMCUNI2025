@@ -9,6 +9,7 @@ from app.services.device_service import devices_service as svc
 from app.api.v1.deps import get_current_user
 from app.schemas.devices import DeviceCreate, DeviceUpdate, DeviceOut
 from app.models.role import RoleType
+from app.models.devices import Device
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -117,14 +118,18 @@ def get_selected_camera(
             "message": str
         }
     """
-    # Find camera marked as selected for this user (or status='active')
-    camera = db.query(Device).filter(
-        Device.user_id == current_user.user_id,
-        Device.device_type_id == 1,  # Assuming device_type_id=1 is camera
-        Device.stream_url.isnot(None),
-    ).order_by(
-        Device.updated_at.desc()
-    ).first()
+    # Find camera marked as selected (status='active') for this user
+    camera = (
+        db.query(Device)
+        .filter(
+            Device.user_id == current_user.user_id,
+            Device.device_type_id == 1,  # Assuming device_type_id=1 is camera
+            Device.stream_url.isnot(None),
+            Device.status == "active",
+        )
+        .order_by(Device.updated_at.desc())
+        .first()
+    )
     
     if not camera:
         return {
@@ -302,4 +307,135 @@ def get_device_stream_status(
         "stream_running": stream_running,
         "hls_url": stream_service.hls_url_for(device_id) if stream_running else None,
         "stream_info": stream_info
+    }
+
+
+# =========================
+# ✅ TEST RTSP/stream URL connection
+# POST /devices/test_stream_url
+# =========================
+class TestStreamUrlIn(BaseModel):
+    stream_url: str
+    timeout: Optional[int] = 10
+
+
+@router.post("/test_stream_url", dependencies=[Depends(get_current_user)])
+def test_stream_url(
+    payload: TestStreamUrlIn,
+    current_user=Depends(get_current_user),
+):
+    """
+    Test RTSP/HTTP stream URL to verify connectivity.
+    Useful for validating DroidCam or other camera URLs before saving.
+    
+    Returns:
+        {
+            "success": bool,
+            "message": str,
+            "url_type": "rtsp" | "http" | "https" | "unknown",
+            "can_capture": bool,
+            "error": Optional[str]
+        }
+    """
+    from app.services.camera_service import capture_image_from_stream
+    from app.utils.droidcam_helper import DroidCamConfig
+    
+    url = payload.stream_url.strip()
+    
+    if not url:
+        return {
+            "success": False,
+            "message": "URL không được để trống",
+            "url_type": "unknown",
+            "can_capture": False,
+            "error": "Empty URL"
+        }
+    
+    # Detect URL type
+    url_type = "unknown"
+    if url.startswith("rtsp://"):
+        url_type = "rtsp"
+        # Validate RTSP format
+        if not DroidCamConfig.validate_rtsp_url(url):
+            return {
+                "success": False,
+                "message": "URL RTSP không hợp lệ",
+                "url_type": url_type,
+                "can_capture": False,
+                "error": "Invalid RTSP URL format"
+            }
+    elif url.startswith("https://"):
+        url_type = "https"
+    elif url.startswith("http://"):
+        url_type = "http"
+    
+    # Try to capture image
+    try:
+        img_data = capture_image_from_stream(url, timeout=payload.timeout)
+        
+        if img_data:
+            return {
+                "success": True,
+                "message": f"Kết nối thành công với {url_type.upper()} stream",
+                "url_type": url_type,
+                "can_capture": True,
+                "image_size": len(img_data),
+                "tips": "URL hoạt động tốt, bạn có thể lưu vào device"
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Không thể lấy ảnh từ {url_type.upper()} stream",
+                "url_type": url_type,
+                "can_capture": False,
+                "error": "Cannot capture frame",
+                "tips": "Kiểm tra xem camera đang bật và cùng mạng với server"
+            }
+    
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Lỗi khi test stream: {str(e)}",
+            "url_type": url_type,
+            "can_capture": False,
+            "error": str(e),
+            "tips": "Kiểm tra URL, network connection và firewall settings"
+        }
+
+
+# =========================
+# ✅ GET DroidCam configuration guide
+# GET /devices/droidcam_guide
+# =========================
+@router.get("/droidcam_guide", dependencies=[Depends(get_current_user)])
+def get_droidcam_guide(current_user=Depends(get_current_user)):
+    """
+    Get DroidCam setup guide and URL format examples.
+    Helpful for users setting up DroidCam cameras.
+    """
+    from app.utils.droidcam_helper import DroidCamConfig
+    
+    tips = DroidCamConfig.get_connection_tips()
+    
+    # Add example URLs with placeholder IP
+    example_ip = "192.168.1.100"
+    examples = {
+        "rtsp_basic": DroidCamConfig.create_rtsp_url(example_ip),
+        "rtsp_with_auth": DroidCamConfig.create_rtsp_url(
+            example_ip, 
+            username="admin", 
+            password="password"
+        ),
+        "rtsp_udp": DroidCamConfig.create_rtsp_url(example_ip, transport="udp"),
+        "http_video": DroidCamConfig.create_http_url(example_ip),
+        "http_mjpeg": DroidCamConfig.create_http_url(example_ip, endpoint="mjpegfeed")
+    }
+    
+    return {
+        "setup_steps": tips["rtsp_setup"],
+        "url_formats": tips["url_formats"],
+        "examples": examples,
+        "optimal_settings": tips["optimal_settings"],
+        "common_issues": tips["common_issues"],
+        "note": "Thay <IP> bằng địa chỉ IP thực tế của điện thoại chạy DroidCam"
     }

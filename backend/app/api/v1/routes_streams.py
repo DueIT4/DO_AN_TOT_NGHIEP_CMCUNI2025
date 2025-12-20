@@ -9,9 +9,9 @@ from pydantic import BaseModel
 from uuid import uuid4
 from typing import Optional
 from pathlib import Path
-import time
+import asyncio
 
-router = APIRouter()
+router = APIRouter(prefix="/streams", tags=["streams"])
 
 
 class StartStreamIn(BaseModel):
@@ -30,14 +30,21 @@ class StopTempIn(BaseModel):
     key: str
 
 
-@router.post("/streams/start")
+@router.post("/start")
 def start_stream(payload: StartStreamIn, db: Session = Depends(get_db)):
     """Start/resume streaming for a device.
     
     ✅ FIX: Stop old stream nếu RTSP URL thay đổi
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🎥 ==========================================")
+    logger.info(f"🎥 Received start_stream request for device_id={payload.device_id}")
+    logger.info(f"🎥 ==========================================")
+    
     device = db.get(Device, payload.device_id)
     if not device:
+        logger.error(f"❌ Device {payload.device_id} not found in database")
         raise HTTPException(status_code=404, detail="Device not found")
     rtsp = device.stream_url or device.gateway_stream_id
     if not rtsp:
@@ -54,7 +61,7 @@ def start_stream(payload: StartStreamIn, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/streams/stop")
+@router.post("/stop")
 def stop_stream(payload: StopStreamIn):
     ok = stream_service.stop_stream(payload.device_id)
     if not ok:
@@ -62,7 +69,7 @@ def stop_stream(payload: StopStreamIn):
     return {"stopped": True}
 
 
-@router.get("/streams/device/{device_id}")
+@router.get("/device/{device_id}")
 def get_stream(device_id: int):
     """Get stream status for a device."""
     running = stream_service.is_running(device_id)
@@ -75,7 +82,7 @@ def get_stream(device_id: int):
     }
 
 
-@router.get("/streams/active")
+@router.get("/active")
 def list_active_streams():
     """List all active streams (useful for dashboard)."""
     streams = stream_service.list_active_streams()
@@ -85,7 +92,7 @@ def list_active_streams():
     }
 
 
-@router.get("/streams/health/{device_id}")
+@router.get("/health/{device_id}")
 def check_stream_health(device_id: int):
     """Check stream health for a device.
     
@@ -100,8 +107,8 @@ def check_stream_health(device_id: int):
     return health
 
 
-@router.post('/streams/start_temp')
-def start_stream_temp(payload: StartTempIn):
+@router.post('/start_temp')
+async def start_stream_temp(payload: StartTempIn):
     import logging
     logger = logging.getLogger(__name__)
 
@@ -128,7 +135,7 @@ def start_stream_temp(payload: StartTempIn):
             if not stream_service.is_running_temp(key):
                 break
 
-            time.sleep(interval)
+            await asyncio.sleep(interval)
             waited += interval
 
         # if we reach here, ffmpeg likely failed early — include tail of ffmpeg.log for debugging
@@ -157,7 +164,7 @@ def start_stream_temp(payload: StartTempIn):
         raise HTTPException(status_code=500, detail={"message": "internal error", "error": str(e)})
 
 
-@router.post('/streams/stop_temp')
+@router.post('/stop_temp')
 def stop_stream_temp(payload: StopTempIn):
     ok = stream_service.stop_stream_temp(payload.key)
     if not ok:
@@ -165,7 +172,7 @@ def stop_stream_temp(payload: StopTempIn):
     return {"stopped": True}
 
 
-@router.get('/streams/temp/{key}')
+@router.get('/temp/{key}')
 def get_stream_temp(key: str):
     """Get status of temp stream."""
     running = stream_service.is_running_temp(key)
@@ -173,9 +180,3 @@ def get_stream_temp(key: str):
         "running": running,
         "hls_url": stream_service.hls_url_for_temp(key) if running else None
     }
-
-
-@router.get('/streams/temp/{key}')
-def get_stream_temp(key: str):
-    running = stream_service.is_running_temp(key)
-    return {"running": running, "hls_url": stream_service.hls_url_for_temp(key)}

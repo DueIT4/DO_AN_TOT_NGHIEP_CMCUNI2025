@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:video_player/video_player.dart';
 import 'dart:async';
 
@@ -32,8 +33,39 @@ class _CameraStreamPlayerState extends State<CameraStreamPlayer> {
   @override
   void initState() {
     super.initState();
-    _initializeVideo();
+    _startStreamAndInitVideo();
     _startHealthCheck();
+  }
+
+  // ✅ Start stream trước khi initialize video
+  Future<void> _startStreamAndInitVideo() async {
+    setState(() {
+      _isInitialized = false;
+      _errorMessage = null;
+    });
+
+    try {
+      // 1. Start stream từ backend
+      final result = await CameraStreamService.startStream(widget.deviceId);
+
+      if (result['running'] != true) {
+        setState(() {
+          _errorMessage =
+              result['message']?.toString() ?? 'Không thể khởi động stream';
+        });
+        return;
+      }
+
+      // 2. Wait 2 giây để FFmpeg tạo segments
+      await Future.delayed(const Duration(seconds: 2));
+
+      // 3. Initialize video player
+      _initializeVideo();
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Lỗi khởi động: $e';
+      });
+    }
   }
 
   @override
@@ -53,8 +85,11 @@ class _CameraStreamPlayerState extends State<CameraStreamPlayer> {
         ? provided
         : CameraStreamService.buildFullHlsUrl(widget.deviceId);
 
-    _videoController = VideoPlayerController.networkUrl(Uri.parse(fullUrl))
-      ..initialize().then((_) {
+    _videoController = VideoPlayerController.networkUrl(
+      Uri.parse(fullUrl),
+      formatHint: VideoFormat.hls, // HLS.js sẽ xử lý trên web
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    )..initialize().then((_) {
         if (!mounted) return;
         setState(() {
           _isInitialized = true;
@@ -99,9 +134,12 @@ class _CameraStreamPlayerState extends State<CameraStreamPlayer> {
 
   void _cleanupVideo() {
     _healthCheckTimer?.cancel();
-    if (_videoController.value.isInitialized) {
+    _healthCheckTimer = null;
+
+    // Dù chưa initialize vẫn nên dispose để giải phóng tài nguyên
+    try {
       _videoController.dispose();
-    }
+    } catch (_) {}
   }
 
   @override
@@ -160,12 +198,8 @@ class _CameraStreamPlayerState extends State<CameraStreamPlayer> {
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
                               onPressed: () {
-                                setState(() {
-                                  _errorMessage = null;
-                                  _isInitialized = false;
-                                });
                                 _cleanupVideo();
-                                _initializeVideo();
+                                _startStreamAndInitVideo();
                               },
                               icon: const Icon(Icons.refresh),
                               label: const Text('Kết nối lại'),

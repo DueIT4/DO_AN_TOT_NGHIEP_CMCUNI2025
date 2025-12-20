@@ -294,7 +294,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   color: Theme.of(context)
                       .colorScheme
-                      .surfaceVariant
+                      .surfaceContainerHighest
                       .withOpacity(0.8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -571,14 +571,18 @@ class _UserFormDialogState extends State<_UserFormDialog> {
       text: widget.initialUser != null ? widget.initialUser!['phone'] : '',
     );
     _emailCtrl = TextEditingController(
-      text: widget.initialUser != null ? widget.initialUser!['email'] ?? '' : '',
+      text:
+          widget.initialUser != null ? widget.initialUser!['email'] ?? '' : '',
     );
     _addressCtrl = TextEditingController(
-      text: widget.initialUser != null ? widget.initialUser!['address'] ?? '' : '',
+      text: widget.initialUser != null
+          ? widget.initialUser!['address'] ?? ''
+          : '',
     );
     _passwordCtrl = TextEditingController();
 
-    if (widget.initialUser != null && widget.initialUser!['role_type'] != null) {
+    if (widget.initialUser != null &&
+        widget.initialUser!['role_type'] != null) {
       _roleValue = (widget.initialUser!['role_type'] as String).toLowerCase();
     } else {
       _roleValue = 'viewer';

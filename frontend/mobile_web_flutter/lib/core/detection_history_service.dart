@@ -2,11 +2,8 @@
 import 'package:http/http.dart' as http;
 
 import 'api_base.dart';
-import 'package:http/http.dart' as http;
-import 'package:mobile_web_flutter/core/api_base.dart';
 import 'dart:html' as html;
-import 'package:http/http.dart' as http;
-import 'package:mobile_web_flutter/core/api_base.dart';
+
 /// Số bản ghi mỗi trang (dùng chung cho FE)
 const int PAGE_SIZE = 20;
 
@@ -133,71 +130,67 @@ class DetectionHistoryService {
       );
     }
   }
-    /// ⭐ Gọi API: POST /detection-history/{detection_id}/export-train
- Future<void> exportToTrainData(int detectionId) async {
-  // Tạo URL
-  final url = '${ApiBase.baseURL}'
-      '${ApiBase.api('/detection-history/$detectionId/export-train')}';
 
-  // Lấy token
-  final token = ApiBase.bearer;
+  /// ⭐ Gọi API: POST /detection-history/{detection_id}/export-train
+  Future<void> exportToTrainData(int detectionId) async {
+    // Tạo URL
+    final url = '${ApiBase.baseURL}'
+        '${ApiBase.api('/detection-history/$detectionId/export-train')}';
 
-  // Headers cho request
-  final headers = <String, String>{
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-  };
+    // Lấy token
+    final token = ApiBase.bearer;
 
-  // Gửi request POST
-  final resp = await http.post(
-    Uri.parse(url),
-    headers: headers,
-  );
+    // Headers cho request
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
 
-  // Kiểm tra response
-  if (resp.statusCode != 200) {
-    throw Exception('Lỗi export train: ${resp.statusCode} ${resp.body}');
-  }
-  
+    // Gửi request POST
+    final resp = await http.post(
+      Uri.parse(url),
+      headers: headers,
+    );
 
-
-}
-
-Future<void> downloadDatasetTrain() async {
-  // URL giống pattern các API khác
-  final url = '${ApiBase.baseURL}'
-      '${ApiBase.api('/dataset/admin/download')}';
-
-  // Lấy token như bạn đang làm
-  final token = ApiBase.bearer;
-
-  // Header giống hệt exportToTrainData
-  final headers = <String, String>{
-    'Accept': 'application/zip',
-    if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-  };
-
-  final resp = await http.get(
-    Uri.parse(url),
-    headers: headers,
-  );
-
-  if (resp.statusCode != 200) {
-    throw Exception('Lỗi tải dataset: ${resp.statusCode} ${resp.body}');
+    // Kiểm tra response
+    if (resp.statusCode != 200) {
+      throw Exception('Lỗi export train: ${resp.statusCode} ${resp.body}');
+    }
   }
 
-  // Tạo file download (Flutter Web)
-  final bytes = resp.bodyBytes;
-  final blob = html.Blob([bytes], 'application/zip');
-  final urlBlob = html.Url.createObjectUrlFromBlob(blob);
+  Future<void> downloadDatasetTrain() async {
+    // URL giống pattern các API khác
+    final url = '${ApiBase.baseURL}'
+        '${ApiBase.api('/dataset/admin/download')}';
 
-  final anchor = html.AnchorElement(href: urlBlob)
-    ..download = "dataset_train.zip"
-    ..click();
+    // Lấy token như bạn đang làm
+    final token = ApiBase.bearer;
 
-  html.Url.revokeObjectUrl(urlBlob);
-}
+    // Header giống hệt exportToTrainData
+    final headers = <String, String>{
+      'Accept': 'application/zip',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
 
+    final resp = await http.get(
+      Uri.parse(url),
+      headers: headers,
+    );
 
+    if (resp.statusCode != 200) {
+      throw Exception('Lỗi tải dataset: ${resp.statusCode} ${resp.body}');
+    }
+
+    // Tạo file download (Flutter Web)
+    final bytes = resp.bodyBytes;
+    final blob = html.Blob([bytes], 'application/zip');
+    final urlBlob = html.Url.createObjectUrlFromBlob(blob);
+
+    final anchor = html.AnchorElement(href: urlBlob)
+      ..download = "dataset_train.zip"
+      ..click();
+
+    html.Url.revokeObjectUrl(urlBlob);
+  }
 }
