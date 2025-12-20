@@ -33,6 +33,9 @@ class DeviceCreate(DeviceBase):
     # vẫn giữ bắt buộc device_type_id
     device_type_id: int
 
+    # 👇 THÊM FIELD NÀY ĐỂ ADMIN GÁN THIẾT BỊ CHO USER KHÁC
+    user_id: Optional[int] = None
+
 
 class DeviceUpdate(BaseModel):
     name: Optional[str] = None
@@ -48,6 +51,7 @@ class DeviceUpdate(BaseModel):
         if v in (0, "0", "", None):
             return None
         return v
+
 
 class DeviceOut(BaseModel):
     device_id: int

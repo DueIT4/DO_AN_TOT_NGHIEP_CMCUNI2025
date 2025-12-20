@@ -2,7 +2,6 @@
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-
 from sqlalchemy.orm import Session
 
 from app.models.image_detection import Img, Detection, Disease
@@ -14,9 +13,9 @@ MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 def save_image_to_disk(raw: bytes, original_filename: str) -> str:
     """
     Lưu ảnh vào media/detections/YYYY/MM/DD/...
-    Trả về file_url tương đối để FE truy cập qua /media/<file_url>.
+    Trả về file_url BẮT ĐẦU BẰNG /media/... để FE dùng trực tiếp.
     """
-    now = datetime.utcnow()
+    now = datetime.now()  # dùng giờ local của server
     subdir = MEDIA_ROOT / str(now.year) / f"{now.month:02d}" / f"{now.day:02d}"
     subdir.mkdir(parents=True, exist_ok=True)
 
@@ -27,9 +26,9 @@ def save_image_to_disk(raw: bytes, original_filename: str) -> str:
     with open(full_path, "wb") as f:
         f.write(raw)
 
-    # file_url: phần tương đối dưới thư mục media/
     rel_path = full_path.relative_to(Path("media"))
-    return str(rel_path).replace("\\", "/")
+    rel_str = str(rel_path).replace("\\", "/")
+    return f"/media/{rel_str}"
 
 
 def ensure_disease(db: Session, class_name_vi: str) -> Optional[Disease]:
@@ -47,6 +46,47 @@ def ensure_disease(db: Session, class_name_vi: str) -> Optional[Disease]:
     return dis
 
 
+def _normalize_bbox(det: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Hỗ trợ 2 kiểu bbox:
+    - list/tuple: [x1, y1, x2, y2]
+    - dict: {"x1":..., "y1":..., "x2":..., "y2":..., "image_width":..., "image_height":...}
+    """
+    bbox = det.get("bbox")
+
+    # Case 1: bbox là dict (đúng kiểu bạn gửi)
+    if isinstance(bbox, dict):
+        return {
+            "x1": bbox.get("x1"),
+            "y1": bbox.get("y1"),
+            "x2": bbox.get("x2"),
+            "y2": bbox.get("y2"),
+            "image_width": bbox.get("image_width", det.get("image_width")),
+            "image_height": bbox.get("image_height", det.get("image_height")),
+        }
+
+    # Case 2: bbox là list/tuple [x1,y1,x2,y2]
+    if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
+        return {
+            "x1": bbox[0],
+            "y1": bbox[1],
+            "x2": bbox[2],
+            "y2": bbox[3],
+            "image_width": det.get("image_width"),
+            "image_height": det.get("image_height"),
+        }
+
+    # Fallback: không có bbox/không đúng định dạng
+    return {
+        "x1": None,
+        "y1": None,
+        "x2": None,
+        "y2": None,
+        "image_width": det.get("image_width"),
+        "image_height": det.get("image_height"),
+    }
+
+
 def save_detection_result(
     db: Session,
     raw: bytes,
@@ -60,8 +100,9 @@ def save_detection_result(
     LƯU vào DB:
     - ảnh → img
     - mỗi box → detections
+    - ✅ Lưu thêm: description + treatment_guideline
     """
-    # 1) Lưu ảnh
+    # 1) Lưu ảnh (GIỮ NGUYÊN LOGIC GỐC CỦA BẠN)
     file_url = save_image_to_disk(raw, filename)
 
     img_row = Img(
@@ -75,20 +116,17 @@ def save_detection_result(
 
     detections_list: List[Dict[str, Any]] = yolo_result.get("detections", [])
 
+    # ✅ NEW: lấy text để lưu vào 2 cột bạn cần (ưu tiên LLM)
+    llm = yolo_result.get("llm") or {}
+    description_text = llm.get("disease_summary") or yolo_result.get("explanation")
+    guideline_text = llm.get("care_instructions")
+
     # 2) Lưu từng detection
     for det in detections_list:
         class_name_vi = det.get("class_name")
         confidence = det.get("confidence")
-        bbox_list = det.get("bbox", [None, None, None, None])
 
-        bbox_json = {
-            "x1": bbox_list[0],
-            "y1": bbox_list[1],
-            "x2": bbox_list[2],
-            "y2": bbox_list[3],
-            "image_width": det.get("image_width"),
-            "image_height": det.get("image_height"),
-        }
+        bbox_json = _normalize_bbox(det)
 
         disease_obj = ensure_disease(db, class_name_vi) if class_name_vi else None
 
@@ -96,8 +134,11 @@ def save_detection_result(
             img_id=img_row.img_id,
             disease_id=disease_obj.disease_id if disease_obj else None,
             confidence=confidence,
-            description=None,
-            treatment_guideline=None,
+
+            # ✅ NEW: lưu thẳng vào DB
+            description=description_text,
+            treatment_guideline=guideline_text,
+
             bbox=bbox_json,
             review_status="pending",
             model_version=model_version,

@@ -9,8 +9,37 @@ from app.api.v1.deps import get_current_user
 from app.services.permissions import require_perm
 from app.models.user import Users
 from app.schemas.user import UserOut
-
+from datetime import datetime
+from app.services.passwords import hash_password, verify_password  # ✅ giống auth bạn
+from app.models.user import Users
+from app.schemas.user import ChangePasswordIn
 router = APIRouter(prefix="/me", tags=["me"])
+
+
+@router.put(
+    "/change_password",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_perm("self:update"))],
+)
+def change_password(
+    payload: ChangePasswordIn,
+    db: Session = Depends(get_db),
+    user: Users = Depends(get_current_user),
+):
+    # user.password là bcrypt hash
+    if not user.password:
+        raise HTTPException(status_code=400, detail="Tài khoản chưa có mật khẩu")
+
+    if not verify_password(payload.old_password, user.password):
+        raise HTTPException(status_code=400, detail="Mật khẩu hiện tại không đúng")
+
+    # Không cho đặt mật khẩu mới giống cũ (tuỳ bạn)
+    if verify_password(payload.new_password, user.password):
+        raise HTTPException(status_code=400, detail="Mật khẩu mới phải khác mật khẩu cũ")
+
+    user.password = hash_password(payload.new_password)
+    db.commit()
+    return {"ok": True, "message": "Đổi mật khẩu thành công"}
 
 @router.get("/get_me", response_model=UserOut, dependencies=[Depends(require_perm("self:read"))])
 def me(user: Users = Depends(get_current_user)):
@@ -86,7 +115,8 @@ async def update_avatar(
 
     # 2. Lưu file vào media/avatars/YYYY/MM/DD
     MEDIA_ROOT = Path("media") / "avatars"
-    now = datetime.utcnow()
+
+    now = datetime.now()  # dùng giờ local của server
     subdir = MEDIA_ROOT / str(now.year) / f"{now.month:02d}" / f"{now.day:02d}"
     subdir.mkdir(parents=True, exist_ok=True)
 

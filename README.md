@@ -8,6 +8,9 @@ Hệ thống phát hiện bệnh cây trồng sử dụng AI với giao diện w
 - **Frontend**: Flutter web UI responsive, chuyên nghiệp
 - **API**: Upload ảnh và nhận kết quả dự đoán bệnh cây
 - **Model**: Hỗ trợ YOLO và các model tương tự
+- **Camera Support**: Hỗ trợ RTSP, HTTP, MJPEG streams
+- **DroidCam**: Sử dụng điện thoại làm webcam qua RTSP/HTTP
+- **Real-time Detection**: Phát hiện bệnh real-time từ camera stream
 
 ## 📋 Yêu cầu hệ thống
 
@@ -176,9 +179,11 @@ ai-plant-health-separated/
 │   ├── app/
 │   │   ├── api/v1/            # API routes
 │   │   ├── core/              # Configuration
-│   │   ├── services/          # Business logic
+│   │   ├── services/          # Business logic (camera, stream, detect)
+│   │   ├── utils/             # Utilities (droidcam_helper)
 │   │   └── main.py            # FastAPI app entry
 │   ├── requirements.txt       # Python dependencies
+│   ├── test_droidcam.py       # DroidCam test script
 │   └── Dockerfile            # Container config
 ├── frontend/                   # Flutter frontend
 │   └── mobile_web_flutter/
@@ -190,6 +195,8 @@ ai-plant-health-separated/
 │   ├── best.onnx             # ONNX model (không commit)
 │   └── labels.txt            # Class labels
 ├── docs/                      # Documentation
+│   ├── DROIDCAM_SETUP.md     # DroidCam hướng dẫn chi tiết
+│   └── DROIDCAM_QUICKSTART.md # DroidCam quick start
 └── README.md                 # Hướng dẫn này
 ```
 
@@ -295,7 +302,52 @@ Invoke-WebRequest -Uri http://localhost:8000/v1/detect -Method Post -Form @{ ima
 2. Cập nhật `ml/exports/v1.0/labels.txt`
 3. Restart backend
 
-## 📝 License
+## � DroidCam Support
+
+### Quick Setup
+Hệ thống hỗ trợ sử dụng điện thoại làm webcam qua DroidCam:
+
+```bash
+# 1. Cài DroidCam app trên điện thoại
+# 2. Kết nối cùng WiFi với server
+# 3. Start DroidCam server, ghi lại IP
+# 4. Test kết nối:
+cd backend
+python test_droidcam.py --url rtsp://192.168.1.100:8554/video --save
+
+# 5. Thêm vào hệ thống qua API
+curl -X POST http://localhost:8000/api/v1/devices/ \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "name": "DroidCam Camera",
+    "device_type_id": 1,
+    "stream_url": "rtsp://192.168.1.100:8554/video"
+  }'
+```
+
+### Supported Formats
+- **RTSP**: `rtsp://192.168.1.100:8554/video` (khuyên dùng)
+- **HTTP**: `http://192.168.1.100:4747/video`
+- **MJPEG**: `http://192.168.1.100:4747/mjpegfeed`
+
+### API Endpoints
+```bash
+# Test stream URL
+POST /api/v1/devices/test_stream_url
+
+# Get setup guide
+GET /api/v1/devices/droidcam_guide
+
+# Create device with stream URL
+POST /api/v1/devices/
+```
+
+### Documentation
+- [Quick Start Guide](docs/DROIDCAM_QUICKSTART.md)
+- [Detailed Setup](docs/DROIDCAM_SETUP.md)
+- [Test Script](backend/test_droidcam.py)
+
+## �📝 License
 
 MIT License - xem file LICENSE để biết thêm chi tiết.
 

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
-from app.core.db import get_db
+from app.core.database import get_db
 from app.models.devices import Device
 from app.models.device_logs import DeviceLogs, EventType
 from app.models.sensor_readings import SensorReadings  # bạn đã có model này

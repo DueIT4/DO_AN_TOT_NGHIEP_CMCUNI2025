@@ -8,8 +8,8 @@ from app.models.devices import Device
 from app.models.device_logs import DeviceLogs
 from app.schemas.sensor import DeviceLogOut
 
-router = APIRouter(tags=["Device Logs"])
 
+router = APIRouter(prefix="/device-logs", tags=["Device Logs"])
 
 @router.get("/{device_id}/logs", response_model=list[DeviceLogOut])
 def list_device_logs(

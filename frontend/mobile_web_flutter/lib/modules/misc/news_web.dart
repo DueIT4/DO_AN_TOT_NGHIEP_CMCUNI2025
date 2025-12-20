@@ -11,12 +11,12 @@ class NewsWeb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const PreferredSize(
+    return const Scaffold(
+      appBar: PreferredSize(
         preferredSize: Size.fromHeight(72),
-        child: WebNavbar(),      // ✅ Thanh menu PlantGuard
+        child: WebNavbar(), // ✅ Thanh menu PlantGuard
       ),
-      body: const NewsContent(), // ✅ Nội dung trang tin tức nông nghiệp
+      body: NewsContent(), // ✅ Nội dung trang tin tức nông nghiệp
     );
   }
 }

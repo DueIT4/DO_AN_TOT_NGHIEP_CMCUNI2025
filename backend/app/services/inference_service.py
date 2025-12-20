@@ -11,7 +11,7 @@ REPO_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
 
 MODEL_PATH = os.getenv(
     "MODEL_PATH",
-    os.path.join(REPO_ROOT, "ml", "exports", "v1.0", "best.onnx")
+    os.path.join(REPO_ROOT, "ml", "exports", "v1.0", "best.pt")
 )
 
 # 🔹 Map nhãn YOLO -> tên tiếng Việt
