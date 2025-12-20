@@ -1,34 +1,51 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <base href="$FLUTTER_BASE_HREF">
     <meta charset="UTF-8" />
     <title>ZestGuard</title>
 
-    <!-- Google Identity Services -->
+    <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+    <meta name="description" content="A new Flutter project.">
+
+    <!-- iOS meta tags & icons -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="mobile_web_flutter">
+    <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png"/>
+
+    <!-- Google Sign-In -->
+    <meta name="google-signin-client_id" content="313452130971-318jkc4qi2uss2r68qlv8ci4lkm77o8f.apps.googleusercontent.com">
+    <!-- Load Google API Loader (gapi) - provides gapi.client -->
+    <script src="https://apis.google.com/js/api.js" onload="onGapiLoad()"></script>
+    <!-- Load Google Identity Services (GSI) -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-    <script>
-      // 🔒 HÀM DUY NHẤT – Flutter sẽ gọi
-      window.gisGetIdToken = function (clientId) {
-        google.accounts.id.initialize({
-          client_id: clientId,
-          callback: (resp) => {
-            // resp.credential = ID TOKEN (JWT)
-            window.dispatchEvent(
-              new CustomEvent("google_id_token", {
-                detail: { idToken: resp.credential }
-              })
-            );
-          }
-        });
+    <!-- HLS.js for video streaming support on web -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
-        // mở popup đăng nhập
-        google.accounts.id.prompt();
-      };
-    </script>
+    <title>mobile_web_flutter</title>
+    <link rel="manifest" href="manifest.json">
   </head>
-
   <body>
+    <!-- Initialize gapi Promise for google_sign_in_web -->
+    <script>
+      window.gapiLoaded = new Promise((resolve) => {
+        window.onGapiLoad = function() {
+          gapi.load('client', () => {
+            console.log('gapi.client initialized');
+            resolve();
+          });
+        };
+        // Call immediately if gapi already loaded
+        if (typeof gapi !== 'undefined') {
+          window.onGapiLoad();
+        }
+      });
+    </script>
     <script src="flutter_bootstrap.js" async></script>
   </body>
 </html>

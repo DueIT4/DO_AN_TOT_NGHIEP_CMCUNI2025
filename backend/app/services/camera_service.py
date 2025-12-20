@@ -111,6 +111,7 @@ def _extract_frame_from_mjpeg(resp: requests.Response, max_bytes: int = 2_000_00
 def _capture_from_rtsp(rtsp_url: str, timeout: int = 10) -> Optional[bytes]:
     """
     Lấy ảnh từ RTSP stream bằng OpenCV.
+    Hỗ trợ DroidCam và các RTSP cameras khác.
     Cần cài: pip install opencv-python-headless
     """
     if not CV2_AVAILABLE:
@@ -118,28 +119,44 @@ def _capture_from_rtsp(rtsp_url: str, timeout: int = 10) -> Optional[bytes]:
         return None
 
     try:
-        cap = cv2.VideoCapture(rtsp_url)
-        # NOTE: CAP_PROP_TIMEOUT không phải backend nào cũng hỗ trợ
+        # Cấu hình OpenCV cho RTSP tốt hơn
+        cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+        
+        # Set các properties để tăng khả năng kết nối
         try:
             cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout * 1000)
             cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, timeout * 1000)
-        except Exception:
-            pass
+            # Giảm buffer để lấy frame mới nhất
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            # Tăng tốc độ khởi tạo
+            cap.set(cv2.CAP_PROP_FPS, 30)
+        except Exception as e:
+            logger.debug(f"[Camera] Không set được timeout properties: {e}")
 
         if not cap.isOpened():
             logger.warning(f"[Camera] Cannot open RTSP stream: {rtsp_url}")
             return None
 
-        ret, frame = cap.read()
+        # Thử đọc frame nhiều lần để đảm bảo lấy được frame ổn định
+        ret, frame = False, None
+        for attempt in range(3):
+            ret, frame = cap.read()
+            if ret and frame is not None:
+                break
+            logger.debug(f"[Camera] RTSP read attempt {attempt + 1}/3 failed")
+        
         cap.release()
 
         if not ret or frame is None:
+            logger.warning(f"[Camera] Không đọc được frame từ RTSP: {rtsp_url}")
             return None
 
+        # Chuyển BGR sang RGB và encode thành JPEG
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(frame_rgb)
         output = BytesIO()
         img.save(output, format="JPEG", quality=85)
+        logger.info(f"[Camera] Successfully captured from RTSP: {rtsp_url}")
         return output.getvalue()
 
     except Exception as e:

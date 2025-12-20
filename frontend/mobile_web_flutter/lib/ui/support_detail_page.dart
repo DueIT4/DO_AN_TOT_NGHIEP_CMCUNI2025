@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 
 import '../services/support_service.dart';
+
 XFile? _selectedFile;
 final ImagePicker _imagePicker = ImagePicker();
 
@@ -55,73 +56,73 @@ class _SupportDetailPageState extends State<SupportDetailPage> {
     });
   }
 
-  
   Future<void> _sendMessage() async {
-  final message = _messageCtrl.text.trim();
-  if (message.isEmpty && _selectedFile == null) return;
+    final message = _messageCtrl.text.trim();
+    if (message.isEmpty && _selectedFile == null) return;
 
-  final ticketId = _ticketId;
-  if (ticketId == null) return;
+    final ticketId = _ticketId;
+    if (ticketId == null) return;
 
-  setState(() => _isSending = true);
-  try {
-    await SupportService.createMessage(
-      ticketId: ticketId,
-      message: message,
-      file: _selectedFile, // ✅ XFile
-    );
+    setState(() => _isSending = true);
+    try {
+      await SupportService.createMessage(
+        ticketId: ticketId,
+        message: message,
+        file: _selectedFile, // ✅ XFile
+      );
 
-    if (!mounted) return;
-    _messageCtrl.clear();
-    setState(() => _selectedFile = null);
-    _loadMessages();
+      if (!mounted) return;
+      _messageCtrl.clear();
+      setState(() => _selectedFile = null);
+      _loadMessages();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Gửi tin nhắn thành công')),
-    );
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Lỗi: $e')),
-    );
-  } finally {
-    if (mounted) setState(() => _isSending = false);
-  }
-}
-
-Future<void> _pickImage() async {
-  try {
-    final file = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-      maxWidth: 1024,
-    );
-    if (file != null) {
-      setState(() => _selectedFile = file);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gửi tin nhắn thành công')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
     }
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Lỗi chọn ảnh: $e')),
-    );
   }
-}
-Future<void> _pickCamera() async {
-  try {
-    final file = await _imagePicker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 85,
-    );
-    if (file != null) {
-      setState(() => _selectedFile = file);
+
+  Future<void> _pickImage() async {
+    try {
+      final file = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1024,
+      );
+      if (file != null) {
+        setState(() => _selectedFile = file);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi chọn ảnh: $e')),
+      );
     }
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Lỗi chụp ảnh: $e')),
-    );
   }
-}
+
+  Future<void> _pickCamera() async {
+    try {
+      final file = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (file != null) {
+        setState(() => _selectedFile = file);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi chụp ảnh: $e')),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -171,18 +172,16 @@ Future<void> _pickCamera() async {
 
                 final messages = snapshot.data ?? [];
 
-                final normalizedMessages = messages
-                    .map((m) {
-                      final mm = (m as Map).cast<String, dynamic>();
-                      return {
-                        'content': mm['message'] ?? '',
-                        'is_user': _asInt(mm['sender_id']) == _ownerUserId,
-                        'created_at': mm['created_at']?.toString() ?? '',
-                        // SupportService đã normalize absolute URL rồi
-                        'attachment_url': mm['attachment_url']?.toString(),
-                      };
-                    })
-                    .toList();
+                final normalizedMessages = messages.map((m) {
+                  final mm = (m as Map).cast<String, dynamic>();
+                  return {
+                    'content': mm['message'] ?? '',
+                    'is_user': _asInt(mm['sender_id']) == _ownerUserId,
+                    'created_at': mm['created_at']?.toString() ?? '',
+                    // SupportService đã normalize absolute URL rồi
+                    'attachment_url': mm['attachment_url']?.toString(),
+                  };
+                }).toList();
 
                 final allMessages = [
                   {
@@ -226,10 +225,10 @@ Future<void> _pickCamera() async {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (!isUser)
-                                CircleAvatar(
-                                  backgroundColor: const Color(0xFF7CCD2B),
+                                const CircleAvatar(
+                                  backgroundColor: Color(0xFF7CCD2B),
                                   radius: 18,
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.support_agent,
                                     color: Colors.white,
                                     size: 20,
@@ -312,8 +311,8 @@ Future<void> _pickCamera() async {
                                                     ),
                                                   );
                                                 },
-                                                errorBuilder:
-                                                    (context, error, stackTrace) {
+                                                errorBuilder: (context, error,
+                                                    stackTrace) {
                                                   return Container(
                                                     padding:
                                                         const EdgeInsets.all(8),
@@ -337,7 +336,8 @@ Future<void> _pickCamera() async {
                                                               ? Colors.white
                                                               : Colors.black54,
                                                         ),
-                                                        const SizedBox(width: 4),
+                                                        const SizedBox(
+                                                            width: 4),
                                                         Flexible(
                                                           child: Text(
                                                             attachmentUrl
@@ -383,10 +383,10 @@ Future<void> _pickCamera() async {
                               ),
                               if (isUser) const SizedBox(width: 8),
                               if (isUser)
-                                CircleAvatar(
-                                  backgroundColor: const Color(0xFF2E7D32),
+                                const CircleAvatar(
+                                  backgroundColor: Color(0xFF2E7D32),
                                   radius: 18,
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.person,
                                     color: Colors.white,
                                     size: 20,
@@ -395,7 +395,7 @@ Future<void> _pickCamera() async {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
                 );
@@ -491,44 +491,43 @@ Future<void> _pickCamera() async {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                  onPressed: _isSending
-                      ? null
-                      : () {
-                          showModalBottomSheet(
-                            context: context,
-                            builder: (context) => SafeArea(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ListTile(
-                                    leading: const Icon(Icons.photo_library,
-                                        color: Color(0xFF7CCD2B)),
-                                    title: const Text('Chọn từ thư viện'),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _pickImage();
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(Icons.camera_alt,
-                                        color: Color(0xFF7CCD2B)),
-                                    title: const Text('Chụp ảnh'),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _pickCamera();
-                                    },
-                                  ),
-                                ],
+                    onPressed: _isSending
+                        ? null
+                        : () {
+                            showModalBottomSheet(
+                              context: context,
+                              builder: (context) => SafeArea(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ListTile(
+                                      leading: const Icon(Icons.photo_library,
+                                          color: Color(0xFF7CCD2B)),
+                                      title: const Text('Chọn từ thư viện'),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _pickImage();
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.camera_alt,
+                                          color: Color(0xFF7CCD2B)),
+                                      title: const Text('Chụp ảnh'),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _pickCamera();
+                                      },
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                  icon: Icon(
-                    Icons.attach_file,
-                    color: _isSending ? Colors.grey : Colors.grey[700],
+                            );
+                          },
+                    icon: Icon(
+                      Icons.attach_file,
+                      color: _isSending ? Colors.grey : Colors.grey[700],
+                    ),
                   ),
-                ),
-
                   const SizedBox(width: 4),
                   Container(
                     decoration: BoxDecoration(

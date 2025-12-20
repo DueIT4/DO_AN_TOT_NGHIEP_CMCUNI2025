@@ -37,7 +37,7 @@ class _AIChatPageState extends State<AIChatPage> {
       // Chỉ load lịch sử nếu đã có session với tin nhắn
       // Không tạo session mới cho đến khi user gửi tin nhắn đầu tiên
       final history = await ChatbotService.getChatHistory();
-      
+
       setState(() {
         _messages.clear();
         for (var item in history) {
@@ -46,7 +46,7 @@ class _AIChatPageState extends State<AIChatPage> {
         }
         _loading = false;
       });
-      
+
       if (_messages.isNotEmpty) {
         _scrollToBottom();
       }
@@ -66,7 +66,7 @@ class _AIChatPageState extends State<AIChatPage> {
 
     try {
       final history = await ChatbotService.loadSession(chatbotId);
-      
+
       setState(() {
         _currentSessionId = chatbotId;
         _messages.clear();
@@ -76,7 +76,7 @@ class _AIChatPageState extends State<AIChatPage> {
         }
         _loading = false;
       });
-      
+
       if (_messages.isNotEmpty) {
         _scrollToBottom();
       }
@@ -90,13 +90,13 @@ class _AIChatPageState extends State<AIChatPage> {
 
   Future<void> _showHistoryDialog() async {
     setState(() => _loading = true);
-    
+
     try {
       final sessions = await ChatbotService.listSessions();
       setState(() => _loading = false);
-      
+
       if (!mounted) return;
-      
+
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -180,13 +180,59 @@ class _AIChatPageState extends State<AIChatPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.translate('ai_chat_title')),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.psychology, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text(l10n.translate('ai_chat_title')),
+          ],
+        ),
+        backgroundColor: const Color(0xFF7CCD2B),
+        foregroundColor: Colors.white,
+        elevation: 2,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'Lịch sử chat',
-            onPressed: _showHistoryDialog,
+          // History button with badge
+          Stack(
+            alignment: Alignment.topRight,
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.history),
+                  tooltip: 'Lịch sử chat',
+                  onPressed: _showHistoryDialog,
+                ),
+              ),
+              if (_currentSessionId != null)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 8,
+                      minHeight: 8,
+                    ),
+                  ),
+                ),
+            ],
           ),
+          const SizedBox(width: 8),
         ],
       ),
       backgroundColor: const Color(0xFFF2F9E9),
@@ -230,95 +276,197 @@ class _AIChatPageState extends State<AIChatPage> {
                     )
                   : ListView.builder(
                       controller: _scrollCtrl,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 20),
                       itemCount: _messages.length,
                       itemBuilder: (context, index) {
                         final msg = _messages[index];
-                        final alignment =
-                            msg.isUser ? Alignment.centerRight : Alignment.centerLeft;
-                        final bubbleColor = msg.isUser
-                            ? const Color(0xFF7CCD2B)
-                            : Colors.white;
-                        final textColor = msg.isUser ? Colors.white : Colors.black87;
+                        final alignment = msg.isUser
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft;
+                        final bubbleColor =
+                            msg.isUser ? const Color(0xFF7CCD2B) : Colors.white;
+                        final textColor =
+                            msg.isUser ? Colors.white : Colors.black87;
 
-                        return Align(
-                          alignment: alignment,
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 6),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
-                            constraints: const BoxConstraints(maxWidth: 280),
-                            decoration: BoxDecoration(
-                              color: bubbleColor,
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(18),
-                                topRight: const Radius.circular(18),
-                                bottomLeft: msg.isUser
-                                    ? const Radius.circular(18)
-                                    : Radius.zero,
-                                bottomRight: msg.isUser
-                                    ? Radius.zero
-                                    : const Radius.circular(18),
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            mainAxisAlignment: msg.isUser
+                                ? MainAxisAlignment.end
+                                : MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // AI avatar (left side for AI messages)
+                              if (!msg.isUser) ...[
+                                CircleAvatar(
+                                  radius: 16,
+                                  backgroundColor: const Color(0xFF7CCD2B),
+                                  child: const Icon(
+                                    Icons.psychology,
+                                    size: 18,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              // Message bubble
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 12),
+                                  constraints: BoxConstraints(
+                                    maxWidth:
+                                        MediaQuery.of(context).size.width *
+                                            0.65,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: bubbleColor,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(18),
+                                      topRight: const Radius.circular(18),
+                                      bottomLeft: msg.isUser
+                                          ? const Radius.circular(18)
+                                          : const Radius.circular(4),
+                                      bottomRight: msg.isUser
+                                          ? const Radius.circular(4)
+                                          : const Radius.circular(18),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.08),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    msg.text,
+                                    style: TextStyle(
+                                      color: textColor,
+                                      height: 1.4,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
+                              // User avatar (right side for user messages)
+                              if (msg.isUser) ...[
+                                const SizedBox(width: 8),
+                                CircleAvatar(
+                                  radius: 16,
+                                  backgroundColor: Colors.grey.shade300,
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 18,
+                                    color: Colors.grey.shade700,
+                                  ),
                                 ),
                               ],
-                            ),
-                            child: Text(
-                              msg.text,
-                              style: TextStyle(
-                                  color: textColor, height: 1.3, fontSize: 15),
-                            ),
+                            ],
                           ),
                         );
                       },
                     ),
             ),
-          SafeArea(
-            minimum: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _inputCtrl,
-                    minLines: 1,
-                    maxLines: 4,
-                    enabled: !_loading && !_sending,
-                    decoration: InputDecoration(
-                      hintText: l10n.translate('ai_input_hint'),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: (_loading || _sending) ? null : () => _sendMessage(),
-                    child: _sending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2.2),
-                          )
-                        : Text(l10n.translate('ai_send')),
-                  ),
+          // Modern input bar with shadow
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
                 ),
               ],
+            ),
+            child: SafeArea(
+              minimum:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF2F9E9),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: const Color(0xFF7CCD2B).withOpacity(0.2),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _inputCtrl,
+                        minLines: 1,
+                        maxLines: 4,
+                        enabled: !_loading && !_sending,
+                        style: const TextStyle(fontSize: 15),
+                        decoration: InputDecoration(
+                          hintText: l10n.translate('ai_input_hint'),
+                          hintStyle: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 15,
+                          ),
+                          filled: false,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
+                        ),
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF7CCD2B), Color(0xFF5AA01F)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF7CCD2B).withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: (_loading || _sending)
+                            ? null
+                            : () => _sendMessage(),
+                        borderRadius: BorderRadius.circular(26),
+                        child: Center(
+                          child: _sending
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.send_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -344,7 +492,7 @@ class _HistoryBottomSheet extends StatelessWidget {
       final date = DateTime.parse(dateStr);
       final now = DateTime.now();
       final diff = now.difference(date);
-      
+
       if (diff.inDays == 0) {
         if (diff.inHours == 0) {
           if (diff.inMinutes == 0) {
@@ -435,7 +583,8 @@ class _HistoryBottomSheet extends StatelessWidget {
                         final session = sessions[index];
                         final chatbotId = session['chatbot_id'] as int?;
                         final count = session['details_count'] as int? ?? 0;
-                        final createdAt = session['created_at']?.toString() ?? '';
+                        final createdAt =
+                            session['created_at']?.toString() ?? '';
                         final status = session['status']?.toString() ?? '';
                         final isActive = status == 'active';
                         final isCurrent = chatbotId == currentSessionId;
@@ -451,16 +600,23 @@ class _HistoryBottomSheet extends StatelessWidget {
                                   ? const Color(0xFF7CCD2B)
                                   : Colors.grey,
                               child: Icon(
-                                isActive ? Icons.chat : Icons.chat_bubble_outline,
+                                isActive
+                                    ? Icons.chat
+                                    : Icons.chat_bubble_outline,
                                 color: Colors.white,
                                 size: 20,
                               ),
                             ),
                             title: Text(
-                              isCurrent ? 'Cuộc trò chuyện hiện tại' : 'Cuộc trò chuyện',
+                              isCurrent
+                                  ? 'Cuộc trò chuyện hiện tại'
+                                  : 'Cuộc trò chuyện',
                               style: TextStyle(
-                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                                color: isCurrent ? const Color(0xFF7CCD2B) : null,
+                                fontWeight: isCurrent
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color:
+                                    isCurrent ? const Color(0xFF7CCD2B) : null,
                               ),
                             ),
                             subtitle: Column(
@@ -480,7 +636,8 @@ class _HistoryBottomSheet extends StatelessWidget {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF7CCD2B).withOpacity(0.2),
+                                      color: const Color(0xFF7CCD2B)
+                                          .withOpacity(0.2),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: const Text(
@@ -495,7 +652,8 @@ class _HistoryBottomSheet extends StatelessWidget {
                               ],
                             ),
                             trailing: isCurrent
-                                ? const Icon(Icons.check_circle, color: Color(0xFF7CCD2B))
+                                ? const Icon(Icons.check_circle,
+                                    color: Color(0xFF7CCD2B))
                                 : const Icon(Icons.chevron_right),
                             onTap: chatbotId != null
                                 ? () => onSessionSelected(chatbotId)

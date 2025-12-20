@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
-import '../core/api_base_app.dart';
+import '../core/camera_provider.dart';
 import '../services/api_client.dart';
 import '../services/device_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,7 +44,6 @@ class DeviceInfo {
   });
 }
 
-
 class DevicesPage extends StatefulWidget {
   const DevicesPage({super.key});
 
@@ -80,159 +78,175 @@ class _DevicesPageState extends State<DevicesPage> {
     super.initState();
     _loadDevices();
   }
-Future<void> _bootstrapAuth() async {
-  if (ApiClient.authToken == null || ApiClient.authToken!.isEmpty) {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('auth_token');
-    if (saved != null && saved.isNotEmpty) {
-      ApiClient.authToken = saved;
+
+  Future<void> _bootstrapAuth() async {
+    if (ApiClient.authToken == null || ApiClient.authToken!.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('auth_token');
+      if (saved != null && saved.isNotEmpty) {
+        ApiClient.authToken = saved;
+      }
     }
   }
-}
 
   Future<void> _loadDevices() async {
-  if (_loading) return;
-  setState(() => _loading = true);
+    if (_loading) return;
+    setState(() => _loading = true);
 
-  try {
-    final list = await DeviceService.fetchMyDevices();
-    final futures = <Future<DeviceInfo?>>[];
+    try {
+      final list = await DeviceService.fetchMyDevices();
+      final futures = <Future<DeviceInfo?>>[];
 
-    for (final d in list) {
-      if (d is! Map) continue;
-      final map = d.cast<String, dynamic>();
+      for (final d in list) {
+        if (d is! Map) continue;
+        final map = d.cast<String, dynamic>();
 
-      final idRaw = map['device_id'] ?? map['id'];
-      final deviceId = (idRaw is num) ? idRaw.toInt() : int.tryParse('$idRaw');
-      if (deviceId == null) continue;
+        final idRaw = map['device_id'] ?? map['id'];
+        final deviceId =
+            (idRaw is num) ? idRaw.toInt() : int.tryParse('$idRaw');
+        if (deviceId == null) continue;
 
-      futures.add(() async {
-        final name = (map['name'] ?? 'Thiết bị').toString();
-        final status = map['status']?.toString();
-        final streamUrl = map['stream_url']?.toString();
-        final location = map['location']?.toString();
+        futures.add(() async {
+          final name = (map['name'] ?? 'Thiết bị').toString();
+          final status = map['status']?.toString();
+          final streamUrl = map['stream_url']?.toString();
+          final location = map['location']?.toString();
 
-        final isCamera = (streamUrl != null && streamUrl.isNotEmpty);
-        final category = isCamera ? DeviceCategory.camera : DeviceCategory.sensor;
+          final isCamera = (streamUrl != null && streamUrl.isNotEmpty);
+          final category =
+              isCamera ? DeviceCategory.camera : DeviceCategory.sensor;
 
-        double? humidity;
-        int? battery;
-        DateTime updatedAt = DateTime.now();
+          double? humidity;
+          int? battery;
+          DateTime updatedAt = DateTime.now();
 
-        // ✅ chạy song song: detail (sensor) + latest detection (camera)
-        final detailFuture = DeviceService.fetchMyDeviceDetail(deviceId);
-        final latestFuture =
-            isCamera ? DeviceService.fetchLatestDetection(deviceId) : Future.value(null);
+          // ✅ chạy song song: detail (sensor) + latest detection (camera)
+          final detailFuture = DeviceService.fetchMyDeviceDetail(deviceId);
+          final latestFuture = isCamera
+              ? DeviceService.fetchLatestDetection(deviceId)
+              : Future.value(null);
 
-        final detail = await detailFuture;
-        final last = detail['last_sensor_reading'];
-        if (last is Map) {
-          final lm = last.cast<String, dynamic>();
+          final detail = await detailFuture;
+          final last = detail['last_sensor_reading'];
+          if (last is Map) {
+            final lm = last.cast<String, dynamic>();
 
-          final h = lm['humidity'] ?? lm['humidity_percent'] ?? lm['humidityPercent'];
-          if (h is num) humidity = h.toDouble();
-          if (h is String) humidity = double.tryParse(h);
+            final h = lm['humidity'] ??
+                lm['humidity_percent'] ??
+                lm['humidityPercent'];
+            if (h is num) humidity = h.toDouble();
+            if (h is String) humidity = double.tryParse(h);
 
-          final b = lm['battery'] ?? lm['battery_percent'] ?? lm['batteryPercent'];
-          if (b is num) battery = b.toInt();
-          if (b is String) battery = int.tryParse(b);
+            final b =
+                lm['battery'] ?? lm['battery_percent'] ?? lm['batteryPercent'];
+            if (b is num) battery = b.toInt();
+            if (b is String) battery = int.tryParse(b);
 
-          final t = lm['updated_at'] ?? lm['created_at'];
-          if (t != null) {
-            try {
-              updatedAt = DateTime.parse(t.toString());
-            } catch (_) {}
+            final t = lm['updated_at'] ?? lm['created_at'];
+            if (t != null) {
+              try {
+                updatedAt = DateTime.parse(t.toString());
+              } catch (_) {}
+            }
+          } else {
+            // nếu backend có updated_at ngay trên device list:
+            final updatedRaw = map['updated_at']?.toString();
+            if (updatedRaw != null) {
+              try {
+                updatedAt = DateTime.parse(updatedRaw);
+              } catch (_) {}
+            }
           }
-        } else {
-          // nếu backend có updated_at ngay trên device list:
-          final updatedRaw = map['updated_at']?.toString();
-          if (updatedRaw != null) {
-            try {
-              updatedAt = DateTime.parse(updatedRaw);
-            } catch (_) {}
+
+          String? latestImageUrl;
+          final latest = await latestFuture;
+          // ✅ map theo schema bản 1: {found:true, img_url:"..."}
+          if (latest != null) {
+            final found = latest['found'] == true;
+            final img = latest['img_url']?.toString();
+            if (found && img != null && img.isNotEmpty) latestImageUrl = img;
           }
-        }
 
-        String? latestImageUrl;
-        final latest = await latestFuture;
-        // ✅ map theo schema bản 1: {found:true, img_url:"..."}
-        if (latest != null) {
-          final found = latest['found'] == true;
-          final img = latest['img_url']?.toString();
-          if (found && img != null && img.isNotEmpty) latestImageUrl = img;
-        }
+          return DeviceInfo(
+            deviceId: deviceId,
+            name: name,
+            category: category,
+            isOnline: true,
+            icon: isCamera ? Icons.videocam_outlined : Icons.sensors_outlined,
+            updatedAt: updatedAt,
+            status: status,
+            streamUrl: streamUrl,
+            location: location,
+            humidityPercent: humidity,
+            batteryPercent: battery,
+            latestImageUrl: latestImageUrl, // ✅ thêm
+          );
+        }());
+      }
 
-        return DeviceInfo(
-          deviceId: deviceId,
-          name: name,
-          category: category,
-          isOnline: true,
-          icon: isCamera ? Icons.videocam_outlined : Icons.sensors_outlined,
-          updatedAt: updatedAt,
-          status: status,
-          streamUrl: streamUrl,
-          location: location,
-          humidityPercent: humidity,
-          batteryPercent: battery,
-          latestImageUrl: latestImageUrl, // ✅ thêm
+      final results = await Future.wait(futures);
+      final items = results.whereType<DeviceInfo>().toList();
+
+      // ✅ set default selected camera (ưu tiên status=active)
+      final cams =
+          items.where((x) => x.category == DeviceCategory.camera).toList();
+      int? defaultCamId;
+      if (cams.isNotEmpty) {
+        final active = cams.firstWhere(
+          (c) => (c.status ?? '').toLowerCase() == 'active',
+          orElse: () => cams.first,
         );
-      }());
-    }
+        defaultCamId = active.deviceId;
+      }
 
-    final results = await Future.wait(futures);
-    final items = results.whereType<DeviceInfo>().toList();
-
-    // ✅ set default selected camera (ưu tiên status=active)
-    final cams = items.where((x) => x.category == DeviceCategory.camera).toList();
-    int? defaultCamId;
-    if (cams.isNotEmpty) {
-      final active = cams.firstWhere(
-        (c) => (c.status ?? '').toLowerCase() == 'active',
-        orElse: () => cams.first,
+      if (!mounted) return;
+      setState(() {
+        _devices = items;
+        _selectedCameraId ??= defaultCamId;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi tải thiết bị: $e')),
       );
-      defaultCamId = active.deviceId;
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-
-    if (!mounted) return;
-    setState(() {
-      _devices = items;
-      _selectedCameraId ??= defaultCamId;
-    });
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Lỗi tải thiết bị: $e')),
-    );
-  } finally {
-    if (mounted) setState(() => _loading = false);
   }
-}
 
-
-
-
-
-  // ✅ Backend không có select_camera => chọn camera chỉ lưu local UI
+  // ✅ Chọn camera → lưu server + update provider → Home tự động cập nhật
   Future<void> _selectCamera(DeviceInfo device) async {
-  setState(() => _selectedCameraId = device.deviceId);
+    setState(() => _selectedCameraId = device.deviceId);
 
-  try {
-    await DeviceService.selectCamera(device.deviceId); // ✅ lưu server
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Đang sử dụng camera: ${device.name}')),
-    );
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Không lưu được lựa chọn camera: $e')),
-    );
+    try {
+      await DeviceService.selectCamera(device.deviceId); // ✅ lưu server
+
+      // Update CameraProvider → Home page sẽ listen + tự cập nhật video
+      final provider = context.read<CameraProvider>();
+      await provider.setSelectedCamera(
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        streamUrl: device.streamUrl ?? '',
+      );
+
+      // Reload danh sách thiết bị để trạng thái active/inactive phản ánh đúng từ backend
+      await _loadDevices();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đang sử dụng camera: ${device.name}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không lưu được lựa chọn camera: $e')),
+      );
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    // final l10n = AppLocalizations.of(context); // not used
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F9E9),
@@ -256,9 +270,9 @@ Future<void> _bootstrapAuth() async {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
+                      const Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Thiết bị',
                             style: TextStyle(
@@ -281,7 +295,8 @@ Future<void> _bootstrapAuth() async {
                                 ? const SizedBox(
                                     width: 18,
                                     height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   )
                                 : const Icon(Icons.refresh),
                           ),
@@ -301,7 +316,6 @@ Future<void> _bootstrapAuth() async {
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -330,7 +344,6 @@ Future<void> _bootstrapAuth() async {
                     ),
                   ),
                   const SizedBox(height: 20),
-
                   if (_devices.any((d) => d.category == DeviceCategory.camera))
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -340,13 +353,13 @@ Future<void> _bootstrapAuth() async {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Row(
-                          children: const [
+                        child: const Row(
+                          children: [
                             Icon(Icons.info_outline, color: Color(0xFF7CCD2B)),
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Chọn một camera để sử dụng (lưu local)',
+                                '',
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
@@ -354,10 +367,15 @@ Future<void> _bootstrapAuth() async {
                         ),
                       ),
                     ),
-
                   ..._visibleDevices.map((device) {
-                    final isSelected = device.category == DeviceCategory.camera &&
-                        device.deviceId == _selectedCameraId;
+                    // Ưu tiên ID từ CameraProvider để phản ánh đổi camera ngay lập tức
+                    final providerSelectedId =
+                        context.watch<CameraProvider>().selectedCameraId;
+                    final effectiveSelectedId =
+                        providerSelectedId ?? _selectedCameraId;
+                    final isSelected =
+                        device.category == DeviceCategory.camera &&
+                            device.deviceId == effectiveSelectedId;
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -369,8 +387,7 @@ Future<void> _bootstrapAuth() async {
                             : null,
                       ),
                     );
-                  }).toList(),
-
+                  }),
                   if (_visibleDevices.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(24),
@@ -522,7 +539,9 @@ class _DeviceCard extends StatelessWidget {
                         children: [
                           Icon(
                             Icons.circle,
-                            color: device.isOnline ? Colors.green : Colors.grey.shade400,
+                            color: device.isOnline
+                                ? Colors.green
+                                : Colors.grey.shade400,
                             size: 10,
                           ),
                           const SizedBox(width: 4),
@@ -536,7 +555,8 @@ class _DeviceCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           device.location!,
-                          style: const TextStyle(color: Colors.black45, fontSize: 12),
+                          style: const TextStyle(
+                              color: Colors.black45, fontSize: 12),
                         ),
                       ]
                     ],
@@ -546,22 +566,31 @@ class _DeviceCard extends StatelessWidget {
                   InkWell(
                     onTap: onSelect,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFF7CCD2B) : const Color(0xFFE8F4D9),
+                        color: isSelected
+                            ? const Color(0xFF7CCD2B)
+                            : const Color(0xFFE8F4D9),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
                         children: [
                           Icon(
-                            isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                            color: isSelected ? Colors.white : const Color(0xFF7CCD2B),
+                            isSelected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF7CCD2B),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             isSelected ? 'Đang dùng' : 'Chọn dùng',
                             style: TextStyle(
-                              color: isSelected ? Colors.white : const Color(0xFF4B8D1F),
+                              color: isSelected
+                                  ? Colors.white
+                                  : const Color(0xFF4B8D1F),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -569,28 +598,29 @@ class _DeviceCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (device.latestImageUrl != null && device.latestImageUrl!.isNotEmpty) ...[
-  const SizedBox(height: 10),
-  ClipRRect(
-    borderRadius: BorderRadius.circular(12),
-    child: Image.network(
-      device.latestImageUrl!,
-      height: 120,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        height: 120,
-        color: const Color(0xFFE8F4D9),
-        child: const Center(child: Icon(Icons.broken_image)),
-      ),
-    ),
-  ),
-],
-
               ],
             ),
+            // Ảnh preview cần nằm dưới Row để tránh lỗi size vô hạn
+            if (device.latestImageUrl != null &&
+                device.latestImageUrl!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  height: 120,
+                  width: double.infinity,
+                  child: Image.network(
+                    device.latestImageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFFE8F4D9),
+                      child: const Center(child: Icon(Icons.broken_image)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
-
             if (!isCamera) ...[
               Row(
                 children: [
@@ -618,7 +648,6 @@ class _DeviceCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
             ],
-
             const SizedBox(height: 10),
             Text(
               _lastUpdateText(),
