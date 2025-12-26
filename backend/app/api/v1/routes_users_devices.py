@@ -13,7 +13,6 @@ from app.schemas.users_devices import (
     UserOut,
     DeviceListItem,
     DeviceDetailOut,
-    SensorReadingOut,
 )
 
 
@@ -34,8 +33,6 @@ def list_users(
     ).all()
     return users
 
-
-# 2) Lấy danh sách thiết bị của 1 user
 @router.get("/users/{user_id}/devices", response_model=List[DeviceListItem])
 def list_user_devices(user_id: int, db: Session = Depends(get_db)):
     user = db.get(Users, user_id)
@@ -60,11 +57,12 @@ def list_user_devices(user_id: int, db: Session = Depends(get_db)):
                 device_type_id=d.device_type_id,
                 device_type_name=d.device_type.device_type_name if d.device_type else None,
                 stream_url=d.stream_url,
+                # Bổ sung:
+                created_at=d.created_at,
+                updated_at=d.updated_at,
             )
         )
     return result
-
-
 # 3) Chi tiết 1 thiết bị (kèm owner + last sensor reading)
 @router.get("/admin/devices/{device_id}", response_model=DeviceDetailOut)
 def get_device_detail(device_id: int, db: Session = Depends(get_db)):
@@ -81,9 +79,6 @@ def get_device_detail(device_id: int, db: Session = Depends(get_db)):
     )
 
     last_sr_out = None
-    if last_sr:
-        last_sr_out = SensorReadingOut.from_orm(last_sr)
-
     # Owner
     owner = device.user
 
@@ -98,5 +93,4 @@ def get_device_detail(device_id: int, db: Session = Depends(get_db)):
         device_type_name=device.device_type.device_type_name if device.device_type else None,
         owner_id=owner.user_id if owner else None,
         owner_username=owner.username if owner else None,
-        last_sensor_reading=last_sr_out,
     )

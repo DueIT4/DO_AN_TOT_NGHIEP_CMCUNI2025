@@ -52,19 +52,17 @@ class DeviceUpdate(BaseModel):
             return None
         return v
 
-
 class DeviceOut(BaseModel):
     device_id: int
-    user_id: Optional[int]
-    name: Optional[str]
-    device_type_id: int
-    parent_device_id: Optional[int]
-    serial_no: Optional[str]
-    location: Optional[str]
-    status: str
-    stream_url: Optional[str]
-    created_at: datetime
-    updated_at: datetime
+    name: Optional[str] = None
+    serial_no: Optional[str] = None
+    location: Optional[str] = None
+    status: Optional[str] = "active"
+    stream_url: Optional[str] = None
+    device_type_id: Optional[int] = None
+    user_id: Optional[int] = None
+    # Quan trọng: Cho phép null nếu DB chưa kịp ghi hoặc dữ liệu cũ
+    created_at: Optional[datetime] = None 
+    updated_at: Optional[datetime] = None 
 
-    # 👇 Pydantic v2: thay cho class Config: orm_mode = True
     model_config = ConfigDict(from_attributes=True)

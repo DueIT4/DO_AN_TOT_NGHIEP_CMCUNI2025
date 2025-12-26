@@ -19,7 +19,6 @@ class UserOut(BaseModel):
     class Config:
         orm_mode = True
 
-
 class DeviceListItem(BaseModel):
     device_id: int
     name: Optional[str]
@@ -29,22 +28,12 @@ class DeviceListItem(BaseModel):
     device_type_id: int
     device_type_name: Optional[str]
     stream_url: Optional[str]
+    # Bổ sung:
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         orm_mode = True
-
-
-class SensorReadingOut(BaseModel):
-    reading_id: int
-    metric: str
-    value_num: Optional[float]
-    unit: Optional[str]
-    status: str
-    recorded_at: datetime
-
-    class Config:
-        orm_mode = True
-
 
 class DeviceDetailOut(BaseModel):
     device_id: int
@@ -53,6 +42,9 @@ class DeviceDetailOut(BaseModel):
     location: Optional[str]
     status: str
     stream_url: Optional[str]
+    # Bổ sung:
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     device_type_id: int
     device_type_name: Optional[str]
@@ -60,12 +52,9 @@ class DeviceDetailOut(BaseModel):
     owner_id: Optional[int]
     owner_username: Optional[str]
 
-    last_sensor_reading: Optional[SensorReadingOut] = None
 
     class Config:
         orm_mode = True
-
-
 class DetectionHistoryItem(BaseModel):
     detection_id: int
     img_id: int
@@ -74,7 +63,6 @@ class DetectionHistoryItem(BaseModel):
     confidence: Optional[float] = None
     created_at: datetime
 
-    # 👇 thêm thông tin user để admin xem tổng hợp
     user_id: Optional[int] = None
     username: Optional[str] = None
     email: Optional[EmailStr] = None

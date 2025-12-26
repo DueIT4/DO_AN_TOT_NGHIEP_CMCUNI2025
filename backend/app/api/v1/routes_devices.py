@@ -10,9 +10,38 @@ from app.api.v1.deps import get_current_user
 from app.schemas.devices import DeviceCreate, DeviceUpdate, DeviceOut
 from app.models.role import RoleType
 from app.models.devices import Device
+from app.services.camera_service import capture_image_from_stream
+from app.utils.droidcam_helper import DroidCamConfig
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
+
+# =========================
+# ✅ CREATE device
+# POST /devices/
+# =========================
+@router.post(
+    "/admin/devices",
+    response_model=DeviceOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
+)
+def create_device(
+    body: DeviceCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    target_user_id = body.user_id or current_user.user_id
+
+    if body.user_id and body.user_id != current_user.user_id:
+        if current_user.role_type not in (RoleType.admin, RoleType.support_admin):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chỉ admin mới được gán thiết bị cho người dùng khác",
+            )
+
+    d = svc.create_device(db, body, user_id=target_user_id)
+    return DeviceOut.from_orm(d)
 
 # =========================
 # ✅ USER: list devices of current user
@@ -188,91 +217,42 @@ def get_device_admin(
     return DeviceOut.from_orm(d)
 
 
-# =========================
-# ✅ CREATE device
-# POST /devices/
-# =========================
-@router.post(
-    "/",
-    response_model=DeviceOut,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(get_current_user)],
-)
-def create_device(
-    body: DeviceCreate,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    target_user_id = body.user_id or current_user.user_id
 
-    if body.user_id and body.user_id != current_user.user_id:
-        if current_user.role_type not in (RoleType.admin, RoleType.support_admin):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Chỉ admin mới được gán thiết bị cho người dùng khác",
-            )
-
-    d = svc.create_device(db, body, user_id=target_user_id)
-    return DeviceOut.from_orm(d)
-
-
+# ✅ UPDATE device (Khớp với FE: /admin/devices/{id})
 # =========================
-# ✅ UPDATE device
-# PUT /devices/{device_id}
-# =========================
-@router.put(
-    "/{device_id}",
-    response_model=DeviceOut,
-    dependencies=[Depends(get_current_user)],
-)
-def update_device(
+@router.put("/admin/devices/{device_id}")
+def update_device_admin(
     device_id: int,
     body: DeviceUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user = Depends(get_current_user)
 ):
-    # user thường: chỉ update device của mình
     if current_user.role_type not in (RoleType.admin, RoleType.support_admin):
-        d0 = svc.get_device(db, device_id)
-        if not d0:
-            raise HTTPException(status_code=404, detail="Không tìm thấy thiết bị")
-        if getattr(d0, "user_id", None) != current_user.user_id:
-            raise HTTPException(status_code=403, detail="Bạn không có quyền sửa thiết bị này")
+        raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền này")
 
-    d = svc.update_device(db, device_id, body)
-    if not d:
+    updated_device = svc.update_device(db, device_id, body)
+    if not updated_device:
         raise HTTPException(status_code=404, detail="Không tìm thấy thiết bị")
-    return DeviceOut.from_orm(d)
-
+    
+    return updated_device
 
 # =========================
-# ✅ DELETE device
-# DELETE /devices/{device_id}
+# ✅ DELETE device (Khớp với FE: /admin/devices/{id})
 # =========================
-@router.delete(
-    "/{device_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(get_current_user)],
-)
-def delete_device(
+@router.delete("/admin/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_device_admin(
     device_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user = Depends(get_current_user)
 ):
-    # user thường: chỉ delete device của mình
     if current_user.role_type not in (RoleType.admin, RoleType.support_admin):
-        d0 = svc.get_device(db, device_id)
-        if not d0:
-            raise HTTPException(status_code=404, detail="Không tìm thấy thiết bị")
-        if getattr(d0, "user_id", None) != current_user.user_id:
-            raise HTTPException(status_code=403, detail="Bạn không có quyền xoá thiết bị này")
+        raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền này")
 
-    ok = svc.delete_device(db, device_id)
-    if not ok:
+    success = svc.delete_device(db, device_id)
+    if not success:
         raise HTTPException(status_code=404, detail="Không tìm thấy thiết bị")
+    
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
 # =========================
 # ✅ GET stream status for a device
 # GET /devices/{device_id}/stream_status
@@ -337,8 +317,7 @@ def test_stream_url(
             "error": Optional[str]
         }
     """
-    from app.services.camera_service import capture_image_from_stream
-    from app.utils.droidcam_helper import DroidCamConfig
+ 
     
     url = payload.stream_url.strip()
     
