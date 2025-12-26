@@ -482,6 +482,8 @@ Widget _buildRoleChip(String? roleType) {
                                 DataColumn(label: Text('Tên')),
                                 DataColumn(label: Text('Serial')),
                                 DataColumn(label: Text('Loại')),
+                                DataColumn(label: Text('IP / Stream URL')), // Thêm cột này
+                                DataColumn(label: Text('Cập nhật lúc')),     // Thêm cột này
                                 DataColumn(label: Text('Trạng thái')),
                                 DataColumn(label: Text('Vị trí')),
                                 DataColumn(label: Text('Hành động')),
@@ -489,6 +491,8 @@ Widget _buildRoleChip(String? roleType) {
                               rows: devices.map((d) {
                                 final id = d['device_id'] as int;
                                 final name = (d['name'] ?? '').toString();
+                                final streamUrl = (d['stream_url'] ?? 'Chưa cấu hình').toString(); // Lấy từ DB
+                                final updatedAt = (d['updated_at'] ?? '-').toString();           // Lấy từ DB
                                 final serial = (d['serial_no'] ?? '').toString();
                                 final typeName = (d['device_type_name'] ??
                                         d['device_type_id']?.toString() ??
@@ -503,6 +507,8 @@ Widget _buildRoleChip(String? roleType) {
                                     DataCell(SizedBox(width: 180, child: Text(name, overflow: TextOverflow.ellipsis))),
                                     DataCell(SizedBox(width: 160, child: Text(serial, overflow: TextOverflow.ellipsis))),
                                     DataCell(SizedBox(width: 150, child: Text(typeName, overflow: TextOverflow.ellipsis))),
+                                    DataCell(Text(streamUrl, style: const TextStyle(color: Colors.blue, fontSize: 12))),
+                                    DataCell(Text(updatedAt.split('T')[0])), // Chỉ lấy phần ngày cho gọn
                                     DataCell(_buildDeviceStatusChip(status)),
                                     DataCell(SizedBox(width: 160, child: Text(location, overflow: TextOverflow.ellipsis))),
                                     DataCell(
@@ -635,7 +641,7 @@ class _DeviceDialogState extends State<_DeviceDialog> {
   late final TextEditingController _name;
   late final TextEditingController _serial;
   late final TextEditingController _location;
-
+  late final TextEditingController _streamUrl; // Thêm dòng này
   bool _saving = false;
   late String _statusValue;
   int? _selectedDeviceTypeId;
@@ -653,7 +659,7 @@ class _DeviceDialogState extends State<_DeviceDialog> {
     _name = TextEditingController(text: (d?['name'] ?? '').toString());
     _serial = TextEditingController(text: (d?['serial_no'] ?? '').toString());
     _location = TextEditingController(text: (d?['location'] ?? '').toString());
-
+    _streamUrl = TextEditingController(text: (d?['stream_url'] ?? '').toString());
     if (d != null && d['device_type_id'] != null) {
       _selectedDeviceTypeId = d['device_type_id'] as int;
     }
@@ -667,6 +673,7 @@ class _DeviceDialogState extends State<_DeviceDialog> {
     _name.dispose();
     _serial.dispose();
     _location.dispose();
+    _streamUrl.dispose(); // Thêm dòng này
     super.dispose();
   }
 
@@ -736,6 +743,7 @@ class _DeviceDialogState extends State<_DeviceDialog> {
       "name": _name.text.trim(),
       "serial_no": _serial.text.trim(),
       "location": _location.text.trim(),
+      "stream_url": _streamUrl.text.trim(), // GỬI IP VỀ BACKEND Ở ĐÂY
       "device_type_id": _selectedDeviceTypeId ?? 0,
       "status": _statusValue,
     };
@@ -875,7 +883,18 @@ class _DeviceDialogState extends State<_DeviceDialog> {
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Không được để trống' : null,
                 ),
-
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _streamUrl,
+                textInputAction: TextInputAction.next,
+                decoration: _decoration(
+                  context,
+                  label: 'IP Camera (Stream URL)',
+                  hint: 'VD: http://192.168.1.6:4747/video',
+                  icon: Icons.videocam_rounded,
+                ),
+                // Có thể để trống nếu thiết bị không phải camera
+              ),
                 const SizedBox(height: 16),
                 _sectionTitle(context, 'Phân loại & trạng thái'),
 
