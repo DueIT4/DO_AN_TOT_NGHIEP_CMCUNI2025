@@ -25,25 +25,22 @@ class ApiHttpException implements Exception {
 }
 
 class ApiBase {
-  // ========================
-  // 🔗 URL CƠ SỞ (baseURL)
-  // ========================
   static String? _customBaseURL;
-  
-  /// Cho phép gán URL động (Dùng khi deploy Cloud Run)
   static set setBaseURL(String url) => _customBaseURL = url;
 
   static String get baseURL {
-if (_customBaseURL != null) return _customBaseURL!;
-  
-  if (kIsWeb) {
-    // Thay đổi mặc định thành https nếu deploy môi trường production
-    return 'https://zestguard-api-38261474833.asia-southeast1.run.app';
-  }
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000'; // Android emulator
+    if (_customBaseURL != null) return _customBaseURL!;
+    
+    if (kIsWeb) {
+      // ✅ BẮT BUỘC: Đổi sang https để tránh lỗi Mixed Content
+      return 'https://zestguard-api-38261474833.asia-southeast1.run.app';
     }
-    return 'http://127.0.0.1:8000'; // iOS / desktop
+    
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      // Khi deploy thật, bạn cũng nên đổi cái này sang https
+      return 'https://zestguard-api-38261474833.asia-southeast1.run.app';
+    }
+    return 'https://zestguard-api-38261474833.asia-southeast1.run.app';
   }
 
   // Prefix API dùng chung

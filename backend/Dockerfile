@@ -1,13 +1,15 @@
 FROM python:3.12-slim
 
 # Cài đặt thư viện hệ thống cần thiết cho AI và Cloudinary
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wkhtmltopdf \
     fonts-liberation \
     fonts-noto-cjk \
     libfontconfig1 \
     libxrender1 \
-    && apt-get clean
+    xfonts-75dpi \
+    xfonts-base \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # Copy và cài đặt thư viện
