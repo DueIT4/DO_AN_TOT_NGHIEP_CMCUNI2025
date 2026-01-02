@@ -1,7 +1,7 @@
 # app/services/chatbot_service.py
 from typing import Optional
 from sqlalchemy.orm import Session
-import google.generativeai as genai
+import google as genai
 from app.core.config import settings
 from app.models.chatbot import Chatbot, ChatbotDetail, ChatbotStatus
 

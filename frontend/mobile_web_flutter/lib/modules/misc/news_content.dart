@@ -98,39 +98,44 @@ class _NewsContentState extends State<NewsContent> {
       });
     }
   }
+Future<List<Map<String, dynamic>>> _fetchNews({required String query}) async {
+  try {
+    // Đảm bảo không bị trùng dấu /
+    String baseUrl = ApiBase.baseURL.endsWith('/') 
+        ? ApiBase.baseURL.substring(0, ApiBase.baseURL.length - 1) 
+        : ApiBase.baseURL;
+    
+    String apiPath = ApiBase.api('/news');
+    if (!apiPath.startsWith('/')) apiPath = '/$apiPath';
 
-  /// HÀM QUAN TRỌNG NHẤT: Kết nối với FastAPI Backend thay vì NewsAPI trực tiếp
-  Future<List<Map<String, dynamic>>> _fetchNews({required String query}) async {
-    try {
-      // 1. Lấy path từ ApiBase (đã bao gồm /api/v1)
-      final String path = ApiBase.api('/news'); 
-      final uri = Uri.parse('${ApiBase.baseURL}$path').replace(
-        queryParameters: {
-          'q': query,
-          'lang': 'vi',
-          'pageSize': '10',
-        },
-      );
+    final uri = Uri.parse('$baseUrl$apiPath').replace(
+      queryParameters: {
+        'q': query,
+        'lang': 'vi',
+        'pageSize': '10',
+      },
+    );
 
-      // 2. Gọi API qua HTTPS để tránh Mixed Content
-      final res = await http.get(uri, headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        if (ApiBase.bearerToken != null) 'Authorization': 'Bearer ${ApiBase.bearerToken}',
-      }).timeout(const Duration(seconds: 15));
+    debugPrint("🌐 Fetching News: $uri");
 
-      if (res.statusCode == 200) {
-        // 3. Giải mã và trả về list articles (Backend đã lọc domain/keyword sạch)
-        final List decoded = jsonDecode(utf8.decode(res.bodyBytes));
-        return decoded.cast<Map<String, dynamic>>();
-      }
-      debugPrint("Backend News Error: ${res.statusCode}");
-      return [];
-    } catch (e) {
-      debugPrint("Fetch News Exception: $e");
+    final res = await http.get(uri, headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (ApiBase.bearerToken != null) 'Authorization': 'Bearer ${ApiBase.bearerToken}',
+    }).timeout(const Duration(seconds: 15));
+
+    if (res.statusCode == 200) {
+      final List decoded = jsonDecode(utf8.decode(res.bodyBytes));
+      return decoded.cast<Map<String, dynamic>>();
+    } else {
+      debugPrint("❌ BE Error ${res.statusCode}: ${res.body}");
       return [];
     }
+  } catch (e) {
+    debugPrint("🚨 Fetch News Exception: $e");
+    return [];
   }
+}
 
   List<Map<String, dynamic>> _defaultArticles() {
     return [
@@ -282,4 +287,5 @@ class _SidebarLinks extends StatelessWidget {
       ],
     );
   }
+
 }
