@@ -2,11 +2,13 @@ FROM python:3.12-slim
 
 # Cài đặt thư viện hệ thống cần thiết cho AI và Cloudinary
 RUN apt-get update && apt-get install -y \
-    libgl1 \
-    libglib2.0-0 \
-    build-essential \
+    wkhtmltopdf \
+    xfonts-75dpi \
+    xfonts-base \
+    libssl-dev \
+    # Thêm font tiếng Việt để PDF không bị lỗi font
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 # Copy và cài đặt thư viện
