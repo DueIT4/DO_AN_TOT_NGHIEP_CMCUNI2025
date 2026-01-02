@@ -54,7 +54,6 @@ def get_default_viewer_role_id(db: Session) -> int:
 GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 
 def _looks_like_jwt(token: str) -> bool:
-    # id_token thường có 3 phần ngăn bởi dấu .
     return token.count(".") == 2
 
 def _looks_like_google_access_token(token: str) -> bool:
