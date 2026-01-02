@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart'; // ✅ Cần thiết để xác định loại file
 
 import 'package:mobile_web_flutter/core/api_base.dart';
 import 'package:mobile_web_flutter/models/admin/admin_user_me.dart';
@@ -83,11 +84,16 @@ class AdminMeService {
     }
     req.headers['Accept'] = 'application/json';
 
+    // ✅ CẢI TIẾN: Xác định rõ MediaType để Cloudinary/Backend nhận diện đúng định dạng ảnh
+    final extension = filename.split('.').last.toLowerCase();
+    final mimeType = extension == 'png' ? 'image/png' : 'image/jpeg';
+
     req.files.add(
       http.MultipartFile.fromBytes(
-        'avatar', // ✅ khớp backend param avatar: UploadFile = File(...)
+        'avatar', 
         bytes,
         filename: filename,
+        contentType: MediaType.parse(mimeType), // ✅ Thêm dòng này
       ),
     );
 
@@ -100,12 +106,12 @@ class AdminMeService {
 
     final Map<String, dynamic> data =
         jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    
+    // ✅ Sau khi update xong, backend trả về link Cloudinary trong field avt_url
     return AdminUserMe.fromJson(data);
   }
 
-  /// ✅ ĐỔI MẬT KHẨU (FE) - yêu cầu backend phải có endpoint tương ứng
-  ///
-  /// Gợi ý endpoint: PUT /api/v1/me/change_password
+  /// ✅ ĐỔI MẬT KHẨU
   Future<void> changePassword({
     required String oldPassword,
     required String newPassword,

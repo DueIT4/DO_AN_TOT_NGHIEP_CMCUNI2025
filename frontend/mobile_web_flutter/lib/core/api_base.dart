@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart'
 import 'package:http/http.dart' as http;
 
 /// Exception HTTP chuẩn để FE đọc được statusCode + body
-/// (AuthService._mapAuthError của bạn sẽ map 401/403 tốt hơn)
 class ApiHttpException implements Exception {
   final int statusCode;
   final String method;
@@ -29,12 +28,19 @@ class ApiBase {
   // ========================
   // 🔗 URL CƠ SỞ (baseURL)
   // ========================
+  static String? _customBaseURL;
+  
+  /// Cho phép gán URL động (Dùng khi deploy Cloud Run)
+  static set setBaseURL(String url) => _customBaseURL = url;
+
   static String get baseURL {
+    if (_customBaseURL != null) return _customBaseURL!;
+    
     if (kIsWeb) {
       return 'http://127.0.0.1:8000';
     }
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000'; // Android emulator -> host
+      return 'http://10.0.2.2:8000'; // Android emulator
     }
     return 'http://127.0.0.1:8000'; // iOS / desktop
   }
@@ -52,8 +58,12 @@ class ApiBase {
   // 🔐 Bearer token
   // ========================
   static String? _bearer;
+  
+  /// Cập nhật token xác thực
   static set bearer(String? t) => _bearer = t;
   static String? get bearer => _bearer;
+  
+  /// ✅ Bí danh (Alias) để khớp với các file UI gọi .bearerToken
   static String? get bearerToken => _bearer;
 
   static Map<String, String> _headers() {
@@ -61,7 +71,6 @@ class ApiBase {
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      // ✅ Chỉ gửi Authorization khi token thật sự có giá trị
       if (t != null && t.trim().isNotEmpty) 'Authorization': 'Bearer $t',
     };
   }
@@ -83,7 +92,6 @@ class ApiBase {
         parsed = null;
       }
 
-      // ✅ Ném exception có statusCode + body để FE map chuẩn (401/403/500…)
       throw ApiHttpException(
         statusCode: r.statusCode,
         method: method,
@@ -95,8 +103,10 @@ class ApiBase {
   }
 
   // ========================
-  // 📡 GET JSON
+  // 📡 CÁC PHƯƠNG THỨC HTTP
   // ========================
+
+  /// GET JSON
   static Future<dynamic> getJson(String path) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.get(url, headers: _headers());
@@ -104,9 +114,7 @@ class ApiBase {
     return _decodeBody(r);
   }
 
-  // ========================
-  // 📡 POST JSON
-  // ========================
+  /// POST JSON
   static Future<dynamic> postJson(String path, Map<String, dynamic> body) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.post(
@@ -118,9 +126,7 @@ class ApiBase {
     return _decodeBody(r);
   }
 
-  // ========================
-  // ✏️ PUT JSON
-  // ========================
+  /// PUT JSON
   static Future<dynamic> putJson(String path, Map<String, dynamic> body) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.put(
@@ -132,9 +138,7 @@ class ApiBase {
     return _decodeBody(r);
   }
 
-  // ========================
-  // 🩹 PATCH JSON
-  // ========================
+  /// PATCH JSON
   static Future<dynamic> patchJson(String path, Map<String, dynamic> body) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.patch(
@@ -146,9 +150,7 @@ class ApiBase {
     return _decodeBody(r);
   }
 
-  // ========================
-  // ❌ DELETE JSON
-  // ========================
+  /// DELETE JSON
   static Future<dynamic> deleteJson(String path) async {
     final url = Uri.parse('$baseURL$path');
     final r = await http.delete(url, headers: _headers());

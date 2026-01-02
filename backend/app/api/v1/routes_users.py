@@ -2,11 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, func, or_
-from uuid import uuid4
-from pathlib import Path
-from typing import List
-import hashlib
-import shutil
+from typing import List, Optional
 
 from app.core.database import get_db
 from app.models.user import Users, UserStatus
@@ -14,10 +10,9 @@ from app.schemas.user import UserOut, UserListOut
 from app.models.role import Role, RoleType
 from app.services.permissions import require_perm
 from app.services.passwords import hash_password
+from app.services.cloudinary_service import upload_image_to_cloudinary  # ✅ Thêm service Cloudinary
 
 router = APIRouter(prefix="/users", tags=["users"])
-
-
 
 
 def _to_user_out(u: Users) -> UserOut:
@@ -57,14 +52,14 @@ def _ensure_role_exists(db: Session, role_id: int) -> None:
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_perm("users:create"))],
 )
-def create_user(
+async def create_user(
     username: str = Form(...),
     phone: str = Form(...),
     password: str = Form(...),
     email: str | None = Form(None),
     address: str | None = Form(None),
     role_id: int | None = Form(None),
-    status: str | None = Form(None),  # 👈 thêm status
+    status: str | None = Form(None),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
@@ -76,18 +71,16 @@ def create_user(
     if email and db.scalar(select(Users).where(Users.email == email)):
         raise HTTPException(409, "Email đã tồn tại")
 
-    # xử lý avatar (tùy chọn)
+    # xử lý avatar qua Cloudinary
     avt_url = None
     if file:
-        if not file.content_type.startswith("image/"):
+        if not (file.content_type or "").startswith("image/"):
             raise HTTPException(400, "Chỉ nhận file ảnh")
-        Path("media/avatars").mkdir(parents=True, exist_ok=True)
-        ext = Path(file.filename).suffix or ".png"
-        fname = f"{uuid4().hex}{ext}"
-        save_path = Path("media/avatars") / fname
-        with save_path.open("wb") as f:
-            shutil.copyfileobj(file.file, f)
-        avt_url = f"/media/avatars/{fname}"
+        
+        content = await file.read()
+        avt_url = upload_image_to_cloudinary(content, folder="zestguard/avatars")
+        if not avt_url:
+            raise HTTPException(500, "Lỗi khi upload avatar lên Cloudinary")
 
     # role
     if role_id is None:
@@ -141,7 +134,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     response_model=UserOut,
     dependencies=[Depends(require_perm("users:update"))],
 )
-def update_user(
+async def update_user(
     user_id: int,
     username: str | None = Form(None),
     phone: str | None = Form(None),
@@ -149,7 +142,7 @@ def update_user(
     email: str | None = Form(None),
     address: str | None = Form(None),
     role_id: int | None = Form(None),
-    status: str | None = Form(None),  # 👈 thêm status
+    status: str | None = Form(None),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
@@ -184,7 +177,7 @@ def update_user(
 
     # password
     if password:
-        user.password =hash_password(password)
+        user.password = hash_password(password)
 
     # role
     if role_id is not None:
@@ -198,29 +191,19 @@ def update_user(
         except ValueError:
             raise HTTPException(400, "Trạng thái không hợp lệ (active/inactive)")
 
-    # avatar
+    # avatar qua Cloudinary
     if file:
         if not (file.content_type or "").startswith("image/"):
             raise HTTPException(400, "Chỉ nhận file ảnh")
-        ext = Path(file.filename).suffix.lower() or ".png"
-        if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
-            raise HTTPException(400, "Định dạng ảnh không hỗ trợ")
-
-        # xoá ảnh cũ
-        if user.avt_url:
-            old_path = Path(user.avt_url.lstrip("/"))
-            try:
-                if old_path.is_file():
-                    old_path.unlink()
-            except Exception:
-                pass
-
-        fname = f"{user_id}_{uuid4().hex}{ext}"
-        save_path = (Path("media") / "avatars") / fname
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-        with save_path.open("wb") as f:
-            shutil.copyfileobj(file.file, f)
-        user.avt_url = f"/media/avatars/{fname}"
+        
+        content = await file.read()
+        new_avt_url = upload_image_to_cloudinary(content, folder="zestguard/avatars")
+        if not new_avt_url:
+            raise HTTPException(500, "Lỗi khi upload avatar lên Cloudinary")
+            
+        # Lưu ý: Với Cloudinary, chúng ta không cần xoá file local. 
+        # Nếu muốn xoá ảnh cũ trên Cloudinary, cần public_id, tạm thời chỉ cập nhật URL mới.
+        user.avt_url = new_avt_url
 
     db.commit()
     db.refresh(user)

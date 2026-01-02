@@ -317,49 +317,68 @@ class _AdminShellScaffoldState extends State<AdminShellScaffold> {
           ),
           const Spacer(),
           FutureBuilder<AdminUserMe>(
-            future: _meService.getMe(),
-            builder: (context, snapshot) {
-              final avt = snapshot.data?.avtUrl;
-              final fullAvtUrl = (avt != null && avt.isNotEmpty)
-                  ? '${ApiBase.baseURL}$avt?v=${DateTime.now().millisecondsSinceEpoch}'
-                  : null;
+          future: _meService.getMe(),
+          builder: (context, snapshot) {
+            final avt = snapshot.data?.avtUrl;
+            String? fullAvtUrl;
 
-              final provider = fullAvtUrl != null ? NetworkImage(fullAvtUrl) : null;
+            if (avt != null && avt.isNotEmpty) {
+              // 1. Kiểm tra nếu avt đã là URL tuyệt đối (Cloudinary)
+              if (avt.startsWith('http')) {
+                fullAvtUrl = avt;
+              } else {
+                // 2. Nếu là path local (media/...) thì mới nối baseURL
+                // Đảm bảo có dấu / giữa host và path
+                final separator = ApiBase.baseURL.endsWith('/') || avt.startsWith('/') ? '' : '/';
+                fullAvtUrl = '${ApiBase.baseURL}$separator$avt';
+              }
 
-              return PopupMenuButton<String>(
-                offset: const Offset(0, 40),
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'profile', child: Text('Thông tin cá nhân')),
-                  PopupMenuItem(value: 'logout', child: Text('Đăng xuất')),
-                ],
-                onSelected: (value) async {
-                  if (value == 'profile') {
-                    await showDialog(
-                      context: context,
-                      builder: (_) => AdminProfileDialog(service: _meService),
-                    );
-                    if (mounted) setState(() {});
-                  } else if (value == 'logout') {
-                    _handleLogout(context);
-                  }
-                },
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: _adminGreen,
-                  backgroundImage: provider,
-                  child: snapshot.connectionState == ConnectionState.waiting
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : (provider == null
-                          ? const Icon(Icons.person, color: Colors.white)
-                          : null),
-                ),
-              );
-            },
-          ),
+              // 3. Thêm tham số timestamp để buộc trình duyệt tải lại ảnh khi có thay đổi (Cache-busting)
+              final connector = fullAvtUrl.contains('?') ? '&' : '?';
+              fullAvtUrl = '$fullAvtUrl${connector}v=${DateTime.now().millisecondsSinceEpoch}';
+            }
+
+            final provider = fullAvtUrl != null ? NetworkImage(fullAvtUrl) : null;
+
+            return PopupMenuButton<String>(
+              offset: const Offset(0, 40),
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'profile', child: Text('Thông tin cá nhân')),
+                PopupMenuItem(value: 'logout', child: Text('Đăng xuất')),
+              ],
+              onSelected: (value) async {
+                if (value == 'profile') {
+                  await showDialog(
+                    context: context,
+                    builder: (_) => AdminProfileDialog(service: _meService),
+                  );
+                  // Sau khi đóng dialog, fetch lại dữ liệu để cập nhật avatar mới nhất
+                  if (mounted) setState(() {});
+                } else if (value == 'logout') {
+                  _handleLogout(context);
+                }
+              },
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: _adminGreen,
+                backgroundImage: provider,
+                // Error listener để xử lý khi link ảnh bị lỗi 404 hoặc lỗi mạng
+                onBackgroundImageError: provider != null 
+                  ? (exception, stackTrace) => print("Lỗi tải avatar: $exception") 
+                  : null,
+                child: snapshot.connectionState == ConnectionState.waiting
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : (provider == null
+                        ? const Icon(Icons.person, color: Colors.white, size: 20)
+                        : null),
+              ),
+            );
+          },
+        ),
         ],
       ),
     );

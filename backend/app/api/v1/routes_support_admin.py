@@ -1,7 +1,7 @@
 # app/api/v1/routes_support_admin.py
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, status
 from sqlalchemy.orm import Session
 from fastapi import UploadFile, File
 import os, uuid
@@ -21,6 +21,7 @@ from app.services.support_admin_service import (
     update_ticket_status,
     TicketNotFoundError,
 )
+from app.services.cloudinary_service import upload_image_to_cloudinary  # ✅ Thêm service Cloudinary
 
 router = APIRouter(
     prefix="/support/admin",
@@ -96,20 +97,27 @@ def change_ticket_status(
         return update_ticket_status(db, ticket_id, status=status)
     except TicketNotFoundError:
         raise HTTPException(status_code=404, detail="Ticket không tồn tại")
+
+
+# 🔥 CẬP NHẬT: Upload file hỗ trợ lên Cloudinary thay vì lưu Disk
 @router.post("/uploads")
-def upload_support_attachment(file: UploadFile = File(...)):
-    # thư mục lưu
-    upload_dir = "uploads/support"
-    os.makedirs(upload_dir, exist_ok=True)
+async def upload_support_attachment(file: UploadFile = File(...)):
+    """
+    Admin upload ảnh đính kèm trong hội thoại hỗ trợ lên Cloudinary.
+    """
+    # 1. Đọc nội dung file
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="File đính kèm trống")
 
-    # đặt tên file an toàn + tránh trùng
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    safe_name = f"{uuid.uuid4().hex}{ext}"
-    path = os.path.join(upload_dir, safe_name)
+    # 2. Upload trực tiếp lên Cloudinary (sử dụng folder riêng cho support)
+    attachment_url = upload_image_to_cloudinary(content, folder="zestguard/support")
+    
+    if not attachment_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Lỗi khi tải file đính kèm lên Cloudinary"
+        )
 
-    # lưu file
-    with open(path, "wb") as f:
-        f.write(file.file.read())
-
-    # trả về đường dẫn public (frontend đang ghép baseURL + raw)
-    return {"attachment_url": f"/{path.replace(os.sep, '/')}"}
+    # 3. Trả về URL tuyệt đối của Cloudinary (https://res.cloudinary.com/...)
+    return {"attachment_url": attachment_url}

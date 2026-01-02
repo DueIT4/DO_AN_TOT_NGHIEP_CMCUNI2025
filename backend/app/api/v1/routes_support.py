@@ -3,8 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from pathlib import Path
-from uuid import uuid4
-import shutil
+from typing import List, Optional
 
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
@@ -16,22 +15,11 @@ from app.schemas.support import (
     SupportMessageOut
 )
 from app.services.permissions import require_perm
+from app.services.cloudinary_service import upload_image_to_cloudinary  # ✅ Import service mới
 
 router = APIRouter(prefix="/support", tags=["support"])
 
-# ====== cấu hình nơi lưu file đính kèm ======
-UPLOAD_ROOT = Path("uploads") / "support"
-UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
-
-def _save_attachment(ticket_id: int, file: UploadFile) -> str:
-    ticket_dir = UPLOAD_ROOT / str(ticket_id)
-    ticket_dir.mkdir(parents=True, exist_ok=True)
-    ext = Path(file.filename).suffix.lower()
-    safe_name = f"{uuid4().hex}{ext}"
-    save_path = ticket_dir / safe_name
-    with save_path.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
-    return f"/uploads/support/{ticket_id}/{safe_name}"
+# ĐÃ LOẠI BỎ: UPLOAD_ROOT và _save_attachment (Lưu local) để chạy trên Cloud Run
 
 # ===================== TICKETS =====================
 
@@ -49,7 +37,7 @@ def create_ticket(payload: SupportTicketCreate, db: Session = Depends(get_db), u
     db.refresh(ticket)
     return ticket
 
-@router.get("/tickets/my_list", response_model=list[SupportTicketWithMessages])
+@router.get("/tickets/my_list", response_model=List[SupportTicketWithMessages])
 def list_my_tickets(db: Session = Depends(get_db), user: Users = Depends(get_current_user)):
     rows = db.scalars(
         select(SupportTicket)
@@ -69,7 +57,7 @@ def list_my_tickets(db: Session = Depends(get_db), user: Users = Depends(get_cur
         for r in rows
     ]
 
-@router.get("/tickets/getlistall_ticket", response_model=list[SupportTicketWithMessages], dependencies=[Depends(require_perm("support:read"))])
+@router.get("/tickets/getlistall_ticket", response_model=List[SupportTicketWithMessages], dependencies=[Depends(require_perm("support:read"))])
 def list_all_tickets(db: Session = Depends(get_db)):
     rows = db.scalars(
         select(SupportTicket)
@@ -112,7 +100,7 @@ def delete_ticket(ticket_id: int, db: Session = Depends(get_db)):
 
 # ===================== MESSAGES =====================
 
-@router.get("/messages/of/{ticket_id}/getlistall_message", response_model=list[SupportMessageOut])
+@router.get("/messages/of/{ticket_id}/getlistall_message", response_model=List[SupportMessageOut])
 def list_messages(ticket_id: int, db: Session = Depends(get_db), user: Users = Depends(get_current_user)):
     ticket = db.get(SupportTicket, ticket_id)
     if not ticket:
@@ -135,7 +123,7 @@ def list_messages(ticket_id: int, db: Session = Depends(get_db), user: Users = D
 async def create_message(
     ticket_id: int = Form(...),
     message: str = Form(...),
-    file: UploadFile | None = File(None),
+    file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     user: Users = Depends(get_current_user)
 ):
@@ -143,8 +131,7 @@ async def create_message(
     Tạo tin nhắn:
     - Người dùng: gửi bổ sung vào ticket của chính mình
     - Support/Admin: trả lời vào bất kỳ ticket nào (support:reply)
-    - Nếu Support/Admin trả lời => ticket.status = processed
-    - Nếu User (chủ ticket) phản hồi => ticket.status = processing
+    - File đính kèm sẽ được lưu lên Cloudinary
     """
     ticket = db.get(SupportTicket, ticket_id)
     if not ticket:
@@ -154,9 +141,14 @@ async def create_message(
     if not is_owner:
         require_perm("support:reply")(user)
 
+    # ✅ THAY ĐỔI: Upload file trực tiếp lên Cloudinary
     attachment_url = None
     if file:
-        attachment_url = _save_attachment(ticket_id, file)
+        content = await file.read()
+        if content:
+            attachment_url = upload_image_to_cloudinary(content, folder=f"zestguard/support/ticket_{ticket_id}")
+            if not attachment_url:
+                raise HTTPException(status_code=500, detail="Lỗi khi tải file đính kèm lên cloud")
 
     msg = SupportMessage(
         ticket_id=ticket_id,

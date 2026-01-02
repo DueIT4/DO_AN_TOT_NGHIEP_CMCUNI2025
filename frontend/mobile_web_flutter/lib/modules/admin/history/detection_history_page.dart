@@ -112,31 +112,39 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
   }
 
   Widget _buildThumb(DetectionHistoryItem item) {
-    if (item.fileUrl.isEmpty) {
-      return const SizedBox(
-        width: 72,
-        height: 72,
-        child: Icon(Icons.image_not_supported),
-      );
-    }
-
-    final fullUrl = '${ApiBase.baseURL}${item.fileUrl}';
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Image.network(
-        fullUrl,
-        width: 72,
-        height: 72,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const SizedBox(
-          width: 72,
-          height: 72,
-          child: Icon(Icons.broken_image),
-        ),
-      ),
+  if (item.fileUrl.isEmpty) {
+    return const SizedBox(
+      width: 72,
+      height: 72,
+      child: Icon(Icons.image_not_supported),
     );
   }
+
+  // --- SỬA TẠI ĐÂY ---
+  String fullUrl = item.fileUrl;
+  
+  // Nếu URL không bắt đầu bằng http (tức là link local cũ) thì mới nối baseURL
+  if (!fullUrl.startsWith('http')) {
+    fullUrl = '${ApiBase.baseURL}${fullUrl.startsWith('/') ? '' : '/'}$fullUrl';
+  }
+  // -------------------
+
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(8),
+    child: Image.network(
+      fullUrl,
+      width: 72,
+      height: 72,
+      fit: BoxFit.cover,
+      // Hỗ trợ cache-busting nếu cần
+      errorBuilder: (_, __, ___) => const SizedBox(
+        width: 72,
+        height: 72,
+        child: Icon(Icons.broken_image),
+      ),
+    ),
+  );
+}
 
   Widget _buildStatusTag(DetectionHistoryItem item) {
     final conf = item.confidence;

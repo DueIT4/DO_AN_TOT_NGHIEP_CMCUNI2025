@@ -181,80 +181,80 @@ class _AdminProfileDialogState extends State<AdminProfileDialog> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final avt = _user?.avtUrl;
+Widget build(BuildContext context) {
+  // 1. Lấy URL từ model (BE hiện đã trả về link https://res.cloudinary...)
+  final fullAvtUrl = _user?.avtUrl;
 
-    // cache-bust để đổi avatar xong thấy ngay
-    final fullAvtUrl = (avt != null && avt.isNotEmpty)
-        ? '${ApiBase.baseURL}$avt?v=${DateTime.now().millisecondsSinceEpoch}'
-        : null;
+  // 2. Sử dụng trực tiếp NetworkImage với URL tuyệt đối
+  // Link Cloudinary không cần thêm cache-bust (?v=...) vì URL của nó là duy nhất
+  final avatarProvider = (fullAvtUrl != null && fullAvtUrl.isNotEmpty) 
+      ? NetworkImage(fullAvtUrl) 
+      : null;
 
-    final avatarProvider = fullAvtUrl != null ? NetworkImage(fullAvtUrl) : null;
-
-    return AlertDialog(
-      title: const Text('Thông tin cá nhân'),
-      content: SizedBox(
-        width: 520,
-        child: _loading
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            : SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_error != null) ...[
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 8),
+  return AlertDialog(
+    title: const Text('Thông tin cá nhân'),
+    content: SizedBox(
+      width: 520,
+      child: _loading
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_error != null) ...[
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: Colors.green.shade700,
+                        backgroundImage: avatarProvider,
+                        child: avatarProvider == null
+                            ? const Icon(Icons.person, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _user?.username ?? 'Admin',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _saving ? null : _pickAndUploadAvatar,
+                        icon: const Icon(Icons.image_outlined),
+                        label: const Text('Đổi avatar'),
+                      ),
                     ],
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 26,
-                          backgroundColor: Colors.green.shade700,
-                          backgroundImage: avatarProvider,
-                          child: avatarProvider == null
-                              ? const Icon(Icons.person, color: Colors.white)
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _user?.username ?? 'Admin',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: _saving ? null : _pickAndUploadAvatar,
-                          icon: const Icon(Icons.image_outlined),
-                          label: const Text('Đổi avatar'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const Divider(),
-                    TextField(
-                      controller: _usernameCtrl,
-                      decoration: const InputDecoration(labelText: 'Tên đăng nhập'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _phoneCtrl,
-                      decoration: const InputDecoration(labelText: 'Số điện thoại'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _emailCtrl,
-                      decoration: const InputDecoration(labelText: 'Email'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _addressCtrl,
-                      decoration: const InputDecoration(labelText: 'Địa chỉ'),
-                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Divider(),
+                  TextField(
+                    controller: _usernameCtrl,
+                    decoration: const InputDecoration(labelText: 'Tên đăng nhập'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _phoneCtrl,
+                    decoration: const InputDecoration(labelText: 'Số điện thoại'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _emailCtrl,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _addressCtrl,
+                    decoration: const InputDecoration(labelText: 'Địa chỉ'),
+                  ),
                     const SizedBox(height: 10),
                     if (_user?.roleType != null)
                       Text(

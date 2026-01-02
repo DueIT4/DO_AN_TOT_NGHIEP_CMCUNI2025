@@ -2,7 +2,7 @@
 import json
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
+import os
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -73,8 +73,16 @@ class Settings(BaseSettings):
     # ===== News (ADD) =====
     NEWS_API_KEY: str = ""  # ✅ thêm để đọc từ .env
     NEWSAPI_BASE_URL: str = "https://newsapi.org/v2"  # ✅ base url cho NewsAPI
-
-
+    # ===== Cloudflare R2 =====
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY: str = ""
+    R2_SECRET_KEY: str = ""
+    R2_BUCKET_NAME: str = ""
+    R2_PUBLIC_URL: str = "" # Dạng https://pub-xxx.r2.dev
+    # ... các cấu hình cũ ...
+    CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME")
+    CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY")
+    CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET")
 settings = Settings()
 
 # Debug (khuyên: chỉ bật khi dev)

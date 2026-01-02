@@ -15,26 +15,26 @@ class UserNotFoundError(Exception):
 
 class DetectionNotFoundError(Exception):
     pass
-
-
 def _normalize_file_url(raw: str | None) -> Optional[str]:
     """
-    Chuẩn hóa file_url:
-    - None => None
-    - "" => None
-    - "detections/2025/..." => "/media/detections/2025/..."
-    - "/media/detections/..." => giữ nguyên
+    Xử lý triệt để: Nếu là link Cloudinary thì giữ nguyên, 
+    nếu là link local cũ thì đảm bảo có /media/
     """
     if not raw:
         return None
+    
     p = raw.strip()
-    if not p:
-        return None
+    
+    # 1. Nếu đã là URL tuyệt đối (Cloudinary/Web) -> Trả về luôn
+    if p.startswith(("http://", "https://")):
+        return p
+
+    # 2. Xử lý ảnh local cũ
     if p.startswith("/media/"):
         return p
+    
+    # Nếu chỉ có path con (ví dụ: detections/2025/abc.jpg)
     return "/media/" + p.lstrip("/")
-
-
 def _normalize_confidence(raw) -> Optional[float]:
     """
     Trả về confidence 0..1 cho FE
@@ -69,11 +69,10 @@ def get_detection_history_for_user(
 ) -> DetectionHistoryList:
     """
     FIX: Trả 1 record lịch sử cho mỗi Img (mỗi ảnh),
-    chọn detection "best" theo confidence cao nhất,
-    nếu confidence bằng nhau thì lấy created_at mới nhất.
+    chọn detection "best" theo confidence cao nhất.
     """
 
-    # Subquery: best_conf per img_id
+    # Subquery: tìm confidence cao nhất cho mỗi img_id của user này
     sub_best = (
         db.query(
             Detection.img_id.label("img_id"),
@@ -85,16 +84,16 @@ def get_detection_history_for_user(
         .subquery()
     )
 
-    # Query: Img + Detection(best) + Disease
+    # Query chính: Kết hợp Img với Detection tốt nhất và Disease tương ứng
     q = (
         db.query(Detection, Img, Disease)
         .join(Img, Detection.img_id == Img.img_id)
-        .join(sub_best, sub_best.c.img_id == Img.img_id)
+        .join(sub_best, and_(
+            sub_best.c.img_id == Img.img_id,
+            Detection.confidence == sub_best.c.best_conf
+        ))
         .outerjoin(Disease, Detection.disease_id == Disease.disease_id)
-        .filter(
-            Img.user_id == user_id,
-            Detection.confidence == sub_best.c.best_conf,
-        )
+        .filter(Img.user_id == user_id)
         .order_by(desc(Img.created_at))
     )
 
@@ -119,7 +118,7 @@ def get_detection_history_for_user(
                 file_url=_normalize_file_url(img.file_url),
                 disease_name=disease.name if disease else None,
                 confidence=_normalize_confidence(det.confidence),
-                created_at=img.created_at,  # ✅ dùng created_at của ảnh để ổn định
+                created_at=img.created_at,
             )
         )
 
@@ -152,7 +151,7 @@ def get_detection_history_all_users(
     limit: int = 50,
     search: Optional[str] = None,
 ) -> DetectionHistoryList:
-    # Subquery best detection per img_id (all users)
+    # Subquery best detection per img_id (tất cả users)
     sub_best = (
         db.query(
             Detection.img_id.label("img_id"),
@@ -165,10 +164,12 @@ def get_detection_history_all_users(
     q = (
         db.query(Detection, Img, Disease, Users)
         .join(Img, Detection.img_id == Img.img_id)
-        .join(sub_best, sub_best.c.img_id == Img.img_id)
+        .join(sub_best, and_(
+            sub_best.c.img_id == Img.img_id,
+            Detection.confidence == sub_best.c.best_conf
+        ))
         .outerjoin(Disease, Detection.disease_id == Disease.disease_id)
         .outerjoin(Users, Img.user_id == Users.user_id)
-        .filter(Detection.confidence == sub_best.c.best_conf)
         .order_by(desc(Img.created_at))
     )
 

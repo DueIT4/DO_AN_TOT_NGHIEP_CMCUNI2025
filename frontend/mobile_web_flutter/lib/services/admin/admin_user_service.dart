@@ -1,9 +1,11 @@
 // lib/core/admin_user_service.dart
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart'; // ✅ Thêm để xử lý MediaType
 
 import 'package:mobile_web_flutter/core/api_base.dart';
-import 'package:mobile_web_flutter/models/admin/admin_user_search_result.dart'; // <- thêm dòng này
+import 'package:mobile_web_flutter/models/admin/admin_user_search_result.dart';
 
 class AdminUserService {
   static final http.Client _client = http.Client();
@@ -32,6 +34,7 @@ class AdminUserService {
     return AdminUserSearchResult.fromJson(map);
   }
 
+  /// TẠO USER (ADMIN) - Hỗ trợ upload Avatar lên Cloudinary
   static Future<Map<String, dynamic>> createUser({
     required String username,
     required String phone,
@@ -40,6 +43,8 @@ class AdminUserService {
     String? address,
     int? roleId,
     String? status, // active / inactive
+    Uint8List? avatarBytes, // ✅ Thêm
+    String? avatarName,     // ✅ Thêm
   }) async {
     final uri = Uri.parse(
       '${ApiBase.baseURL}${ApiBase.api('/users/create')}',
@@ -66,6 +71,19 @@ class AdminUserService {
       request.fields['status'] = status;
     }
 
+    // ✅ Gửi file ảnh lên Cloudinary qua Backend
+    if (avatarBytes != null && avatarName != null) {
+      final ext = avatarName.split('.').last.toLowerCase();
+      final mimeType = (ext == 'png') ? 'image/png' : 'image/jpeg';
+      
+      request.files.add(http.MultipartFile.fromBytes(
+        'file', // ✅ Khớp với backend: file: UploadFile = File(None)
+        avatarBytes,
+        filename: avatarName,
+        contentType: MediaType.parse(mimeType),
+      ));
+    }
+
     final resp = await _client.send(request);
     final body = await resp.stream.bytesToString();
 
@@ -79,6 +97,7 @@ class AdminUserService {
     return Map<String, dynamic>.from(json as Map);
   }
 
+  /// CẬP NHẬT USER (ADMIN) - Hỗ trợ cập nhật Avatar lên Cloudinary
   static Future<Map<String, dynamic>> updateUser({
     required int userId,
     String? username,
@@ -88,6 +107,8 @@ class AdminUserService {
     String? address,
     int? roleId,
     String? status, // active / inactive
+    Uint8List? avatarBytes, // ✅ Thêm
+    String? avatarName,     // ✅ Thêm
   }) async {
     final uri = Uri.parse(
       '${ApiBase.baseURL}${ApiBase.api('/users/update/$userId')}',
@@ -113,6 +134,19 @@ class AdminUserService {
       request.fields['status'] = status;
     }
 
+    // ✅ Gửi file ảnh cập nhật
+    if (avatarBytes != null && avatarName != null) {
+      final ext = avatarName.split('.').last.toLowerCase();
+      final mimeType = (ext == 'png') ? 'image/png' : 'image/jpeg';
+
+      request.files.add(http.MultipartFile.fromBytes(
+        'file', // ✅ Khớp với backend update_user
+        avatarBytes,
+        filename: avatarName,
+        contentType: MediaType.parse(mimeType),
+      ));
+    }
+
     final resp = await _client.send(request);
     final body = await resp.stream.bytesToString();
 
@@ -126,7 +160,6 @@ class AdminUserService {
     return Map<String, dynamic>.from(json as Map);
   }
 
-  /// vẫn giữ hàm deleteUser (gọi /delete) – BE đã đổi qua set inactive
   static Future<void> deleteUser(int userId) async {
     final uri = Uri.parse(
       '${ApiBase.baseURL}${ApiBase.api('/users/delete/$userId')}',

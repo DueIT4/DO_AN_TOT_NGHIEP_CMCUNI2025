@@ -24,6 +24,9 @@ def list_tickets_admin(
     skip: int,
     limit: int,
 ) -> AdminTicketList:
+    """
+    Lấy danh sách ticket cho admin với phân trang, lọc theo trạng thái và tìm kiếm.
+    """
     q = (
         db.query(SupportTicket, Users)
         .join(Users, SupportTicket.user_id == Users.user_id)
@@ -45,20 +48,18 @@ def list_tickets_admin(
     rows = q.offset(skip).limit(limit).all()
 
     items: List[AdminTicketListItem] = []
-    # app/services/support_admin_service.py
     for ticket, user in rows:
         items.append(
-        AdminTicketListItem(
-            ticket_id=ticket.ticket_id,
-            user_id=ticket.user_id,
-            username=user.username,
-            title=ticket.title,
-            description=ticket.description,   # 👈 THÊM DÒNG NÀY
-            status=ticket.status,
-            created_at=ticket.created_at,
+            AdminTicketListItem(
+                ticket_id=ticket.ticket_id,
+                user_id=ticket.user_id,
+                username=user.username,
+                title=ticket.title,
+                description=ticket.description,
+                status=ticket.status,
+                created_at=ticket.created_at,
+            )
         )
-    )
-
 
     return AdminTicketList(total=total, items=items)
 
@@ -67,6 +68,10 @@ def get_ticket_detail_admin(
     db: Session,
     ticket_id: int,
 ) -> AdminTicketDetail:
+    """
+    Lấy chi tiết 1 ticket bao gồm toàn bộ hội thoại.
+    attachment_url trả về sẽ tự động tương thích với link Cloudinary (https://).
+    """
     ticket = db.get(SupportTicket, ticket_id)
     if not ticket:
         raise TicketNotFoundError
@@ -90,7 +95,7 @@ def get_ticket_detail_admin(
                 sender_id=msg.sender_id,
                 sender_name=sender.username if sender else "Hệ thống",
                 message=msg.message,
-                attachment_url=msg.attachment_url,
+                attachment_url=msg.attachment_url, # Trả về link Cloudinary lưu trong DB
                 created_at=msg.created_at,
             )
         )
@@ -98,7 +103,7 @@ def get_ticket_detail_admin(
     return AdminTicketDetail(
         ticket_id=ticket.ticket_id,
         user_id=ticket.user_id,
-        username=user.username if user else None,
+        username=user.username if user else "Người dùng đã xóa",
         title=ticket.title,
         description=ticket.description,
         status=ticket.status,
@@ -114,6 +119,10 @@ def add_admin_message(
     message: str,
     attachment_url: Optional[str] = None,
 ) -> AdminSupportMessageOut:
+    """
+    Admin gửi tin nhắn trả lời.
+    attachment_url nhận được từ routes_support_admin (đã upload lên Cloudinary).
+    """
     ticket = db.get(SupportTicket, ticket_id)
     if not ticket:
         raise TicketNotFoundError
@@ -125,6 +134,10 @@ def add_admin_message(
         attachment_url=attachment_url,
     )
     db.add(msg)
+    
+    # Đồng thời cập nhật trạng thái ticket khi admin phản hồi
+    ticket.status = "processed"
+    
     db.commit()
     db.refresh(msg)
 
@@ -146,6 +159,9 @@ def update_ticket_status(
     ticket_id: int,
     status: str,
 ) -> AdminTicketDetail:
+    """
+    Cập nhật trạng thái thủ công cho ticket.
+    """
     ticket = db.get(SupportTicket, ticket_id)
     if not ticket:
         raise TicketNotFoundError
@@ -154,5 +170,4 @@ def update_ticket_status(
     db.commit()
     db.refresh(ticket)
 
-    # trả về detail luôn
     return get_ticket_detail_admin(db, ticket_id)

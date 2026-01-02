@@ -3,16 +3,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.services.permissions import require_perm
 from app.models.user import Users
 from app.schemas.user import UserOut
-from datetime import datetime
-from app.services.passwords import hash_password, verify_password  # ✅ giống auth bạn
-from app.models.user import Users
+from app.services.passwords import hash_password, verify_password
 from app.schemas.user import ChangePasswordIn
+from app.services.cloudinary_service import upload_image_to_cloudinary  # ✅ Thêm service Cloudinary
+
 router = APIRouter(prefix="/me", tags=["me"])
 
 
@@ -97,7 +98,7 @@ def update_me(
     )
 
 
-# 🔥 API RIÊNG: cập nhật avatar
+# 🔥 API RIÊNG: cập nhật avatar lên Cloudinary
 @router.post(
     "/update_avatar",
     response_model=UserOut,
@@ -113,28 +114,15 @@ async def update_avatar(
     if not content:
         raise HTTPException(status_code=400, detail="File avatar trống")
 
-    # 2. Lưu file vào media/avatars/YYYY/MM/DD
-    MEDIA_ROOT = Path("media") / "avatars"
+    # 2. Tải lên Cloudinary thay vì lưu vào Disk
+    # Folder được đặt là 'zestguard/avatars' để quản lý riêng với ảnh detection
+    image_url = upload_image_to_cloudinary(content, folder="zestguard/avatars")
+    
+    if not image_url:
+        raise HTTPException(status_code=500, detail="Lỗi khi tải ảnh đại diện lên Cloudinary")
 
-    now = datetime.now()  # dùng giờ local của server
-    subdir = MEDIA_ROOT / str(now.year) / f"{now.month:02d}" / f"{now.day:02d}"
-    subdir.mkdir(parents=True, exist_ok=True)
-
-    safe_name = avatar.filename.replace(" ", "_")
-    filename = f"{now.strftime('%H%M%S_%f')}_{user.user_id}_{safe_name}"
-    full_path = subdir / filename
-
-    with open(full_path, "wb") as f:
-        f.write(content)
-
-    # 3. Tạo đường dẫn cho FE
-    # Giống cách bạn lưu detect: lưu path tương đối dưới 'media'
-    rel_path = full_path.relative_to(Path("media"))
-    # Nếu FE đang serve /media/* thì avt_url có thể là "/media/<rel_path>"
-    user.avt_url = f"/media/{rel_path.as_posix()}"
-
-    # 4. (Tuỳ chọn) Xoá avatar cũ nếu bạn muốn dọn rác
-    # TODO: nếu user.avt_url cũ là file local, có thể unlink
+    # 3. Cập nhật URL mới vào database (Lưu link https://res.cloudinary.com/...)
+    user.avt_url = image_url
 
     db.commit()
     db.refresh(user)

@@ -1,4 +1,7 @@
-import 'dart:html' as html;
+// lib/services/admin/detection_history_service.dart
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:html' as html; // Lưu ý: Chỉ dùng được trên Flutter Web
 
 import 'package:http/http.dart' as http;
 import 'package:mobile_web_flutter/core/api_base.dart';
@@ -7,14 +10,15 @@ import 'package:mobile_web_flutter/models/admin/detection_history_models.dart';
 /// Số bản ghi mỗi trang (dùng chung cho FE)
 const int PAGE_SIZE = 20;
 
-/// Service chỉ dùng cho ADMIN
+/// Service chỉ dùng cho ADMIN quản lý lịch sử nhận diện toàn hệ thống
 class DetectionHistoryService {
   final http.Client _client;
 
   DetectionHistoryService({http.Client? client})
       : _client = client ?? http.Client();
 
-  /// ADMIN: GET /api/v1/detection-history/admin?skip=&limit=&search=
+  /// ADMIN: Lấy toàn bộ lịch sử nhận diện của tất cả người dùng
+  /// Backend mới trả về URL Cloudinary trực tiếp trong trường file_url
   Future<DetectionHistoryList> getAllHistoryAdmin({
     required int page,
     String? search,
@@ -40,7 +44,7 @@ class DetectionHistoryService {
     return DetectionHistoryList.fromJson(map);
   }
 
-  /// ADMIN: DELETE /api/v1/detection-history/admin/{detection_id}
+  /// ADMIN: Xoá một bản ghi lịch sử bất kỳ
   Future<void> deleteDetectionAdmin(int detectionId) async {
     final uri = Uri.parse(
       '${ApiBase.baseURL}${ApiBase.api('/detection-history/admin/$detectionId')}',
@@ -61,7 +65,8 @@ class DetectionHistoryService {
     }
   }
 
-  /// ⭐ Gọi API: POST /detection-history/{detection_id}/export-train
+  /// ⭐ Xuất dữ liệu nhận diện vào tập dữ liệu Training (Dataset)
+  /// Backend sẽ tải ảnh từ Cloudinary về, crop theo bbox và lưu vào thư mục dataset
   Future<void> exportToTrainData(int detectionId) async {
     final url = '${ApiBase.baseURL}'
         '${ApiBase.api('/detection-history/$detectionId/export-train')}';
@@ -74,7 +79,7 @@ class DetectionHistoryService {
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
 
-    final resp = await http.post(
+    final resp = await _client.post(
       Uri.parse(url),
       headers: headers,
     );
@@ -84,6 +89,7 @@ class DetectionHistoryService {
     }
   }
 
+  /// Tải về toàn bộ Dataset dạng ZIP từ server
   Future<void> downloadDatasetTrain() async {
     final url = '${ApiBase.baseURL}'
         '${ApiBase.api('/dataset/admin/download')}';
@@ -95,7 +101,7 @@ class DetectionHistoryService {
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
 
-    final resp = await http.get(
+    final resp = await _client.get(
       Uri.parse(url),
       headers: headers,
     );
@@ -104,15 +110,19 @@ class DetectionHistoryService {
       throw Exception('Lỗi tải dataset: ${resp.statusCode} ${resp.body}');
     }
 
-    // Tạo file download (Flutter Web)
-    final bytes = resp.bodyBytes;
-    final blob = html.Blob([bytes], 'application/zip');
-    final urlBlob = html.Url.createObjectUrlFromBlob(blob);
+    // Xử lý tải file cho môi trường Flutter Web
+    try {
+      final bytes = resp.bodyBytes;
+      final blob = html.Blob([bytes], 'application/zip');
+      final urlBlob = html.Url.createObjectUrlFromBlob(blob);
 
-    final anchor = html.AnchorElement(href: urlBlob)
-      ..download = "dataset_train.zip"
-      ..click();
+      final anchor = html.AnchorElement(href: urlBlob)
+        ..download = "zestguard_dataset_${DateTime.now().millisecondsSinceEpoch}.zip"
+        ..click();
 
-    html.Url.revokeObjectUrl(urlBlob);
+      html.Url.revokeObjectUrl(urlBlob);
+    } catch (e) {
+      throw Exception('Trình duyệt không hỗ trợ tải file trực tiếp: $e');
+    }
   }
 }

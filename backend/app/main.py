@@ -1,6 +1,7 @@
 # app/main.py
 from pathlib import Path
 import logging
+import os  # ✅ Thêm mới để đọc biến môi trường
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -12,21 +13,33 @@ from starlette.staticfiles import StaticFiles
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
 from sqlalchemy.orm import configure_mappers
+from dotenv import load_dotenv  # ✅ Thêm mới để nạp file .env
 
 from app.core.config import settings
+
+# ==== 1. Load Biến môi trường (.env) ====
+# Phải gọi load_dotenv TRƯỚC khi các service khác (như Cloudinary) khởi tạo
+load_dotenv() 
 
 # Import models để SQLAlchemy map đầy đủ
 import app.models  # noqa: F401
 from app.models import user, role, auth_account  # noqa: F401
 
-# ==== Logging ====
+# ==== 2. Logging Configuration ====
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+# Kiểm tra log xem đã nhận được Cloudinary URL chưa (Giải quyết lỗi 500)
+c_url = os.getenv("CLOUDINARY_URL")
+if c_url:
+    logger.info(f"🚀 Cloudinary Configured: {c_url[:20]}...")
+else:
+    logger.warning("⚠️ CLOUDINARY_URL không tìm thấy trong file .env - Sẽ gây lỗi 500 khi upload")
 
 # Bắt buộc gọi trước khi tạo app nếu có relationships phức tạp
 configure_mappers()
 
-# ==== Routers ====
+# ==== 3. Import Routers ====
 from app.api.v1.routes_health import router as health_router
 from app.api.v1.routes_detect import router as detect_router
 from app.api.v1.routes_auth import router as auth_router
@@ -43,19 +56,17 @@ from app.api.v1.routes_dashboard import router as dashboard_router
 from app.api.v1.routes_support_admin import router as support_admin_router
 from app.api.v1.routes_device_types import router as routes_device_types
 from app.api.v1.routes_dataset_admin import router as routes_dataset_admin
-from app.api.v1.routes_reports import router as routes_reports   # 👈 thêm
+from app.api.v1.routes_reports import router as routes_reports
 from app.api.v1.routes_weather import router as weather_router
 from app.api.v1.routes_news import router as news_router
-from app.api.v1.routes_chatbot import router as chatbot
 from app.api.v1.routes_chatbot import router as chatbot_router
-from app.api.v1.routes_stream import router as stream_router  # ✅ MJPEG → HLS conversion
-from app.api.v1.routes_streams import router as streams_router  # ✅ Stream management (devices)
-
+from app.api.v1.routes_stream import router as stream_router
+from app.api.v1.routes_streams import router as streams_router
 
 API_PREFIX = getattr(settings, "API_V1", "/api/v1")
 
 tags_metadata = [
-    {"name": "Detection", "description": "Upload/Camera → ONNX → LLM → lưu DB."},
+    {"name": "Detection", "description": "Upload/Camera → ONNX → LLM → Cloudinary → lưu DB."},
     {"name": "Notifications", "description": "Thông báo hệ thống cho người dùng."},
     {"name": "Support", "description": "Ticket & hội thoại hỗ trợ khách hàng."},
     {"name": "Users", "description": "Quản lý người dùng & hồ sơ cá nhân."},
@@ -71,49 +82,19 @@ app = FastAPI(
     openapi_tags=tags_metadata,
 )
 
-# ==== Middleware để log requests (Debug) ====
+# ==== 4. Middleware log requests (Debug Terminal) ====
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    logger.info(f"📨 {request.method} {request.url.path}")
+    logger.info(f"Incoming: {request.method} {request.url.path}")
     response = await call_next(request)
-    logger.info(f"📤 {request.method} {request.url.path} → {response.status_code}")
+    logger.info(f"Outgoing: {request.method} {request.url.path} -> {response.status_code}")
     return response
 
-# ==== Middlewares ====
-# ⚠️ Dev: KHÔNG dùng "*" nếu allow_credentials=True (browser sẽ chặn CORS)
-# Hãy whitelist origin của Flutter Web dev server (port có thể thay đổi)
-DEFAULT_DEV_ORIGINS = [
-    "http://localhost:61164",
-    "http://127.0.0.1:61164",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:57174",
-    "http://127.0.0.1:57174",
-]
-
-cors_origins = getattr(settings, "CORS_ORIGINS", None)
-cors_origin_regex = getattr(settings, "CORS_ORIGIN_REGEX", None)
-
-# Nếu settings.CORS_ORIGINS không set hoặc để ["*"] thì dùng danh sách dev ở trên
-if not cors_origins or cors_origins == ["*"] or cors_origins == "*":
-    cors_origins = DEFAULT_DEV_ORIGINS
-
-
-# Flutter Web dev server thường chạy localhost với port ngẫu nhiên.
-# Cho phép bất kỳ port localhost khi ở môi trường dev bằng regex.
-if not cors_origin_regex and getattr(settings, "APP_ENV", "dev") != "prod":
-    cors_origin_regex = r"https?://(localhost|127\\.0\\.0\\.1):\\d+"
-
-logger.info(f"🌐 CORS Origins: {cors_origins}")
-logger.info(f"🌐 CORS Regex: {cors_origin_regex}")
-
-
+# ==== 5. Middlewares & CORS (Sửa lỗi chặn request từ Web) ====
+# Cho phép tất cả các nguồn khi phát triển để tránh lỗi Port ngẫu nhiên của Flutter Web
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_origin_regex=cors_origin_regex,
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -122,23 +103,23 @@ app.add_middleware(
 
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
-# Khi lên production, nên giới hạn host cụ thể
 if getattr(settings, "APP_ENV", "dev") == "prod":
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])  # TODO: thay * bằng domain thật
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
-# ==== Static / Media ====
+# ==== 6. Static / Media / HLS Directories ====
 MEDIA_DIR = Path("media")
 AVT_DIR = MEDIA_DIR / "avatars"
 UPLOADS_DIR = Path("uploads") / "support"
+HLS_TMP_DIR = Path("/tmp/hls")
 
-MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-AVT_DIR.mkdir(parents=True, exist_ok=True)
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+for d in [MEDIA_DIR, AVT_DIR, UPLOADS_DIR, HLS_TMP_DIR]:
+    d.mkdir(parents=True, exist_ok=True)
 
 app.mount("/media", StaticFiles(directory=str(MEDIA_DIR), html=False), name="media")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/tmp/hls", StaticFiles(directory="/tmp/hls"), name="tmp_hls")
 
-# ==== Routers ====
+# ==== 7. Routers Registration ====
 app.include_router(health_router, prefix=API_PREFIX)
 app.include_router(detect_router, prefix=API_PREFIX)
 app.include_router(auth_router, prefix=API_PREFIX)
@@ -146,61 +127,51 @@ app.include_router(users_router, prefix=API_PREFIX)
 app.include_router(me_router, prefix=API_PREFIX)
 app.include_router(support_router, prefix=API_PREFIX)
 app.include_router(notifications_router, prefix=API_PREFIX)
-
 app.include_router(users_devices_router, prefix=API_PREFIX)
 app.include_router(sensors_router, prefix=API_PREFIX)
 app.include_router(device_logs_router, prefix=API_PREFIX)
-
 app.include_router(devices_router, prefix=API_PREFIX)
 app.include_router(detection_history_router, prefix=API_PREFIX)
 app.include_router(dashboard_router, prefix=API_PREFIX)
 app.include_router(support_admin_router, prefix=API_PREFIX)
 app.include_router(routes_device_types, prefix=API_PREFIX)
 app.include_router(routes_dataset_admin, prefix=API_PREFIX)
-app.include_router(routes_reports,prefix=API_PREFIX)  # 👈 thêm
+app.include_router(routes_reports, prefix=API_PREFIX)
 app.include_router(weather_router, prefix=API_PREFIX)
-app.include_router(chatbot, prefix=API_PREFIX)
 app.include_router(news_router, prefix=API_PREFIX)
 app.include_router(chatbot_router, prefix=API_PREFIX)
-app.include_router(stream_router, prefix=API_PREFIX)  # ✅ MJPEG → HLS conversion
-app.include_router(streams_router, prefix=API_PREFIX)  # ✅ Stream management
+app.include_router(stream_router, prefix=API_PREFIX)
+app.include_router(streams_router, prefix=API_PREFIX)
 
-# ==== Root & tiện ích ====
+# ==== 8. Root & Tiện ích ====
 @app.get("/")
 def root():
     return JSONResponse({"name": getattr(settings, "APP_NAME", "ZestGuard API"), "health": "ok", "docs": "/docs"})
 
-
+# ✅ Đã sửa: Bọc an toàn Scheduler để không làm sập server nếu thiếu file
 @app.on_event("startup")
 async def startup_event():
-    """Initialize scheduler on app startup."""
+    logger.info("✅ Server startup: System is ready")
     try:
         from app.services.scheduler_service import start_scheduler
         start_scheduler()
-        logger.info("✅ Scheduler khởi động thành công")
+        logger.info("⏰ Scheduler khởi động thành công")
     except Exception as e:
-        logger.error(f"❌ Lỗi khi khởi động scheduler: {e}", exc_info=True)
+        logger.warning(f"⚠️ Tạm thời bỏ qua Scheduler: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Clean up scheduler on app shutdown."""
     try:
         from app.services.scheduler_service import stop_scheduler
         stop_scheduler()
-        logger.info("✅ Scheduler dừng thành công")
+        logger.info("⏰ Scheduler dừng thành công")
     except Exception as e:
-        logger.error(f"❌ Lỗi khi dừng scheduler: {e}", exc_info=True)
-
+        pass
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     return Response(status_code=204)
 
-@app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
-def chrome_devtools_probe():
-    return Response(status_code=204)
-
-# ==== Error handler cho 422 ====
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(

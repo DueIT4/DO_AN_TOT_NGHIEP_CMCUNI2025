@@ -1,20 +1,14 @@
+// app/services/support_service.py
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:http_parser/http_parser.dart'; // ✅ Thêm để xử lý MediaType
 
 import '../core/api_base_app.dart';
 import 'api_client.dart';
 
-/// =========================
-/// SupportService (Refactored – Detection-style)
-/// =========================
-/// - Dùng ApiBase.uri(...) thay vì parse string
-/// - Multipart dùng http.Response.fromStream
-/// - Chuẩn hoá lỗi bằng Exception (fail fast)
-/// - Chuẩn hoá attachment_url (relative -> absolute)
-/// =========================
 class SupportService {
   SupportService._();
 
@@ -30,6 +24,7 @@ class SupportService {
     }
   }
 
+  // ✅ CẬP NHẬT: Ưu tiên link Cloudinary tuyệt đối
   static String? normalizeFileUrl(String? raw) {
     if (raw == null || raw.isEmpty) return null;
     if (raw.startsWith('http')) return raw;
@@ -43,25 +38,20 @@ class SupportService {
   static Future<List<dynamic>> fetchMyTickets() async {
     final uri = ApiBase.uri('/support/tickets/my_list');
 
-    http.Response resp;
     try {
-      resp = await http
+      final resp = await http
           .get(uri, headers: ApiClient.authHeaders())
           .timeout(const Duration(seconds: 20));
-    } on TimeoutException {
-      throw Exception('Hết thời gian kết nối máy chủ hỗ trợ.');
-    }
 
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Lỗi lấy danh sách ticket (${resp.statusCode}): ${resp.body}');
-    }
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw Exception('Lỗi lấy danh sách ticket: ${resp.statusCode}');
+      }
 
-    final data = jsonDecode(resp.body);
-    if (data is! List) {
-      throw Exception('Dữ liệu ticket không hợp lệ.');
+      final data = jsonDecode(resp.body);
+      return data is List ? data : [];
+    } catch (e) {
+      throw Exception('Lỗi kết nối hỗ trợ: $e');
     }
-
-    return data;
   }
 
   static Future<Map<String, dynamic>> createTicket({
@@ -70,43 +60,19 @@ class SupportService {
   }) async {
     final uri = ApiBase.uri('/support/tickets/create_ticket');
 
-    http.Response resp;
-    try {
-      resp = await http
-          .post(
-            uri,
-            headers: ApiClient.authHeaders(),
-            body: jsonEncode({
-              'title': title,
-              'description': description,
-            }),
-          )
-          .timeout(const Duration(seconds: 20));
-    } on TimeoutException {
-      throw Exception('Hết thời gian kết nối máy chủ hỗ trợ.');
-    }
+    final resp = await http
+        .post(
+          uri,
+          headers: ApiClient.authHeaders(),
+          body: jsonEncode({
+            'title': title,
+            'description': description,
+          }),
+        )
+        .timeout(const Duration(seconds: 20));
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Tạo ticket thất bại (${resp.statusCode}): ${resp.body}');
-    }
-
-    return _decodeJson(resp.body);
-  }
-
-  static Future<Map<String, dynamic>> fetchTicketDetail(int ticketId) async {
-    final uri = ApiBase.uri('/support/tickets/$ticketId/read_detail');
-
-    http.Response resp;
-    try {
-      resp = await http
-          .get(uri, headers: ApiClient.authHeaders())
-          .timeout(const Duration(seconds: 20));
-    } on TimeoutException {
-      throw Exception('Hết thời gian kết nối máy chủ hỗ trợ.');
-    }
-
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Lỗi lấy chi tiết ticket (${resp.statusCode}): ${resp.body}');
+      throw Exception('Tạo ticket thất bại: ${resp.body}');
     }
 
     return _decodeJson(resp.body);
@@ -119,39 +85,27 @@ class SupportService {
   static Future<List<dynamic>> fetchMessages(int ticketId) async {
     final uri = ApiBase.uri('/support/messages/of/$ticketId/getlistall_message');
 
-    http.Response resp;
-    try {
-      resp = await http
-          .get(uri, headers: ApiClient.authHeaders())
-          .timeout(const Duration(seconds: 20));
-    } on TimeoutException {
-      throw Exception('Hết thời gian kết nối máy chủ hỗ trợ.');
-    }
+    final resp = await http
+        .get(uri, headers: ApiClient.authHeaders())
+        .timeout(const Duration(seconds: 20));
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Lỗi lấy tin nhắn (${resp.statusCode}): ${resp.body}');
+      throw Exception('Lỗi lấy tin nhắn: ${resp.statusCode}');
     }
 
     final data = jsonDecode(resp.body);
-    if (data is! List) {
-      throw Exception('Dữ liệu tin nhắn không hợp lệ.');
-    }
+    if (data is! List) throw Exception('Dữ liệu không hợp lệ');
 
-    // Chuẩn hoá attachment_url
+    // Chuẩn hoá attachment_url sang Cloudinary URL tuyệt đối
     return data.map((m) {
       if (m is Map<String, dynamic>) {
-        final raw = m['attachment_url']?.toString();
-        m['attachment_url'] = normalizeFileUrl(raw);
+        m['attachment_url'] = normalizeFileUrl(m['attachment_url']?.toString());
       }
       return m;
     }).toList();
   }
 
-  /// Gửi tin nhắn hỗ trợ (multipart)
-  /// BE nhận field:
-  /// - ticket_id (Form)
-  /// - message   (Form)
-  /// - file      (UploadFile)
+  /// Gửi tin nhắn hỗ trợ kèm ảnh lên Cloudinary (qua Backend)
   static Future<Map<String, dynamic>> createMessage({
     required int ticketId,
     required String message,
@@ -166,33 +120,30 @@ class SupportService {
 
     if (file != null) {
       final bytes = await file.readAsBytes();
+      
+      // ✅ Xác định MediaType để Cloudinary xử lý đúng
+      final ext = file.name.split('.').last.toLowerCase();
+      final mimeType = (ext == 'png') ? 'image/png' : 'image/jpeg';
+
       request.files.add(
         http.MultipartFile.fromBytes(
-          'file', // ⚠️ BE nhận đúng field tên "file"
+          'file', // Field name khớp với Backend
           bytes,
-          filename: file.name.isNotEmpty ? file.name : 'attachment.jpg',
+          filename: file.name,
+          contentType: MediaType.parse(mimeType),
         ),
       );
     }
 
-    http.StreamedResponse streamed;
-    try {
-      streamed = await request.send().timeout(const Duration(seconds: 30));
-    } on TimeoutException {
-      throw Exception('Hết thời gian gửi tin nhắn hỗ trợ.');
-    }
-
+    final streamed = await request.send().timeout(const Duration(seconds: 30));
     final response = await http.Response.fromStream(streamed);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Gửi tin nhắn thất bại (${response.statusCode}): ${response.body}');
+      throw Exception('Gửi tin nhắn thất bại: ${response.body}');
     }
 
     final data = _decodeJson(response.body);
-
-    // Chuẩn hoá attachment_url trả về (nếu có)
-    final raw = data['attachment_url']?.toString();
-    data['attachment_url'] = normalizeFileUrl(raw);
+    data['attachment_url'] = normalizeFileUrl(data['attachment_url']?.toString());
 
     return data;
   }

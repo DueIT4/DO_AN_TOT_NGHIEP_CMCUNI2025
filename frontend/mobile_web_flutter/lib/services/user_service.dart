@@ -25,14 +25,16 @@ class UserService {
     }
   }
 
+  // ✅ CẬP NHẬT: Xử lý thông minh cho Cloudinary URL
   static String _resolveUrl(dynamic raw) {
     if (raw == null) return '';
     final v = raw.toString();
     if (v.isEmpty) return '';
+    
+    // Nếu là link tuyệt đối (Cloudinary), trả về luôn
     if (v.startsWith('http')) return v;
 
-    // ApiBase(host) bên user phải có .host
-    // nếu bạn đặt tên khác (baseUrl), đổi lại ở đây
+    // Nếu là link tương đối cũ, ghép với host
     return '${ApiBase.host}$v';
   }
 
@@ -54,28 +56,26 @@ class UserService {
   // -------------------------
   static Future<UserProfile> fetchProfile() async {
     _requireAuth();
-
     final uri = ApiBase.uri('/me/get_me');
 
-    http.Response resp;
     try {
-      resp = await http
+      final resp = await http
           .get(uri, headers: ApiClient.authHeaders())
           .timeout(const Duration(seconds: 20));
-    } on TimeoutException {
-      throw Exception('Hết thời gian kết nối máy chủ.');
-    }
 
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Lỗi lấy thông tin (${resp.statusCode}): ${resp.body}');
-    }
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw Exception('Lỗi lấy thông tin: ${resp.statusCode}');
+      }
 
-    final data = _decodeJsonMap(resp.body);
-    return _mapProfile(data);
+      final data = _decodeJsonMap(resp.body);
+      return _mapProfile(data);
+    } catch (e) {
+      throw Exception('Lỗi kết nối: $e');
+    }
   }
 
   // -------------------------
-  // PUT /me/update_me  (x-www-form-urlencoded)
+  // PUT /me/update_me
   // -------------------------
   static Future<UserProfile> updateProfile({
     String? username,
@@ -84,7 +84,6 @@ class UserService {
     String? address,
   }) async {
     _requireAuth();
-
     final uri = ApiBase.uri('/me/update_me');
 
     final body = <String, String>{};
@@ -93,24 +92,17 @@ class UserService {
     if (email != null) body['email'] = email;
     if (address != null) body['address'] = address;
 
-    http.Response resp;
-    try {
-      resp = await http
-          .put(
-            uri,
-            headers: ApiClient.authHeaders(
-              json: false,
-              extra: const {'Content-Type': 'application/x-www-form-urlencoded'},
-            ),
-            body: body,
-          )
-          .timeout(const Duration(seconds: 20));
-    } on TimeoutException {
-      throw Exception('Hết thời gian kết nối máy chủ.');
-    }
+    final resp = await http.put(
+      uri,
+      headers: ApiClient.authHeaders(
+        json: false,
+        extra: const {'Content-Type': 'application/x-www-form-urlencoded'},
+      ),
+      body: body,
+    ).timeout(const Duration(seconds: 20));
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Cập nhật thất bại (${resp.statusCode}): ${resp.body}');
+      throw Exception('Cập nhật thất bại');
     }
 
     final data = _decodeJsonMap(resp.body);
@@ -118,64 +110,43 @@ class UserService {
   }
 
   // -------------------------
-  // POST /me/update_avatar  (multipart)
-  // BE param: avatar: UploadFile = File(...)
-  // Field name MUST be 'avatar'
+  // POST /me/update_avatar
+  // BE: Đẩy bytes trực tiếp lên Cloudinary
   // -------------------------
   static Future<UserProfile> uploadAvatar(XFile file) async {
     _requireAuth();
-
     final uri = ApiBase.uri('/me/update_avatar');
 
     final request = http.MultipartRequest('POST', uri)
       ..headers.addAll(ApiClient.authHeaders(json: false));
 
-    // filename fallback
-    var filename = file.name;
-    if (filename.isEmpty) {
-      final seg = file.path.split('/');
-      filename = (seg.isNotEmpty && seg.last.isNotEmpty) ? seg.last : 'avatar.jpg';
-    }
-
-    // mime type
+    var filename = file.name.isEmpty ? 'avatar.jpg' : file.name;
     final mimeType = lookupMimeType(filename) ?? 'image/jpeg';
-    final parts = mimeType.split('/');
-    final mediaType = MediaType(parts[0], parts.length > 1 ? parts[1] : 'jpeg');
+    final mediaType = MediaType.parse(mimeType);
 
+    // Xử lý upload cho cả Web và Mobile
     if (kIsWeb) {
       final bytes = await file.readAsBytes();
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'avatar', // ✅ IMPORTANT: khớp backend
-          bytes,
-          filename: filename,
-          contentType: mediaType,
-        ),
-      );
+      request.files.add(http.MultipartFile.fromBytes(
+        'avatar', 
+        bytes,
+        filename: filename,
+        contentType: mediaType,
+      ));
     } else {
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'avatar', // ✅ IMPORTANT: khớp backend
-          file.path,
-          filename: filename,
-          contentType: mediaType,
-        ),
-      );
+      request.files.add(await http.MultipartFile.fromPath(
+        'avatar',
+        file.path,
+        filename: filename,
+        contentType: mediaType,
+      ));
     }
 
-    http.StreamedResponse streamed;
-    try {
-      streamed = await request.send().timeout(const Duration(seconds: 30));
-    } on TimeoutException {
-      throw Exception('Hết thời gian tải avatar.');
-    } catch (e) {
-      throw Exception('Không thể kết nối máy chủ: $e');
-    }
-
+    final streamed = await request.send().timeout(const Duration(seconds: 30));
     final resp = await http.Response.fromStream(streamed);
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Upload avatar thất bại (${resp.statusCode}): ${resp.body}');
+      throw Exception('Upload avatar thất bại');
     }
 
     final data = _decodeJsonMap(resp.body);
@@ -183,34 +154,26 @@ class UserService {
   }
 
   // -------------------------
-  // PUT /me/change_password (JSON)
+  // PUT /me/change_password
   // -------------------------
   static Future<void> changePassword({
     required String oldPassword,
     required String newPassword,
   }) async {
     _requireAuth();
-
     final uri = ApiBase.uri('/me/change_password');
 
-    http.Response resp;
-    try {
-      resp = await http
-          .put(
-            uri,
-            headers: ApiClient.authHeaders(),
-            body: jsonEncode({
-              'old_password': oldPassword,
-              'new_password': newPassword,
-            }),
-          )
-          .timeout(const Duration(seconds: 20));
-    } on TimeoutException {
-      throw Exception('Hết thời gian kết nối máy chủ.');
-    }
+    final resp = await http.put(
+      uri,
+      headers: ApiClient.authHeaders(),
+      body: jsonEncode({
+        'old_password': oldPassword,
+        'new_password': newPassword,
+      }),
+    ).timeout(const Duration(seconds: 20));
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Đổi mật khẩu thất bại (${resp.statusCode}): ${resp.body}');
+      throw Exception('Đổi mật khẩu thất bại');
     }
   }
 }

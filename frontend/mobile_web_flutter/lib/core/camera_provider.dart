@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Provider quản lý camera được chọn
-/// - Lưu selected camera vào local storage + server
-/// - Thông báo cho các page khác khi camera thay đổi
+/// Provider quản lý camera được chọn của người dùng
 class CameraProvider extends ChangeNotifier {
   int? _selectedCameraId;
   String? _selectedCameraName;
@@ -17,6 +15,7 @@ class CameraProvider extends ChangeNotifier {
     _loadFromStorage();
   }
 
+  // Khôi phục camera đã chọn từ lần đăng nhập trước
   Future<void> _loadFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -27,7 +26,7 @@ class CameraProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Cập nhật camera được chọn (từ DevicesPage hoặc HomeUserPage)
+  /// Cập nhật thiết bị mới được chọn
   Future<void> setSelectedCamera({
     required int deviceId,
     required String deviceName,
@@ -37,7 +36,6 @@ class CameraProvider extends ChangeNotifier {
     _selectedCameraName = deviceName;
     _selectedCameraStreamUrl = streamUrl;
 
-    // Lưu vào local storage
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('selected_camera_id', deviceId);
@@ -45,10 +43,11 @@ class CameraProvider extends ChangeNotifier {
       await prefs.setString('selected_camera_stream_url', streamUrl);
     } catch (_) {}
 
+    // Thông báo cho toàn bộ App (Home, CameraPage...) để cập nhật luồng stream
     notifyListeners();
   }
 
-  /// Clear selected camera
+  /// Xóa camera (ví dụ khi người dùng Logout hoặc xóa thiết bị)
   Future<void> clearSelectedCamera() async {
     _selectedCameraId = null;
     _selectedCameraName = null;

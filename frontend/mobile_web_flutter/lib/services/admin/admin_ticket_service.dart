@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:typed_data';
+import 'package:http_parser/http_parser.dart'; // ✅ Thêm để xử lý MediaType
 
 import 'package:mobile_web_flutter/core/api_base.dart';
 import 'package:mobile_web_flutter/models/admin/admin_ticket_models.dart';
-import 'dart:typed_data';
-import 'package:file_picker/file_picker.dart';
 
 class AdminTicketService {
   /// GET /support/admin/tickets
@@ -63,6 +62,8 @@ class AdminTicketService {
     final body = <String, dynamic>{
       'message': message,
     };
+    
+    // attachmentUrl bây giờ sẽ là link Cloudinary tuyệt đối trả về từ hàm upload
     if (attachmentUrl != null) {
       body['attachment_url'] = attachmentUrl;
     }
@@ -78,7 +79,6 @@ class AdminTicketService {
   }
 
   /// PATCH /support/admin/tickets/{ticket_id}/status
-  /// KHÔNG dùng ApiBase.patchJson, dùng http.patch trực tiếp
   static Future<AdminTicketDetail> updateTicketStatus({
     required int ticketId,
     required String status, // 'processing' | 'processed'
@@ -109,36 +109,53 @@ class AdminTicketService {
     final map = jsonDecode(resp.body) as Map<String, dynamic>;
     return AdminTicketDetail.fromJson(map);
   }
+
+  /// UPLOAD FILE LÊN CLOUDINARY (QUA BACKEND)
   static Future<String> uploadSupportAttachment({
-  required Uint8List bytes,
-  required String filename,
-}) async {
-  final uri = Uri.parse(
-    '${ApiBase.baseURL}${ApiBase.api('/support/admin/uploads')}',
-  );
+    required Uint8List bytes,
+    required String filename,
+  }) async {
+    final uri = Uri.parse(
+      '${ApiBase.baseURL}${ApiBase.api('/support/admin/uploads')}',
+    );
 
-  final token = ApiBase.bearer;
-  final req = http.MultipartRequest('POST', uri);
+    final token = ApiBase.bearer;
+    final req = http.MultipartRequest('POST', uri);
 
-  if (token != null && token.isNotEmpty) {
-    req.headers['Authorization'] = 'Bearer $token';
+    if (token != null && token.isNotEmpty) {
+      req.headers['Authorization'] = 'Bearer $token';
+    }
+    req.headers['Accept'] = 'application/json';
+
+    // ✅ CẢI TIẾN: Xác định Content-Type để Cloudinary nhận diện đúng
+    final ext = filename.split('.').last.toLowerCase();
+    String mimeType = 'image/jpeg';
+    if (ext == 'png') mimeType = 'image/png';
+    if (ext == 'webp') mimeType = 'image/webp';
+    if (ext == 'pdf') mimeType = 'application/pdf';
+
+    req.files.add(http.MultipartFile.fromBytes(
+      'file', // ✅ Khớp với backend: file: UploadFile = File(...)
+      bytes,
+      filename: filename,
+      contentType: MediaType.parse(mimeType),
+    ));
+
+    final streamed = await req.send();
+    final resp = await http.Response.fromStream(streamed);
+
+    if (resp.statusCode ~/ 100 != 2) {
+      throw Exception('Upload thất bại (${resp.statusCode}): ${resp.body}');
+    }
+
+    final map = jsonDecode(resp.body) as Map<String, dynamic>;
+    
+    // ✅ URL trả về từ Backend bây giờ đã là URL tuyệt đối từ Cloudinary
+    final url = (map['attachment_url'] ?? '').toString();
+    
+    if (url.isEmpty) {
+      throw Exception('Upload OK nhưng thiếu attachment_url: ${resp.body}');
+    }
+    return url;
   }
-
-  req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
-
-  final streamed = await req.send();
-  final resp = await http.Response.fromStream(streamed);
-
-  if (resp.statusCode ~/ 100 != 2) {
-    throw Exception('Upload thất bại (${resp.statusCode}): ${resp.body}');
-  }
-
-  final map = jsonDecode(resp.body) as Map<String, dynamic>;
-  final url = (map['attachment_url'] ?? '').toString();
-  if (url.isEmpty) {
-    throw Exception('Upload OK nhưng thiếu attachment_url: ${resp.body}');
-  }
-  return url;
-}
-
 }

@@ -3,46 +3,44 @@
 # ============================================
 
 import os
-import json
+import logging
 from collections import Counter
 from typing import List, Dict, Any, Tuple, Optional
 
-# SDK MỚI – KHÔNG DÙNG google.generativeai NỮA
-from google import genai  
+# SDK MỚI – Google GenAI
+from google import genai 
 from dotenv import load_dotenv
 
-# Load .env (đảm bảo chạy dù VSCode không inject)
+# Setup logging để theo dõi lỗi trên Cloud Run dễ hơn
+logger = logging.getLogger(__name__)
+
+# Load .env
 load_dotenv()
 
 # =====================================================
 # 1. LẤY API KEY + MODEL TỪ .env
 # =====================================================
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")   # KHÔNG BAO GIỜ LOG KEY RA !!!
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-
-print("[LLM] HAS API KEY:", bool(GEMINI_API_KEY))
-print("[LLM] USING MODEL:", GEMINI_MODEL)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") 
+# Sửa lại thành 2.0-flash để đảm bảo chạy được
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 # =====================================================
 # 2. TẠO CLIENT
 # =====================================================
-
 client = None
 if GEMINI_API_KEY:
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        print("[LLM] Gemini client initialized OK.")
+        logger.info(f"[LLM] Gemini client initialized OK with model: {GEMINI_MODEL}")
     except Exception as e:
-        print("[LLM] ERROR initializing Gemini client:", e)
+        logger.error(f"[LLM] ERROR initializing Gemini client: {e}")
 else:
-    print("[LLM] ❌ GEMINI_API_KEY missing! LLM disabled.")
+    logger.warning("[LLM] ❌ GEMINI_API_KEY missing! LLM disabled.")
 
 
 # =====================================================
-# 3. DANH SÁCH BỆNH / KHỎE ĐỂ PHÂN LOẠI DETECTIONS
+# 3. DANH SÁCH PHÂN LOẠI (Giữ nguyên của bạn)
 # =====================================================
-
 DISEASE_CLASS_KEYS = {
     "pomelo_leaf_miner",
     "pomelo_leaf_yellowing",
@@ -54,15 +52,12 @@ HEALTHY_CLASS_KEYS = {
     "pomelo_fruit_healthy",
 }
 
-
 # =====================================================
-# 4. TẠO PROMPT TỰ ĐỘNG
+# 4. TẠO PROMPT TỰ ĐỘNG (Giữ nguyên logic của bạn)
 # =====================================================
-
 def _build_prompt_from_detections(detections: List[Dict[str, Any]]) -> str:
-    """Sinh prompt mô tả bệnh + yêu cầu LLM trả về nội dung dạng 2 phần."""
-
-    # Không phát hiện gì
+    """Sinh prompt dựa trên kết quả AI phát hiện được."""
+    
     if not detections:
         return (
             "Hệ thống AI không phát hiện bệnh rõ ràng.\n\n"
@@ -85,8 +80,7 @@ def _build_prompt_from_detections(detections: List[Dict[str, Any]]) -> str:
         elif key in HEALTHY_CLASS_KEYS:
             healthy_items.append(name_vi)
 
-    # Chỉ khỏe
-    if len(disease_items) == 0:
+    if not disease_items:
         return (
             "AI nhận thấy các vùng quét đều thuộc nhóm khoẻ mạnh.\n\n"
             "Hãy trả lời theo đúng cấu trúc:\n\n"
@@ -96,48 +90,43 @@ def _build_prompt_from_detections(detections: List[Dict[str, Any]]) -> str:
             "- Hướng dẫn bảo dưỡng, chăm sóc, phòng ngừa.\n"
         )
 
-    # Có bệnh thật
     disease_counts = Counter(disease_items)
     lines = [f"- {name}: {cnt} vùng" for name, cnt in disease_counts.items()]
 
     return f"""
 Bạn là chuyên gia bệnh cây bưởi.
-
-AI phát hiện các bệnh sau:
+AI phát hiện các dấu hiệu sau trên cây:
 {chr(10).join(lines)}
 
-Hãy trả lời theo đúng format:
+Hãy trả lời theo đúng format sau đây (không được bỏ tag):
 
 [DISEASE_SUMMARY]
 - Giải thích cây đang bị gì, mức độ nặng nhẹ, triệu chứng.
 
 [CARE_INSTRUCTIONS]
 - Hướng dẫn xử lý chi tiết: biện pháp sinh học, cắt tỉa, vệ sinh vườn.
-- Nếu cần thuốc: chỉ ghi tên HOẠT CHẤT, không ghi thương hiệu.
+- Nếu cần dùng thuốc: chỉ ghi tên HOẠT CHẤT, không ghi thương hiệu cụ thể.
 - Hướng dẫn phòng ngừa sau này.
 """.strip()
 
 
 # =====================================================
-# 5. GỌI LLM + TÁCH KẾT QUẢ THÀNH 2 PHẦN
+# 5. GỌI LLM + TÁCH KẾT QUẢ
 # =====================================================
-
 def summarize_detections_with_llm(
     detections: List[Dict[str, Any]]
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Trả về: (disease_summary, care_instructions)
-    KHÔNG ĐỔI INTERFACE → tránh làm lỗi API detect.
     """
 
     if client is None:
-        print("[LLM] Client is None → LLM disabled.")
         return None, None
 
     prompt = _build_prompt_from_detections(detections)
 
     try:
-        # ===== GỌI GEMINI =====
+        # Gọi Gemini Model
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=prompt,
@@ -147,25 +136,21 @@ def summarize_detections_with_llm(
         if not full_text:
             return None, None
 
-        # ===== TÁCH HAI PHẦN =====
+        # Tách hai phần dựa trên tag
         text_lower = full_text.lower()
-
         idx_ds = text_lower.find("[disease_summary]")
         idx_ci = text_lower.find("[care_instructions]")
 
         if idx_ds == -1 or idx_ci == -1:
-            # LLM không theo format → return toàn bộ
+            # Nếu LLM không theo format, trả toàn bộ vào summary
             return full_text, None
 
+        # Cắt chuỗi lấy nội dung giữa các tag
         disease_summary = full_text[idx_ds + len("[DISEASE_SUMMARY]"): idx_ci].strip()
         care_instructions = full_text[idx_ci + len("[CARE_INSTRUCTIONS]"):].strip()
 
-        disease_summary = disease_summary or None
-        care_instructions = care_instructions or None
-
-        return disease_summary, care_instructions
+        return (disease_summary or None), (care_instructions or None)
 
     except Exception as e:
-        # In lỗi chi tiết
-        print("LLM ERROR:", e)
+        logger.error(f"LLM ERROR: {e}")
         return None, None
