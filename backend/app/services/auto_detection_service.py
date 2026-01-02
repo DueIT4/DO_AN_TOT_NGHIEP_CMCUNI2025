@@ -188,13 +188,20 @@ def detect_from_camera_auto(
         # 2. Setup Detector
         local_detector = detector
         if local_detector is None:
-            THIS_DIR = Path(__file__).resolve().parent
-            REPO_ROOT = THIS_DIR.parents[2]
-            MODEL_PATH = os.getenv("MODEL_PATH", str(REPO_ROOT / "ml/exports/v1.0/best.pt"))
+            # Xác định thư mục gốc của app dựa trên file này
+            # File ở: app/services/auto_detection_service.py -> lùi 1 cấp là app/
+            APP_ROOT = Path(__file__).resolve().parent.parent
+            
+            # Đường dẫn chuẩn trong Docker: app/weights/best.pt
+            DEFAULT_MODEL_PATH = str(APP_ROOT / "weights" / "best.pt")
+            MODEL_PATH = os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH)
+            
             try:
+                logger.info(f"[AutoDetection] Khởi tạo Detector với: {MODEL_PATH}")
                 local_detector = YoloDetector(MODEL_PATH)
-            except FileNotFoundError:
-                return {'success': False, 'error': f'Model not found: {MODEL_PATH}'}
+            except Exception as e:
+                logger.error(f"[AutoDetection] Không tìm thấy model: {e}")
+                return {'success': False, 'error': f'Model not found at {MODEL_PATH}'}
 
         all_detections = []
         best_confidence = 0.0

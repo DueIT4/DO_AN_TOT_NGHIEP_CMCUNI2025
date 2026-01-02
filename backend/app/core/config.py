@@ -80,9 +80,9 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME: str = ""
     R2_PUBLIC_URL: str = "" # Dạng https://pub-xxx.r2.dev
     # ... các cấu hình cũ ...
-    CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME")
-    CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY")
-    CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET")
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
 settings = Settings()
 
 # Debug (khuyên: chỉ bật khi dev)

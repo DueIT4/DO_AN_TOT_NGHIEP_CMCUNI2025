@@ -2,18 +2,22 @@
 import os
 from io import BytesIO
 from typing import List, Dict, Any
+from pathlib import Path  # Nên dùng Pathlib cho chuyên nghiệp
 
 from ultralytics import YOLO
 from PIL import Image
 
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
+# 1. Xác định đường dẫn gốc của thư mục 'app'
+# File này ở: backend/app/services/inference_service.py
+# .parent -> services/
+# .parent.parent -> app/
+APP_ROOT = Path(__file__).resolve().parent.parent
 
-MODEL_PATH = os.getenv(
-    "MODEL_PATH",
-    os.path.join(REPO_ROOT, "ml", "exports", "v1.0", "best.pt")
-)
+# 2. Cấu hình đường dẫn Model
+# Nếu bạn đã copy best.pt vào backend/app/weights/best.pt
+DEFAULT_MODEL_PATH = str(APP_ROOT / "weights" / "best.pt")
 
+MODEL_PATH = os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH)
 # 🔹 Map nhãn YOLO -> tên tiếng Việt
 VN_LABELS = {
     "pomelo_leaf_healthy": "Lá bưởi khỏe mạnh",
@@ -21,6 +25,7 @@ VN_LABELS = {
     "pomelo_leaf_yellowing": "Lá bưởi bị vàng lá",
     "pomelo_fruit_healthy": "Quả bưởi khỏe mạnh",
     "pomelo_fruit_scorch": "Quả bưởi bị cháy / nám vỏ",
+    "unknown": "Không xác định",
 }
 
 

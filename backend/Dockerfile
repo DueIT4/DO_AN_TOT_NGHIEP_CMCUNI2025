@@ -1,25 +1,21 @@
-# 1. Chọn hệ điều hành nhẹ có sẵn Python
-FROM python:3.11-slim
+FROM python:3.12-slim
 
-# 2. Cài đặt các thư viện hỗ trợ xử lý ảnh (OpenCV cần cái này)
+# Cài đặt thư viện hệ thống cho OpenCV/AI
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
-
-# 3. Tạo thư mục làm việc trong server ảo
+# ... (Các phần trên giữ nguyên)
 WORKDIR /app
+COPY backend/requirements.txt .
+RUN pip install -r requirements.txt
 
-# 4. Copy danh sách thư viện và cài đặt
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/ .
+# Copy cả model và labels vào cùng một cấu trúc
+RUN mkdir -p ml/exports/v1.0
+COPY ../ml/exports/v1.0/best.pt ./ml/exports/v1.0/
+COPY ../ml/exports/v1.0/labels.txt ./ml/exports/v1.0/ 
 
-# 5. Copy toàn bộ code từ máy bạn vào server ảo
-COPY . .
-
-# 6. Mở cổng để App có thể ra ngoài internet
-ENV PORT=8080
-EXPOSE 8080
-
-# 7. Lệnh để chạy App
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+ENV PYTHONPATH=/app
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

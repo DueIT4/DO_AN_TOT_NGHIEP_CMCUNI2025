@@ -151,20 +151,20 @@ def root():
 # ✅ Đã sửa: Bọc an toàn Scheduler để không làm sập server nếu thiếu file
 @app.on_event("startup")
 async def startup_event():
-    logger.info("✅ Server startup: System is ready")
+    logger.info(" Server startup: System is ready")
     try:
         from app.services.scheduler_service import start_scheduler
         start_scheduler()
-        logger.info("⏰ Scheduler khởi động thành công")
+        logger.info(" Scheduler khởi động thành công")
     except Exception as e:
-        logger.warning(f"⚠️ Tạm thời bỏ qua Scheduler: {e}")
+        logger.warning(f" Tạm thời bỏ qua Scheduler: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     try:
         from app.services.scheduler_service import stop_scheduler
         stop_scheduler()
-        logger.info("⏰ Scheduler dừng thành công")
+        logger.info(" Scheduler dừng thành công")
     except Exception as e:
         pass
 
