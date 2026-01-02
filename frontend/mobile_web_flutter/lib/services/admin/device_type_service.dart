@@ -4,7 +4,7 @@ class DeviceTypeService {
   /// Lấy danh sách tất cả loại thiết bị
   static Future<List<Map<String, dynamic>>> listDeviceTypes() async {
     final res = await ApiBase.getJson(
-      ApiBase.api('/device-types/device-types/'),
+      ApiBase.api('/device-types/'),
     );
 
     return (res as List)

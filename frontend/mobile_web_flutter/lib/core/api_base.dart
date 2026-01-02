@@ -34,11 +34,12 @@ class ApiBase {
   static set setBaseURL(String url) => _customBaseURL = url;
 
   static String get baseURL {
-    if (_customBaseURL != null) return _customBaseURL!;
-    
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000';
-    }
+if (_customBaseURL != null) return _customBaseURL!;
+  
+  if (kIsWeb) {
+    // Thay đổi mặc định thành https nếu deploy môi trường production
+    return 'https://zestguard-api-38261474833.asia-southeast1.run.app';
+  }
     if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:8000'; // Android emulator
     }
