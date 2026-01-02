@@ -1,5 +1,6 @@
-FROM python:3.11-bullseye
+FROM python:3.11-slim-bullseye
 
+# Cài đặt các gói cần thiết
 RUN apt-get update && apt-get install -y \
     wkhtmltopdf \
     fonts-liberation \
