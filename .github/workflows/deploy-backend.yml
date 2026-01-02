@@ -25,7 +25,6 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           gcloud auth configure-docker
-          # Build image từ thư mục backend
           docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/zestguard-api ./backend
           docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/zestguard-api
 
@@ -40,4 +39,4 @@ jobs:
             --memory 4Gi \
             --cpu 2 \
             --timeout 300 \
-            --set-env-vars "^|^DATABASE_URL=${{ secrets.DATABASE_URL }}|SMTP_USER=${{ secrets.SMTP_USER }}|SMTP_PASS=${{ secrets.SMTP_PASS }}|SMTP_HOST=${{ secrets.SMTP_HOST }}|SMTP_PORT=${{ secrets.SMTP_PORT }}|OPENWEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }}|GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}|NEWS_API_KEY=${{ secrets.NEWS_API_KEY }}|CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}|CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}|CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}|PYTHONPATH=/app|DEBUG=True|DATASET_ROOT=/tmp/dataset|NEWSAPI_BASE_URL=https://newsapi.org/v2"
+            --set-env-vars "^|^DATABASE_URL=${{ secrets.DATABASE_URL }}|SMTP_USER=${{ secrets.SMTP_USER }}|SMTP_PASS=${{ secrets.SMTP_PASS }}|SMTP_HOST=${{ secrets.SMTP_HOST }}|SMTP_PORT=${{ secrets.SMTP_PORT }}|OPENWEATHER_API_KEY=${{ secrets.OPENWEATHER_API_KEY }}|GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}|GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}|NEWS_API_KEY=${{ secrets.NEWS_API_KEY }}|NEWSAPI_BASE_URL=${{ secrets.NEWSAPI_BASE_URL }}|CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}|CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}|CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}|PYTHONPATH=/app|DEBUG=True|DATASET_ROOT=/tmp/dataset"
