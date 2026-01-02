@@ -19,7 +19,7 @@ router = APIRouter(prefix="/device-types", tags=["Device Types"])
 # =============================
 # 1) GET danh sách loại thiết bị (public / ai cũng dùng được)
 # =============================
-@router.get("/device-types", response_model=List[DeviceTypeOut])
+@router.get("/", response_model=List[DeviceTypeOut])
 def list_device_types(db: Session = Depends(get_db)):
     dts = svc.list_device_types(db)
     return [DeviceTypeOut.model_validate(dt) for dt in dts]
