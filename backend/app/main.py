@@ -90,15 +90,19 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Outgoing: {request.method} {request.url.path} -> {response.status_code}")
     return response
 
-# ==== 5. Middlewares & CORS (Sửa lỗi chặn request từ Web) ====
-# Cho phép tất cả các nguồn khi phát triển để tránh lỗi Port ngẫu nhiên của Flutter Web
+# Trong file main.py của Backend
+origins = [
+    "http://localhost:3000",
+    "https://ai-plant-health-65293.web.app", # Link Firebase của bạn
+    "https://ai-plant-health-65293.firebaseapp.com",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1024)
