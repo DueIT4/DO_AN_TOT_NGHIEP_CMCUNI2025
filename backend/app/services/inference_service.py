@@ -119,10 +119,36 @@ class YoloDetector:
             )
         }
 
+# ... (Giữ nguyên phần code phía trên của bạn cho đến hết class YoloDetector)
 
-# instance dùng chung
+# ============================================
+# 🔥 Khởi tạo instance dùng chung kèm Log chi tiết
+# ============================================
 detector: YoloDetector | None = None
+
+print(f"--- Đang kiểm tra Model tại: {MODEL_PATH} ---")
+
+if not os.path.exists(MODEL_PATH):
+    print(f"❌ LỖI NGHIÊM TRỌNG: Không tìm thấy file model tại {MODEL_PATH}")
+    # Liệt kê các file đang có trong thư mục weights để kiểm tra
+    weights_dir = os.path.dirname(MODEL_PATH)
+    if os.path.exists(weights_dir):
+        print(f"Danh sách file trong {weights_dir}: {os.listdir(weights_dir)}")
+    else:
+        print(f"Thư mục {weights_dir} cũng không tồn tại!")
+else:
+    print(f"✅ Đã thấy file model. Bắt đầu nạp vào YOLO...")
+
 try:
+    # Thử nạp model
     detector = YoloDetector(MODEL_PATH)
-except FileNotFoundError:
+    print("🚀 YOLO Detector đã khởi tạo thành công!")
+except FileNotFoundError as e:
+    print(f"❌ Lỗi FileNotFoundError: {e}")
+    detector = None
+except Exception as e:
+    # Bắt tất cả các lỗi khác (ví dụ: thiếu thư viện cv2, torch, v.v.)
+    print(f"❌ LỖI HỆ THỐNG khi nạp Model: {str(e)}")
+    import traceback
+    traceback.print_exc() # In chi tiết lỗi hệ thống ra Log
     detector = None

@@ -29,7 +29,7 @@ Future<void> main() async {
   // 4. Cấu hình URL Backend (Cloud Run) cho bản Web
   // Nếu bạn đã có link Cloud Run, hãy set vào đây
   // ApiBase.setBaseURL = "https://zestguard-admin-api-xxx.a.run.app";
-
+ApiBase.setBaseURL = "https://zestguard-api-38261474833.asia-southeast1.run.app";
   runApp(const ZestGuardWeb());
 }
 

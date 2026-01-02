@@ -1,4 +1,3 @@
-// lib/main_app.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -6,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 import 'modules/auth/auth_service.dart';
+import 'core/api_base.dart'; // Đảm bảo import file này
 
 import 'l10n/app_localizations.dart';
 import 'l10n/language_service.dart';
@@ -19,18 +19,22 @@ import 'ui/home_shell.dart';
 import 'core/camera_provider.dart';
 
 Future<void> main() async {
-  // Đảm bảo các plugin Flutter đã được liên kết
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Khởi tạo Firebase (Cho Google Login/Push Notifications)
+  // 1. THIẾT LẬP KẾT NỐI SERVER (BẮT BUỘC)
+  // Dán link Cloud Run bạn vừa nhận được vào đây
+  ApiBase.setBaseURL = "https://zestguard-api-38261474833.asia-southeast1.run.app";
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Khôi phục phiên đăng nhập cũ từ SharedPreferences/SecureStorage
-  // Stateless Auth: Chỉ cần Token là đủ để làm việc với Cloud Run
+  // 2. KHÔI PHỤC TOKEN
   await AuthService.restoreBearer();
   await ApiClient.restoreToken();
+  
+  // Đồng bộ token sang ApiBase để các hàm getJson/postJson hoạt động
+  ApiBase.bearer = ApiClient.authToken;
 
   runApp(const ZestGuardMobileApp());
 }
@@ -45,13 +49,11 @@ class ZestGuardMobileApp extends StatelessWidget {
       builder: (context, _) {
         return MultiProvider(
           providers: [
-            // Cung cấp trạng thái Camera cho toàn bộ ứng dụng (HLS Streaming)
             ChangeNotifierProvider(create: (_) => CameraProvider()),
           ],
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
-            title: 'ZestGuard',
-            // Quản lý ngôn ngữ (Vi/En)
+            title: 'ZestGuard Mobile',
             locale: LanguageService.instance.locale,
             supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: const [
@@ -60,9 +62,9 @@ class ZestGuardMobileApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            // Theme tối ưu cho UI Nông nghiệp (Xanh lá)
             theme: ThemeData(
               useMaterial3: true,
+              // Theme xanh nông nghiệp chuẩn của bạn
               colorSchemeSeed: const Color(0xFF7CCD2B),
               inputDecorationTheme: InputDecorationTheme(
                 filled: true,
@@ -74,9 +76,9 @@ class ZestGuardMobileApp extends StatelessWidget {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
-            // Logic điều hướng ban đầu
-            home: ApiClient.authToken != null && ApiClient.authToken!.isNotEmpty 
-                ? const HomeShell() 
+            // Logic điều hướng: Nếu có token thì vào thẳng Home
+            home: (ApiClient.authToken != null && ApiClient.authToken!.isNotEmpty)
+                ? const HomeShell()
                 : const LoginPage(),
             routes: {
               '/login': (_) => const LoginPage(),
