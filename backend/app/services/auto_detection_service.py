@@ -236,7 +236,7 @@ def detect_from_camera_auto(
         if sensor_data or trend_info.get('has_history'):
             try:
                 from app.services.llm_service import client, GEMINI_MODEL
-                import google.generativeai as genai
+                import google as genai
                 if client:
                     model = genai.GenerativeModel(model_name=GEMINI_MODEL)
                     response = model.generate_content(enhanced_prompt)
