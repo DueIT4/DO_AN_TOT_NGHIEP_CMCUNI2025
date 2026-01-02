@@ -1,23 +1,21 @@
 FROM python:3.12-slim
 
 # Cài đặt thư viện hệ thống cần thiết cho AI và Cloudinary
+FROM python:3.12-slim
+
+# Cài đặt tối thiểu các thư viện cơ bản cho OpenCV và tải file
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     xz-utils \
-    libxrender1 \
-    libxext6 \
-    libfontconfig1 \
-    libfontconfig \
-    fontconfig \
-    # Các thư viện bổ sung cho OpenCV và AI
     libgl1-mesa-glx \
     libglib2.0-0 \
-    && wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.generic.amd64.tar.xz \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Tải bản wkhtmltopdf tĩnh (không phụ thuộc vào thư viện hệ thống)
+RUN wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.generic.amd64.tar.xz \
     && tar -xf wkhtmltox_0.12.6-1.generic.amd64.tar.xz \
     && cp wkhtmltox/bin/wkhtmltopdf /usr/local/bin/ \
-    && rm -rf wkhtmltox* \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf wkhtmltox* wkhtmltox_0.12.6-1.generic.amd64.tar.xz
 WORKDIR /app
 
 # Copy và cài đặt thư viện
