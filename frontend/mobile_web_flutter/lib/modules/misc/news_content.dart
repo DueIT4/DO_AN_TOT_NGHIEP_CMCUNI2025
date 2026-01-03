@@ -15,7 +15,7 @@ class NewsContent extends StatefulWidget {
 class _NewsContentState extends State<NewsContent> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _articles = [];
-  static const String _cacheKey = 'agri_news_cache_v4';
+  static const String _cacheKey = 'agri_news_cache_v3';
 
   @override
   void initState() {
@@ -121,58 +121,36 @@ class _NewsContentState extends State<NewsContent> {
   List<Map<String, dynamic>> _defaultArticles() {
     return [
       {
-        'title': 'Nông nghiệp công nghệ cao: Hướng đi tất yếu',
-        'description': 'Ứng dụng IoT và AI giúp tối ưu năng suất và giảm thiểu rủi ro cho nhà nông. Các mô hình nhà kính thông minh đang được nhân rộng.',
-        'url': 'https://nongnghiep.vn',
-        // Ảnh ruộng bậc thang/nông nghiệp Việt Nam
-        'imageUrl': 'https://images.unsplash.com/photo-1536617637075-2d3279b6b22b?w=800&q=80', 
-        'source': 'Gợi ý',
+        'title': 'Cục Bảo vệ Thực vật - Bộ NN&PTNT',
+        'description': 'Cổng thông tin chính thức về kiểm dịch thực vật, quản lý thuốc BVTV và mã số vùng trồng quốc gia.',
+        'url': 'https://www.ppd.gov.vn',
+        'imageUrl': '', 
+        'source': 'Chính phủ', // Trigger màu Xanh dương/Blue
         'publishedAt': DateTime.now().toIso8601String(),
       },
       {
-        'title': 'Giải pháp tưới tiêu thông minh tiết kiệm nước',
-        'description': 'Hệ thống tưới nhỏ giọt tự động đang được áp dụng rộng rãi tại ĐBSCL, giúp tiết kiệm đến 40% lượng nước tưới.',
-        'url': 'https://khuyennongvn.gov.vn',
-        // Ảnh tưới tiêu
-        'imageUrl': 'https://images.unsplash.com/photo-1622383563227-0440114a8520?w=800&q=80',
-        'source': 'Gợi ý',
+        'title': 'Tạp chí Nông nghiệp và Môi trường',
+        'description': 'Cập nhật tin tức chuyên sâu về nông nghiệp xanh, bảo vệ môi trường và phát triển bền vững.',
+        'url': 'https://nnmt.net.vn',
+        'imageUrl': '',
+        'source': 'Tạp chí', // Trigger màu Xanh lá/Green
+        'publishedAt': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
+      },
+      {
+        'title': 'Cộng đồng Nông nghiệp AgriViet',
+        'description': 'Diễn đàn chia sẻ kỹ thuật trồng trọt, chăn nuôi và giá cả thị trường lớn nhất Việt Nam.',
+        'url': 'https://agriviet.com',
+        'imageUrl': '',
+        'source': 'Cộng đồng', // Trigger màu Cam/Orange
         'publishedAt': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
       },
-      {
-        'title': 'Xuất khẩu gạo Việt Nam lập kỷ lục mới',
-        'description': 'Giá gạo xuất khẩu của Việt Nam tiếp tục tăng cao, khẳng định vị thế trên thị trường quốc tế.',
-        'url': 'https://vtv.vn',
-        // Ảnh gạo
-        'imageUrl': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=800&q=80',
-        'source': 'Gợi ý',
-        'publishedAt': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-      },
-      {
-        'title': 'Mô hình trồng rau sạch thủy canh tại nhà phố',
-        'description': 'Xu hướng tự trồng rau sạch bằng phương pháp thủy canh đang thu hút nhiều hộ gia đình ở đô thị.',
-        'url': 'https://dantri.com.vn',
-        // Ảnh thủy canh
-        'imageUrl': 'https://images.unsplash.com/photo-1556910103-1c02745a30bf?w=800&q=80',
-        'source': 'Gợi ý',
-        'publishedAt': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
-      },
        {
-        'title': 'Cảnh báo sâu bệnh hại lúa mùa mưa',
-        'description': 'Các chuyên gia khuyến cáo bà con nông dân cần chủ động phòng trừ rầy nâu và bệnh đạo ôn trong mùa mưa bão.',
-        'url': 'https://baocantho.com.vn',
-        // Ảnh cánh đồng lúa xanh
-        'imageUrl': 'https://images.unsplash.com/photo-1611735341450-74d61e66ee62?w=800&q=80',
-        'source': 'Gợi ý',
-        'publishedAt': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
-      },
-       {
-        'title': 'Phát triển bền vững cây ăn trái đặc sản',
-        'description': 'Nâng cao chất lượng và xây dựng thương hiệu cho trái cây đặc sản vùng miền để mở rộng thị trường tiêu thụ.',
-        'url': 'https://nongnghiep.vn',
-        // Ảnh trái cây
-        'imageUrl': 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?w=800&q=80',
-        'source': 'Gợi ý',
-        'publishedAt': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        'title': 'Thần Nông - Bạn nhà nông',
+        'description': 'Cẩm nang tra cứu sâu bệnh, kỹ thuật canh tác và dự báo thời tiết nông vụ chuẩn xác.',
+        'url': 'https://thannong.net',
+        'imageUrl': '',
+        'source': 'Ứng dụng', // Trigger màu Tím/Indigo
+        'publishedAt': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
       },
     ];
   }
@@ -207,26 +185,17 @@ class _NewsContentState extends State<NewsContent> {
                   children: [
                     Expanded(
                       flex: 3,
-                      child: crossAxisCount == 1 
-                        ? ListView.separated(
-                            physics: const NeverScrollableScrollPhysics(),
-                            shrinkWrap: true,
-                            itemCount: _articles.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 24),
-                            itemBuilder: (_, i) => _NewsCard(article: _articles[i], isHorizontal: true),
-                          )
-                        : GridView.builder(
-                            physics: const NeverScrollableScrollPhysics(),
-                            shrinkWrap: true,
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: crossAxisCount,
-                              crossAxisSpacing: 24,
-                              mainAxisSpacing: 24,
-                              childAspectRatio: 0.75,
-                            ),
-                            itemCount: _articles.length,
-                            itemBuilder: (_, i) => _NewsCard(article: _articles[i]),
-                          ),
+                      child: ListView.separated(
+                        physics: const NeverScrollableScrollPhysics(),
+                        shrinkWrap: true,
+                        itemCount: _articles.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 24),
+                        itemBuilder: (_, i) => _NewsCard(
+                          article: _articles[i], 
+                          isHorizontal: false, 
+                          isBigCard: true, // Force Big Card style
+                        ),
+                      ),
                     ),
                     if (isWide) ...[
                       const SizedBox(width: 32),
@@ -261,7 +230,7 @@ class _NewsContentState extends State<NewsContent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                    Text(
-                    'Tin tức nông nghiệp',
+                    'Tin Tức Nông Nghiệp',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
@@ -285,8 +254,13 @@ class _NewsContentState extends State<NewsContent> {
 class _NewsCard extends StatelessWidget {
   final Map<String, dynamic> article;
   final bool isHorizontal; // Cho mobile view dạng list
+  final bool isBigCard; // Cho view demo to
   
-  const _NewsCard({required this.article, this.isHorizontal = false});
+  const _NewsCard({
+    required this.article, 
+    this.isHorizontal = false,
+    this.isBigCard = false,
+  });
 
   String _formatTime(String? isoString) {
     if (isoString == null) return '';
@@ -302,8 +276,8 @@ class _NewsCard extends StatelessWidget {
     final hasImage = imageUrl != null && imageUrl.isNotEmpty;
 
     return Card(
-      elevation: 2,
-      shadowColor: Colors.black12,
+      elevation: 4,
+      shadowColor: Colors.black26,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -313,12 +287,140 @@ class _NewsCard extends StatelessWidget {
             await launchUrl(url, mode: LaunchMode.externalApplication);
           }
         },
-        child: isHorizontal ? _buildHorizontalLayout(context, imageUrl, hasImage) : _buildVerticalLayout(context, imageUrl, hasImage),
+        child: isHorizontal 
+            ? _buildHorizontalLayout(context, imageUrl, hasImage) 
+            : _buildVerticalLayout(context, imageUrl, hasImage),
       ),
     );
   }
 
   Widget _buildVerticalLayout(BuildContext context, String? imageUrl, bool hasImage) {
+    // LAYOUT TẠP CHÍ (Magazine Style) cho card to
+    if (isBigCard) {
+      // Xác định màu gradient dựa trên nguồn/chủ đề
+      final source = (article['source'] ?? '').toString().toLowerCase();
+      List<Color> gradientColors = [Colors.blue.shade900, Colors.blue.shade600]; // Default
+      IconData bgIcon = Icons.article;
+
+      if (source.contains('chính phủ') || article['title'].toString().toLowerCase().contains('cục')) {
+        gradientColors = [const Color(0xFF1565C0), const Color(0xFF1976D2)]; // Blue (Chính phủ)
+        bgIcon = Icons.account_balance;
+      } else if (source.contains('tạp chí') || article['title'].toString().toLowerCase().contains('báo')) {
+        gradientColors = [const Color(0xFF2E7D32), const Color(0xFF43A047)]; // Green (Báo chí)
+        bgIcon = Icons.newspaper;
+      } else if (source.contains('cộng đồng') || article['title'].toString().toLowerCase().contains('agriviet')) {
+        gradientColors = [const Color(0xFFEF6C00), const Color(0xFFFFA726)]; // Orange (Cộng đồng)
+        bgIcon = Icons.groups;
+      } else {
+        gradientColors = [const Color(0xFF4527A0), const Color(0xFF673AB7)]; // Purple (Thần Nông/Khác)
+        bgIcon = Icons.smartphone;
+      }
+
+      return Container(
+        height: 280,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: gradientColors,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Icon chìm trang trí
+            Positioned(
+              right: -20,
+              bottom: -20,
+              child: Transform.rotate(
+                angle: -0.2,
+                child: Icon(bgIcon, size: 180, color: Colors.white.withOpacity(0.15)),
+              ),
+            ),
+            // Pattern chìm
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _DotPatternPainter(),
+              ),
+            ),
+            // Nội dung
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        (article['source'] ?? 'TIN TỨC').toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                   ),
+                   const Spacer(),
+                   Text(
+                    article['title'] ?? '',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      height: 1.2,
+                      fontFamily: 'Roboto', // Đảm bảo font đẹp nếu có
+                    ),
+                   ),
+                   const SizedBox(height: 12),
+                   Text(
+                     article['description'] ?? '',
+                     maxLines: 2,
+                     overflow: TextOverflow.ellipsis,
+                     style: TextStyle(
+                       color: Colors.white.withOpacity(0.9),
+                       fontSize: 14,
+                       height: 1.4,
+                     ),
+                   ),
+                   const SizedBox(height: 16),
+                   Row(
+                     children: [
+                       Icon(Icons.calendar_today, size: 12, color: Colors.white.withOpacity(0.8)),
+                       const SizedBox(width: 6),
+                       Text(
+                         _formatTime(article['publishedAt']),
+                         style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                       ),
+                       const Spacer(),
+                       Text(
+                         'Xem chi tiết',
+                         style: TextStyle(
+                           color: Colors.white,
+                           fontWeight: FontWeight.bold,
+                           decoration: TextDecoration.underline,
+                           decorationColor: Colors.white,
+                         ),
+                       ),
+                       const SizedBox(width: 4),
+                       Icon(Icons.arrow_forward, size: 16, color: Colors.white),
+                     ],
+                   )
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Layout thẻ thường (Vertical nhỏ)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -493,4 +595,24 @@ class _SidebarLinks extends StatelessWidget {
       ],
     );
   }
+}
+
+class _DotPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    var paint = Paint()
+      ..color = Colors.white.withOpacity(0.05)
+      ..style = PaintingStyle.fill;
+
+    for (var i = 0; i < size.width; i += 20) {
+      for (var j = 0; j < size.height; j += 20) {
+        if ((i + j) % 40 == 0) {
+          canvas.drawCircle(Offset(i.toDouble(), j.toDouble()), 2, paint);
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

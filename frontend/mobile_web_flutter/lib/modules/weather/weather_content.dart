@@ -68,27 +68,16 @@ class _WeatherContentState extends State<WeatherContent>
   Widget build(BuildContext context) {
     super.build(context);
 
-    // Gradient nền động
-    final backgroundGradient = LinearGradient(
-      colors: [
-        const Color(0xFF2E7D32), // Green 800
-        const Color(0xFF43A047), // Green 600
-        const Color(0xFF81C784), // Green 300
-      ],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
-
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Container(
-        decoration: BoxDecoration(gradient: backgroundGradient),
         child: _loading 
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? const Center(child: CircularProgressIndicator())
           : _error != null
             ? _buildErrorState()
             : RefreshIndicator(
                 onRefresh: _loadWeather,
-                color: Colors.green.shade800,
+                color: Colors.blue.shade800,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(20, 48, 20, 20),
@@ -120,29 +109,29 @@ class _WeatherContentState extends State<WeatherContent>
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                 const Text(
+                const Text(
                   'Thời tiết nông vụ',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 24,
-                    color: Colors.white,
+                    color: Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.location_on, color: Colors.white70, size: 14),
+                    const Icon(Icons.location_on, color: Colors.grey, size: 14),
                     const SizedBox(width: 4),
                     Text(
                       _weatherData!['location'] ?? 'Đang định vị...',
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      style: const TextStyle(color: Colors.grey, fontSize: 14),
                     ),
                   ],
                 ),
               ],
             ),
             IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white70),
+              icon: const Icon(Icons.refresh, color: Colors.grey),
               onPressed: _loadWeather,
             )
           ],
@@ -164,7 +153,7 @@ class _WeatherContentState extends State<WeatherContent>
           Text(
             '${w['temperature'] ?? '--'}°',
             style: const TextStyle(
-              color: Colors.white,
+              color: Colors.black87,
               fontWeight: FontWeight.w300, 
               fontSize: 80,
               height: 1,
@@ -173,7 +162,7 @@ class _WeatherContentState extends State<WeatherContent>
           Text(
             '${w['description'] ?? ''}'.toUpperCase(),
             style: const TextStyle(
-              color: Colors.white,
+              color: Colors.black54,
               fontSize: 18,
               fontWeight: FontWeight.w500,
               letterSpacing: 1.5,
@@ -204,17 +193,17 @@ class _WeatherContentState extends State<WeatherContent>
     return Container(
       height: 30,
       width: 1,
-      color: Colors.white24,
+      color: Colors.grey.shade300,
     );
   }
 
   Widget _statItem(IconData icon, String value, String label) {
     return Column(
       children: [
-        Icon(icon, color: Colors.white, size: 24),
+        Icon(icon, color: Colors.blue.shade700, size: 24),
         const SizedBox(height: 8),
-        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        Text(value, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
       ],
     );
   }
@@ -225,8 +214,8 @@ class _WeatherContentState extends State<WeatherContent>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Dự báo 7 ngày tới',
-          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          'Dự báo 5 ngày tới',
+          style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
         _GlassContainer(
@@ -236,7 +225,7 @@ class _WeatherContentState extends State<WeatherContent>
                for (int i = 0; i < forecast.take(5).length; i++) ...[
                 _forecastRow(forecast[i]),
                 if (i < forecast.take(5).length - 1)
-                   const Divider(height: 1, color: Colors.white12),
+                   const Divider(height: 1, color: Colors.grey),
               ]
             ],
           ),
@@ -254,7 +243,7 @@ class _WeatherContentState extends State<WeatherContent>
             width: 80,
             child: Text(
               '${day['day'] ?? ''}',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
             ),
           ),
           Text('${day['icon'] ?? '☁️'}', style: const TextStyle(fontSize: 24)),
@@ -262,17 +251,17 @@ class _WeatherContentState extends State<WeatherContent>
           Expanded(
             child: Text(
               '${day['desc'] ?? ''}',
-              style: const TextStyle(color: Colors.white70, fontSize: 14),
+              style: const TextStyle(color: Colors.black54, fontSize: 14),
             ),
           ),
           Text(
             '${day['high'] ?? '--'}°',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
           ),
           const SizedBox(width: 8),
           Text(
             '${day['low'] ?? '--'}°',
-            style: const TextStyle(color: Colors.white54),
+            style: const TextStyle(color: Colors.grey),
           ),
         ],
       ),
@@ -284,15 +273,15 @@ class _WeatherContentState extends State<WeatherContent>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.cloud_off, size: 80, color: Colors.white54),
+          const Icon(Icons.cloud_off, size: 80, color: Colors.grey),
           const SizedBox(height: 16),
-          Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
+          Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: _loadWeather,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.green.shade800,
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
             ),
             child: const Text('Thử lại'),
           ),
@@ -317,9 +306,9 @@ class _GlassContainer extends StatelessWidget {
         child: Container(
           padding: padding ?? const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
+            border: Border.all(color: Colors.grey.shade200),
             boxShadow: [
                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
             ],
