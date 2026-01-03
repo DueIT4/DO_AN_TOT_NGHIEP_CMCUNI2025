@@ -22,7 +22,7 @@ load_dotenv()
 # =====================================================
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") 
 # Sửa lại thành 2.0-flash để đảm bảo chạy được
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 # =====================================================
 # 2. TẠO CLIENT
@@ -95,20 +95,30 @@ def _build_prompt_from_detections(detections: List[Dict[str, Any]]) -> str:
 
     return f"""
 Bạn là chuyên gia bệnh cây bưởi.
-AI phát hiện các dấu hiệu sau trên cây:
+
+AI phát hiện các dấu hiệu sau:
 {chr(10).join(lines)}
 
-Hãy trả lời theo đúng format sau đây (không được bỏ tag):
+YÊU CẦU BẮT BUỘC:
+- Chỉ dùng văn bản thuần
+- Không dùng Markdown
+- Không dùng ký hiệu *, **, -, #
 
-[DISEASE_SUMMARY]
-- Giải thích cây đang bị gì, mức độ nặng nhẹ, triệu chứng.
+FORMAT TRẢ LỜI (KHÔNG ĐƯỢC SAI):
 
-[CARE_INSTRUCTIONS]
-- Hướng dẫn xử lý chi tiết: biện pháp sinh học, cắt tỉa, vệ sinh vườn.
-- Nếu cần dùng thuốc: chỉ ghi tên HOẠT CHẤT, không ghi thương hiệu cụ thể.
-- Hướng dẫn phòng ngừa sau này.
+BEGIN_DISEASE_SUMMARY
+Giải thích cây đang bị bệnh gì, mức độ, triệu chứng.
+END_DISEASE_SUMMARY
+
+BEGIN_CARE_INSTRUCTIONS
+Hướng dẫn xử lý chi tiết: sinh học, cắt tỉa, vệ sinh, phòng ngừa.
+END_CARE_INSTRUCTIONS
 """.strip()
 
+def _extract_block(text: str, start: str, end: str):
+    if start not in text or end not in text:
+        return None
+    return text.split(start, 1)[1].split(end, 1)[0].strip()
 
 # =====================================================
 # 5. GỌI LLM + TÁCH KẾT QUẢ
@@ -137,19 +147,19 @@ def summarize_detections_with_llm(
             return None, None
 
         # Tách hai phần dựa trên tag
-        text_lower = full_text.lower()
-        idx_ds = text_lower.find("[disease_summary]")
-        idx_ci = text_lower.find("[care_instructions]")
+        disease_summary = _extract_block(
+            full_text,
+            "BEGIN_DISEASE_SUMMARY",
+            "END_DISEASE_SUMMARY"
+        )
 
-        if idx_ds == -1 or idx_ci == -1:
-            # Nếu LLM không theo format, trả toàn bộ vào summary
-            return full_text, None
+        care_instructions = _extract_block(
+            full_text,
+            "BEGIN_CARE_INSTRUCTIONS",
+            "END_CARE_INSTRUCTIONS"
+        )
 
-        # Cắt chuỗi lấy nội dung giữa các tag
-        disease_summary = full_text[idx_ds + len("[DISEASE_SUMMARY]"): idx_ci].strip()
-        care_instructions = full_text[idx_ci + len("[CARE_INSTRUCTIONS]"):].strip()
-
-        return (disease_summary or None), (care_instructions or None)
+        return disease_summary, care_instructions
 
     except Exception as e:
         logger.error(f"LLM ERROR: {e}")
