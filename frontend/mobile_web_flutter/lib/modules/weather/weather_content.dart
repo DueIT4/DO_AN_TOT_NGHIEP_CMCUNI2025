@@ -87,57 +87,66 @@ class _WeatherContentState extends State<WeatherContent>
           : _error != null
             ? _buildErrorState()
             : SafeArea(
-                child: RefreshIndicator(
-                  onRefresh: _loadWeather,
-                  color: Colors.blue,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // Bố cục chia đôi màn hình (Split Screen Dashboard)
-                      return SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight - 20, // Trừ padding
-                          ),
-                          child: IntrinsicHeight(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column( // Dùng Column để bọc Header riêng
-                                children: [
-                                  _buildHeader(), // Header ở trên cùng
-                                  const SizedBox(height: 20),
-                                  Expanded(
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                                      children: [
-                                        // CỘT TRÁI: Thông tin hiện tại (Temp + Stats)
-                                        Expanded(
-                                          flex: 6,
-                                          child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Expanded(child: Center(child: _buildMainWeatherCard())),
-                                              _buildDetailedStats(),
-                                              const SizedBox(height: 20),
-                                            ],
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1100),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight - 40,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                                child: Column(
+                                  children: [
+                                    _buildHeader(),
+                                    const SizedBox(height: 30),
+                                    Expanded(
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          Expanded(
+                                            flex: 6,
+                                            child: Column(
+                                              children: [
+                                                // Khối Nhiệt độ (Main)
+                                                Expanded(
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius: BorderRadius.circular(24),
+                                                      border: Border.all(color: Colors.blue.shade50),
+                                                    ),
+                                                    child: Center(child: _buildMainWeatherCard()),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 16),
+                                                // Khối Chi tiết (Stats)
+                                                _buildDetailedStats(),
+                                                const SizedBox(height: 20),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 24),
-                                        // CỘT PHẢI: Dự báo 5 ngày (Full height)
-                                        Expanded(
-                                          flex: 4,
-                                          child: _buildForecastSection(),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 24),
+                                          Expanded(
+                                            flex: 4,
+                                            child: _buildForecastSection(),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }
+                        );
+                      }
+                    ),
                   ),
                 ),
               ),
@@ -147,12 +156,13 @@ class _WeatherContentState extends State<WeatherContent>
 
   Widget _buildHeader() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.center, // Can giua
       children: [
         Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center, // Can giua cot noi dung
           children: [
              Row(
+              mainAxisSize: MainAxisSize.min, // Chi chiem khong gian can thiet
               children: [
                 Icon(Icons.location_on, color: Colors.blue.shade700, size: 24),
                 const SizedBox(width: 8),
@@ -166,16 +176,13 @@ class _WeatherContentState extends State<WeatherContent>
                 ),
               ],
             ),
+            const SizedBox(height: 4),
             Text(
               '${DateTime.now().day} tháng ${DateTime.now().month}, ${DateTime.now().year}',
-              style: TextStyle(color: Colors.blueGrey.shade400, fontSize: 13),
+              style: TextStyle(color: Colors.blueGrey.shade400, fontSize: 14),
             ),
           ],
         ),
-        IconButton(
-          icon: Icon(Icons.refresh, color: Colors.blue.shade300),
-          onPressed: _loadWeather,
-        )
       ],
     );
   }
@@ -204,15 +211,15 @@ class _WeatherContentState extends State<WeatherContent>
                       '${w['temperature'] ?? '--'}',
                       style: const TextStyle(
                         color: Color(0xFF1565C0),
-                        fontWeight: FontWeight.w300, 
-                        fontSize: 80,
+                        fontWeight: FontWeight.w600, // Đậm hơn (Bold)
+                        fontSize: 90, // To hơn
                         height: 1,
-                        letterSpacing: -4,
+                        letterSpacing: -2,
                       ),
                     ),
                     const Padding(
                       padding: EdgeInsets.only(top: 10),
-                      child: Text('°', style: TextStyle(fontSize: 40, color: Color(0xFF1565C0))),
+                      child: Text('°', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 50, color: Color(0xFF1565C0))),
                     ),
                   ],
                 ),
@@ -236,26 +243,20 @@ class _WeatherContentState extends State<WeatherContent>
   Widget _buildDetailedStats() {
     final w = _weatherData!;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20), // Padding rộng hơn
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withOpacity(0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          )
-        ],
+        color: Colors.blue.shade50.withOpacity(0.5), // Nền xanh nhạt phân biệt
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.blue.shade100), // Viền nhẹ
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _statItem(Icons.water_drop, '${w['humidity'] ?? '--'}%', 'Độ ẩm', Colors.blue),
+          _statItem(Icons.water_drop, '${w['humidity'] ?? '--'}%', 'Độ ẩm', Colors.blue.shade700),
           _divider(),
-          _statItem(Icons.air, '${w['windSpeed'] ?? '--'} km/h', 'Gió', Colors.teal),
+          _statItem(Icons.air, '${w['windSpeed'] ?? '--'} km/h', 'Gió', Colors.teal.shade700),
           _divider(),
-          _statItem(Icons.wb_sunny, 'Cao', 'UV', Colors.orange),
+          _statItem(Icons.wb_sunny, 'Cao', 'UV', Colors.orange.shade800),
         ],
       ),
     );
@@ -326,35 +327,38 @@ class _WeatherContentState extends State<WeatherContent>
   }
 
   Widget _forecastRow(dynamic day) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 40,
-          child: Text(
-            '${day['day'] ?? ''}',
-            style: TextStyle(color: Colors.blueGrey.shade700, fontWeight: FontWeight.bold, fontSize: 14),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8), // Giảm khoảng cách dọc
+      child: Row(
+        children: [
+          SizedBox(
+            width: 40,
+            child: Text(
+              '${day['day'] ?? ''}',
+              style: TextStyle(color: Colors.blueGrey.shade700, fontWeight: FontWeight.bold, fontSize: 14),
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Text('${day['icon'] ?? '☁️'}', style: const TextStyle(fontSize: 18)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            '${day['desc'] ?? ''}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.blueGrey.shade400, fontSize: 13, fontWeight: FontWeight.w500),
+          const SizedBox(width: 8),
+          Text('${day['icon'] ?? '☁️'}', style: const TextStyle(fontSize: 18)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '${day['desc'] ?? ''}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.blueGrey.shade400, fontSize: 13, fontWeight: FontWeight.w500),
+            ),
           ),
-        ),
-        Text(
-          '${day['high'] ?? '--'}°',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey.shade800, fontSize: 14),
-        ),
-        Text(
-          ' /${day['low'] ?? '--'}°',
-          style: TextStyle(color: Colors.blueGrey.shade300, fontSize: 12),
-        ),
-      ],
+          Text(
+            '${day['high'] ?? '--'}°',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey.shade800, fontSize: 14),
+          ),
+          Text(
+            ' /${day['low'] ?? '--'}°',
+            style: TextStyle(color: Colors.blueGrey.shade300, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 
