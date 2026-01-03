@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart'; // 👈 thêm import này
+import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_web_flutter/src/routes/web_routes.dart';
 
@@ -8,214 +8,81 @@ class HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 900;
-
+    final width = MediaQuery.of(context).size.width;
+    final isWide = width >= 900;
+    
     return SingleChildScrollView(
       child: Column(
         children: [
-          // ===== HERO =====
+          // ===== HERO SECTION =====
           Container(
             padding: EdgeInsets.symmetric(
               horizontal: isWide ? 80 : 20,
-              vertical: isWide ? 80 : 48,
+              vertical: isWide ? 80 : 40,
             ),
-            width: double.infinity,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Text(
-                  'Ứng dụng MIỄN PHÍ \nchẩn đoán và điều trị cây trồng',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 35,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black87,
-                    height: 1.25,
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // 👉 Nhóm nút hành động: Dùng thử chẩn đoán + Tải ngay
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: () => context.go(WebRoutes.detect),
-                      icon: const Icon(Icons.camera_alt),
-                      label: const Text('Dùng thử chẩn đoán'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        // 👇 Mở link CH Play thật
-                        const url =
-                            'https://play.google.com/store/apps/details?id=com.yourcompany.zestguard';
-                        // TODO: thay com.yourcompany.zestguard bằng packageId thật của bạn
-                        await launchUrl(Uri.parse(url));
-                      },
-                      icon: const Icon(Icons.android),
-                      label: const Text('Tải trên CH Play'),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 40),
-
-                // Ảnh demo ứng dụng (đã đổi)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 900),
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.green.shade50,
-                              Colors.green.shade100,
-                              Colors.lightGreen.shade50,
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Stack(
-                          children: [
-                            Positioned.fill(
-                              child: CustomPaint(
-                                painter: _DottedPatternPainter(),
-                              ),
-                            ),
-                            Center(
-                              child: SingleChildScrollView(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min, // ✅ tránh Column "ăn" full height
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    // Ảnh demo ứng dụng: chỉ ảnh, không khung gì cả
-                                    // ✅ THAY THẾ ẢNH BẰNG MOCK (KHÔNG CẦN ASSET)
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: _HeroMockImage(isWide: isWide),
-                                    ),
-                                    const SizedBox(height: 24),
-
-                                    Text(
-                                      'ZestGuard',
-                                      style: TextStyle(
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green.shade900,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Chẩn đoán bệnh cây trồng\nbằng AI thông minh',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.green.shade700,
-                                        height: 1.5,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 24),
-
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        _AppStoreBadge(
-                                          icon: Icons.android,
-                                          label: 'Tải trên CH Play',
-                                          color: Colors.green,
-                                          onTap: () async {
-                                            const url =
-                                                'https://play.google.com/store/apps/details?id=com.yourcompany.zestguard';
-                                            await launchUrl(Uri.parse(url));
-                                          },
-                                        ),
-                                        // 👇 Bỏ iOS (không dùng nữa)
-                                        // const SizedBox(width: 16),
-                                        // _AppStoreBadge(
-                                        //   icon: Icons.apple,
-                                        //   label: 'iOS',
-                                        //   color: Colors.black87,
-                                        // ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            color: Colors.white,
+            child: isWide 
+             ? _buildDesktopHero(context) 
+             : _buildMobileHero(context),
           ),
 
-          const Divider(height: 1),
-
-          // ===== FEATURES =====
+          // ===== FEATURES SECTION =====
           Container(
             padding: EdgeInsets.symmetric(
               horizontal: isWide ? 80 : 20,
-              vertical: isWide ? 56 : 32,
+              vertical: isWide ? 64 : 40,
             ),
+            decoration: BoxDecoration(color: Colors.grey.shade50),
             child: Column(
               children: [
                 Text(
                   'Vì sao chọn ZestGuard?',
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade900,
+                  ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                Text(
+                  'Công nghệ AI tiên tiến đồng hành cùng nhà nông',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 48),
                 LayoutBuilder(
                   builder: (context, c) {
                     final w = c.maxWidth;
-                    final cross = w >= 1100
-                        ? 4
-                        : w >= 800
-                            ? 3
-                            : w >= 600
-                                ? 2
-                                : 1;
-
+                    final cross = w >= 1100 ? 4 : w >= 800 ? 3 : w >= 600 ? 2 : 1;
                     return GridView.count(
                       physics: const NeverScrollableScrollPhysics(),
                       shrinkWrap: true,
                       crossAxisCount: cross,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 4 / 3,
+                      crossAxisSpacing: 24,
+                      mainAxisSpacing: 24,
+                      childAspectRatio: 0.9,
                       children: const [
                         _FeatureCard(
-                          icon: Icons.camera,
+                          icon: Icons.camera_enhance_rounded,
                           title: 'Chẩn đoán bằng ảnh',
-                          desc: 'AI nhận diện bệnh đã huấn luyện.',
+                          desc: 'Chụp ảnh lá cây, AI sẽ phân tích và nhận diện bệnh chính xác ngay lập tức.',
+                          color: Colors.blue,
                         ),
                         _FeatureCard(
-                          icon: Icons.science,
-                          title: 'Hướng dẫn xử lý',
-                          desc:
-                              'Biện pháp an toàn, hiệu quả, thân thiện môi trường.',
+                          icon: Icons.health_and_safety_rounded,
+                          title: 'Giải pháp xử lý',
+                          desc: 'Đề xuất biện pháp phòng trừ sâu bệnh hiệu quả, an toàn và thân thiện môi trường.',
+                          color: Colors.green,
                         ),
                         _FeatureCard(
-                          icon: Icons.menu_book,
+                          icon: Icons.library_books_rounded,
                           title: 'Thư viện tri thức',
-                          desc: 'Tài liệu thực hành canh tác.',
+                          desc: 'Kho kỹ thuật canh tác, chăm sóc cây trồng được cập nhật liên tục từ chuyên gia.',
+                          color: Colors.orange,
                         ),
                         _FeatureCard(
-                          icon: Icons.support_agent,
-                          title: 'Kết nối hỗ trợ',
-                          desc: 'Tư vấn nhanh khi cần hỗ trợ.',
+                          icon: Icons.support_agent_rounded,
+                          title: 'Hỗ trợ 24/7',
+                          desc: 'Kết nối trực tiếp với các kỹ sư nông nghiệp để được tư vấn nhanh chóng.',
+                          color: Colors.purple,
                         ),
                       ],
                     );
@@ -224,378 +91,217 @@ class HomeContent extends StatelessWidget {
               ],
             ),
           ),
+          
+          // ===== CTA FOOTER =====
+           Container(
+             padding: const EdgeInsets.symmetric(vertical: 64, horizontal: 24),
+             width: double.infinity,
+             color: Colors.green.shade900,
+             child: Column(
+               children: [
+                 const Text(
+                   'Sẵn sàng bảo vệ mùa màng của bạn?',
+                   textAlign: TextAlign.center,
+                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                 ),
+                 const SizedBox(height: 24),
+                 FilledButton.icon(
+                    onPressed: () async {
+                      const url = 'https://play.google.com/store/apps/details?id=com.yourcompany.zestguard';
+                      await launchUrl(Uri.parse(url));
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.green.shade900,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    ),
+                    icon: const Icon(Icons.android),
+                    label: const Text('Tải ứng dụng ngay'),
+                 ),
+               ],
+             ),
+           )
         ],
+      ),
+    );
+  }
+
+  // Desktop: Layout Row (Text - Image)
+  Widget _buildDesktopHero(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          flex: 5,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeroContent(context),
+            ],
+          ),
+        ),
+        const SizedBox(width: 48),
+        Expanded(
+          flex: 6,
+          child: _buildHeroImage(),
+        ),
+      ],
+    );
+  }
+
+  // Mobile: Layout Column (Image - Text)
+  Widget _buildMobileHero(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+         _buildHeroImage(),
+         const SizedBox(height: 48),
+         _buildHeroContent(context, centered: true),
+      ],
+    );
+  }
+
+  Widget _buildHeroContent(BuildContext context, {bool centered = false}) {
+    return Column(
+      crossAxisAlignment: centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      children: [
+         Container(
+           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+           decoration: BoxDecoration(
+             color: Colors.green.shade50,
+             borderRadius: BorderRadius.circular(20),
+             border: Border.all(color: Colors.green.shade100),
+           ),
+           child: Text(
+             '✨ Trợ lý nông nghiệp 4.0',
+             style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold),
+           ),
+         ),
+         const SizedBox(height: 24),
+         Text(
+          'Chẩn đoán bệnh cây trồng\nchính xác bằng AI',
+          textAlign: centered ? TextAlign.center : TextAlign.left,
+          style: const TextStyle(
+            fontSize: 42,
+            fontWeight: FontWeight.w800,
+            color: Colors.black87,
+            height: 1.15,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Giúp bà con nông dân phát hiện sớm sâu bệnh, tối ưu năng suất và giảm thiểu rủi ro với công nghệ nhận diện hình ảnh tiên tiến.',
+          textAlign: centered ? TextAlign.center : TextAlign.left,
+          style: TextStyle(
+            fontSize: 18,
+            color: Colors.grey.shade600,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 32),
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          alignment: centered ? WrapAlignment.center : WrapAlignment.start,
+          children: [
+            FilledButton.icon(
+              onPressed: () => context.go(WebRoutes.detect),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text('Dùng thử miễn phí'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                const url = 'https://play.google.com/store/apps/details?id=com.yourcompany.zestguard';
+                await launchUrl(Uri.parse(url));
+              },
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              icon: const Icon(Icons.download),
+              label: const Text('Tải App Android'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeroImage() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.shade900.withOpacity(0.15),
+            blurRadius: 40,
+            offset: const Offset(0, 20),
+          )
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      // Ảnh Unsplash chất lượng cao: Nông dân dùng tablet/phone giữa đồng ruộng
+      child: Image.network(
+        'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=1000&auto=format&fit=crop',
+        fit: BoxFit.cover,
       ),
     );
   }
 }
 
-// ============================================================================
-//  FEATURE CARD
-// ============================================================================
 class _FeatureCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String desc;
+  final Color color;
 
   const _FeatureCard({
     required this.icon,
     required this.title,
     required this.desc,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 28, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(desc, style: Theme.of(context).textTheme.bodyMedium),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-//  APP BADGE (Android, có onTap mở CH Play)
-// ============================================================================
-class _AppStoreBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback? onTap;
-
-  const _AppStoreBadge({
-    required this.icon,
-    required this.label,
     required this.color,
-    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(8),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          )
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 32, color: color),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+          const SizedBox(height: 20),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const SizedBox(height: 12),
+          Text(
+            desc, 
+            style: TextStyle(color: Colors.grey.shade600, height: 1.5),
           ),
-        ),
+        ],
       ),
     );
   }
-}
-
-// ============================================================================
-//  HERO MOCK "IMAGE" (thay cho Image.asset)
-// ============================================================================
-class _HeroMockImage extends StatelessWidget {
-  final bool isWide;
-
-  const _HeroMockImage({required this.isWide});
-
-  @override
-  Widget build(BuildContext context) {
-    final width = isWide ? 900.0 : double.infinity;
-
-    return SizedBox(
-      width: width,
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.85),
-                Colors.green.shade50.withOpacity(0.9),
-                Colors.lightGreen.shade100.withOpacity(0.75),
-              ],
-            ),
-            border: Border.all(
-              color: Colors.green.shade200.withOpacity(0.7),
-              width: 1,
-            ),
-          ),
-          child: Stack(
-            children: [
-              // faint leaves
-              Positioned(
-                left: -30,
-                top: -30,
-                child: Icon(
-                  Icons.eco,
-                  size: 140,
-                  color: Colors.green.shade200.withOpacity(0.25),
-                ),
-              ),
-              Positioned(
-                right: -20,
-                bottom: -20,
-                child: Icon(
-                  Icons.local_florist,
-                  size: 160,
-                  color: Colors.green.shade200.withOpacity(0.22),
-                ),
-              ),
-
-              // center "phone" mock
-              Align(
-                alignment: Alignment.center,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _PhoneCardMock(
-                        title: "Chụp ảnh lá",
-                        subtitle: "AI nhận diện bệnh",
-                        icon: Icons.camera_alt,
-                        accent: Colors.green.shade700,
-                      ),
-                      const SizedBox(width: 18),
-                      _PhoneCardMock(
-                        title: "Kết quả rõ ràng",
-                        subtitle: "Gợi ý xử lý an toàn",
-                        icon: Icons.health_and_safety,
-                        accent: Colors.lightGreen.shade800,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // bottom label
-              Positioned(
-                left: 14,
-                bottom: 12,
-                child: Row(
-                  children: [
-                    Icon(Icons.verified, size: 18, color: Colors.green.shade700),
-                    const SizedBox(width: 6),
-                    
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PhoneCardMock extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color accent;
-
-  const _PhoneCardMock({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: AspectRatio(
-        aspectRatio: 9 / 16,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.black.withOpacity(0.08)),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 18,
-                offset: const Offset(0, 10),
-                color: Colors.black.withOpacity(0.08),
-              )
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // top status bar mock
-                Row(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    const Spacer(),
-                    Icon(Icons.wifi, size: 16, color: Colors.black.withOpacity(0.35)),
-                    const SizedBox(width: 6),
-                    Icon(Icons.battery_full, size: 16, color: Colors.black.withOpacity(0.35)),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // hero icon
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: accent.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: accent, size: 26),
-                ),
-                const SizedBox(height: 12),
-
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black.withOpacity(0.85),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.35,
-                    color: Colors.black.withOpacity(0.6),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // mock image area
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.green.shade50,
-                          Colors.green.shade100.withOpacity(0.7),
-                          Colors.white,
-                        ],
-                      ),
-                      border: Border.all(color: Colors.black.withOpacity(0.06)),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        Icons.image_outlined,
-                        size: 42,
-                        color: Colors.black.withOpacity(0.25),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // mock buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: accent,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            "Phân tích",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.more_horiz,
-                        color: Colors.black.withOpacity(0.45),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-//  DOT PATTERN
-// ============================================================================
-class _DottedPatternPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.green.shade200.withOpacity(0.3)
-      ..style = PaintingStyle.fill;
-
-    const spacing = 40.0;
-    const radius = 3.0;
-
-    for (double x = 0; x < size.width; x += spacing) {
-      for (double y = 0; y < size.height; y += spacing) {
-        canvas.drawCircle(Offset(x, y), radius, paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

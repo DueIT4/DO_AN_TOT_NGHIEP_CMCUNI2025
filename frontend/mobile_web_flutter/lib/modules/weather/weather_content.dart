@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/weather_api.dart';
@@ -14,11 +15,6 @@ class _WeatherContentState extends State<WeatherContent>
   bool _loading = true;
   Map<String, dynamic>? _weatherData;
   String? _error;
-
-  // Bảng màu Xanh lá chuyên nghiệp (Emerald/Forest Green)
-  final Color primaryGreen = const Color(0xFF1B5E20); // Xanh đậm chuyên nghiệp
-  final Color lightGreen = const Color(0xFFE8F5E9);    // Nền xanh nhạt
-  final Color accentGreen = const Color(0xFF43A047);   // Xanh lá tươi làm điểm nhấn
 
   @override
   bool get wantKeepAlive => true;
@@ -72,196 +68,175 @@ class _WeatherContentState extends State<WeatherContent>
   Widget build(BuildContext context) {
     super.build(context);
 
-    if (_loading) {
-      return Center(child: CircularProgressIndicator(color: accentGreen));
-    }
-
-    if (_error != null) {
-      return _buildErrorState();
-    }
-
-    final w = _weatherData!;
-    final forecast = (w['forecast'] as List?) ?? const [];
+    // Gradient nền động
+    final backgroundGradient = LinearGradient(
+      colors: [
+        const Color(0xFF2E7D32), // Green 800
+        const Color(0xFF43A047), // Green 600
+        const Color(0xFF81C784), // Green 300
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
 
     return Scaffold(
-      backgroundColor: lightGreen,
-      body: RefreshIndicator(
-        onRefresh: _loadWeather,
-        color: primaryGreen,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 20),
-              _buildMainWeatherCard(w),
-              const SizedBox(height: 20),
-              _buildDetailedStats(w),
-              const SizedBox(height: 24),
-              _buildForecastSection(forecast),
-            ],
-          ),
-        ),
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: _loading 
+          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          : _error != null
+            ? _buildErrorState()
+            : RefreshIndicator(
+                onRefresh: _loadWeather,
+                color: Colors.green.shade800,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 48, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 32),
+                      _buildMainWeatherCard(),
+                      const SizedBox(height: 24),
+                      _buildDetailedStats(),
+                      const SizedBox(height: 24),
+                      _buildForecastSection(),
+                    ],
+                  ),
+                ),
+              ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Dự báo thời tiết',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: primaryGreen,
-              ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Cập nhật dựa trên vị trí của bạn',
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMainWeatherCard(Map<String, dynamic> w) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [accentGreen, primaryGreen],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: primaryGreen.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 10),
-          )
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                 const Text(
+                  'Thời tiết nông vụ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
                   children: [
+                    const Icon(Icons.location_on, color: Colors.white70, size: 14),
+                    const SizedBox(width: 4),
                     Text(
-                      '${w['location'] ?? 'Vị trí hiện tại'}',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${w['description'] ?? ''}'.toUpperCase(),
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 12,
-                          letterSpacing: 1.2),
+                      _weatherData!['location'] ?? 'Đang định vị...',
+                      style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],
                 ),
-              ),
-              Text(
-                '${w['icon'] ?? '☁️'}',
-                style: const TextStyle(fontSize: 56),
-              ),
-            ],
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white70),
+              onPressed: _loadWeather,
+            )
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMainWeatherCard() {
+    final w = _weatherData!;
+    return Center(
+      child: Column(
+        children: [
+           Text(
+            '${w['icon'] ?? '🌤️'}',
+            style: const TextStyle(fontSize: 100),
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Text(
-                '${w['temperature'] ?? '--'}°',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w200,
-                  fontSize: 64,
-                ),
-              ),
-              const Spacer(),
-              const Icon(Icons.info_outline, color: Colors.white54, size: 20),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            '${w['temperature'] ?? '--'}°',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w300, 
+              fontSize: 80,
+              height: 1,
+            ),
+          ),
+          Text(
+            '${w['description'] ?? ''}'.toUpperCase(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1.5,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailedStats(Map<String, dynamic> w) {
-    return Row(
-      children: [
-        _statItem(Icons.water_drop_outlined, 'Độ ẩm', '${w['humidity'] ?? '--'}%'),
-        const SizedBox(width: 15),
-        _statItem(Icons.air_rounded, 'Tốc độ gió', '${w['windSpeed'] ?? '--'} km/h'),
-      ],
-    );
-  }
-
-  Widget _statItem(IconData icon, String label, String value) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            )
-          ],
-        ),
-        child: Column(
-          children: [
-            CircleAvatar(
-              backgroundColor: lightGreen,
-              child: Icon(icon, color: accentGreen, size: 20),
-            ),
-            const SizedBox(height: 12),
-            Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
-            const SizedBox(height: 2),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          ],
-        ),
+  Widget _buildDetailedStats() {
+    final w = _weatherData!;
+    return _GlassContainer(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _statItem(Icons.water_drop, '${w['humidity'] ?? '--'}%', 'Độ ẩm'),
+          _divider(),
+          _statItem(Icons.air, '${w['windSpeed'] ?? '--'} km/h', 'Gió'),
+          _divider(),
+          _statItem(Icons.wb_sunny, 'Cao', 'UV Index'), // Placeholder vì API có thể chưa có UV
+        ],
       ),
     );
   }
 
-  Widget _buildForecastSection(List forecast) {
+  Widget _divider() {
+    return Container(
+      height: 30,
+      width: 1,
+      color: Colors.white24,
+    );
+  }
+
+  Widget _statItem(IconData icon, String value, String label) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.white, size: 24),
+        const SizedBox(height: 8),
+        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildForecastSection() {
+    final forecast = (_weatherData!['forecast'] as List?) ?? const [];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4),
-          child: Text(
-            'Dự báo trong tuần',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
+        const Text(
+          'Dự báo 7 ngày tới',
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-          ),
+        const SizedBox(height: 16),
+        _GlassContainer(
+          padding: EdgeInsets.zero,
           child: Column(
             children: [
-              for (int i = 0; i < forecast.take(5).length; i++) ...[
+               for (int i = 0; i < forecast.take(5).length; i++) ...[
                 _forecastRow(forecast[i]),
                 if (i < forecast.take(5).length - 1)
-                  Divider(height: 1, color: Colors.grey.shade100, indent: 20, endIndent: 20),
+                   const Divider(height: 1, color: Colors.white12),
               ]
             ],
           ),
@@ -279,7 +254,7 @@ class _WeatherContentState extends State<WeatherContent>
             width: 80,
             child: Text(
               '${day['day'] ?? ''}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
           Text('${day['icon'] ?? '☁️'}', style: const TextStyle(fontSize: 24)),
@@ -287,17 +262,17 @@ class _WeatherContentState extends State<WeatherContent>
           Expanded(
             child: Text(
               '${day['desc'] ?? ''}',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
             ),
           ),
           Text(
             '${day['high'] ?? '--'}°',
-            style: TextStyle(fontWeight: FontWeight.bold, color: primaryGreen),
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Text(
             '${day['low'] ?? '--'}°',
-            style: TextStyle(color: Colors.grey.shade400),
+            style: const TextStyle(color: Colors.white54),
           ),
         ],
       ),
@@ -309,16 +284,48 @@ class _WeatherContentState extends State<WeatherContent>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.cloud_off, size: 80, color: Colors.grey.shade300),
+          const Icon(Icons.cloud_off, size: 80, color: Colors.white54),
           const SizedBox(height: 16),
-          Text(_error!, textAlign: TextAlign.center),
+          Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: _loadWeather,
-            style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-            child: const Text('Thử lại', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.green.shade800,
+            ),
+            child: const Text('Thử lại'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GlassContainer extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+
+  const _GlassContainer({required this.child, this.padding});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: padding ?? const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
+            boxShadow: [
+               BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
+            ],
+          ),
+          child: child,
+        ),
       ),
     );
   }

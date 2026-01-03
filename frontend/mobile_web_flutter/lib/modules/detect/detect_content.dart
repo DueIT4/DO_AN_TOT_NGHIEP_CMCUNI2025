@@ -35,14 +35,11 @@ class _DetectContentState extends State<DetectContent>
   Map<String, dynamic>? _apiJson;
   String? _error;
 
-  // *** cache client key trong state
   String? _clientKeyCache;
-
-  // Đường dẫn detect (ApiBase.api thường trả về path như /api/v1/detect)
   static final String _detectPath = ApiBase.api('/detect');
 
   @override
-  bool get wantKeepAlive => true; // nếu sau này dùng trong IndexedStack thì giữ state
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -50,22 +47,16 @@ class _DetectContentState extends State<DetectContent>
     super.dispose();
   }
 
-  // ===========================================================
-  // *** HÀM TẠO / LẤY CLIENT KEY (lưu trong localStorage)
-  // ===========================================================
   String _ensureClientKey() {
     if (_clientKeyCache != null && _clientKeyCache!.isNotEmpty) {
       return _clientKeyCache!;
     }
-
     final storage = html.window.localStorage;
     var key = storage['client_key'];
-
     if (key == null || key.isEmpty) {
       key = const Uuid().v4();
       storage['client_key'] = key;
     }
-
     _clientKeyCache = key;
     return key;
   }
@@ -109,16 +100,18 @@ class _DetectContentState extends State<DetectContent>
 
     try {
       final uri = Uri.parse('${ApiBase.baseURL}$_detectPath');
-
       final req = http.MultipartRequest("POST", uri);
 
-      // *** Lấy client_key và gắn vào header
       final clientKey = _ensureClientKey();
       req.headers['X-Client-Key'] = clientKey;
 
       if (ApiBase.bearerToken != null && ApiBase.bearerToken!.isNotEmpty) {
         req.headers['Authorization'] = 'Bearer ${ApiBase.bearerToken}';
       }
+
+      // *** Thêm tham số bật LLM ***
+      req.fields['enable_llm'] = 'true';
+      req.fields['language'] = 'vi'; 
 
       req.files.add(
         http.MultipartFile.fromBytes(
@@ -132,14 +125,12 @@ class _DetectContentState extends State<DetectContent>
       final streamedResp = await req.send();
       final resp = await http.Response.fromStream(streamedResp);
 
-      // *** Hết lượt miễn phí (429)
       if (resp.statusCode == 429) {
         final bodyStr = utf8.decode(resp.bodyBytes);
-        String message = "Bạn đã dùng hết lượt miễn phí hôm nay. Vui lòng tải ứng dụng để tiếp tục.";
+        String message = "Bạn đã dùng hết lượt miễn phí hôm nay.";
 
         try {
           final decoded = jsonDecode(bodyStr);
-          // kiểu {"detail": {"code": "LIMIT_REACHED", "message": "..."}}
           if (decoded is Map &&
               decoded['detail'] is Map &&
               (decoded['detail']['message'] is String)) {
@@ -147,34 +138,10 @@ class _DetectContentState extends State<DetectContent>
           } else if (decoded is Map && decoded['detail'] is String) {
             message = decoded['detail'] as String;
           }
-        } catch (_) {
-          // ignore parse error, dùng message mặc định
-        }
+        } catch (_) {}
 
-        // Hiện dialog buộc tải app
         if (!mounted) return;
-        await showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Hết lượt miễn phí'),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('ĐÓNG'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _openDownloadLink();
-                },
-                child: const Text('TẢI APP'),
-              ),
-            ],
-          ),
-        );
-
-        // không set _apiJson, chỉ dừng lại
+        _showLimitDialog(message);
         return;
       }
 
@@ -184,75 +151,101 @@ class _DetectContentState extends State<DetectContent>
           if (!mounted) return;
           setState(() => _apiJson = decoded);
 
-          // scroll xuống kết quả
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_scrollController.hasClients) {
               _scrollController.animateTo(
                 _scrollController.position.maxScrollExtent,
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOut,
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
               );
             }
           });
         } else {
           if (!mounted) return;
-          setState(() => _error = "Phản hồi không giống JSON Object.");
+          setState(() => _error = "Phản hồi không hợp lệ.");
         }
       } else {
         if (!mounted) return;
-        setState(() {
-          _error = "Lỗi server (${resp.statusCode}): ${resp.body}";
-        });
+        setState(() => _error = "Lỗi server (${resp.statusCode})");
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = "Không thể kết nối: $e");
+      setState(() => _error = "Không thể kết nối máy chủ");
     } finally {
       if (!mounted) return;
       setState(() => _loading = false);
     }
   }
 
+  Future<void> _showLimitDialog(String message) async {
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Hết lượt miễn phí'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('ĐÓNG'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _openDownloadLink();
+            },
+            child: const Text('TẢI APP'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _openDownloadLink() async {
-    // *** nhớ đổi sang link CH Play thật của bạn
-    const url = "https://your-download-link.com/app.apk";
+    const url = "https://play.google.com/store/apps/details?id=com.yourcompany.zestguard";
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      setState(() {
-        _error = 'Không mở được link tải ứng dụng.';
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // bắt buộc khi dùng AutomaticKeepAliveClientMixin
+    super.build(context);
 
-    final theme = Theme.of(context);
+    // Màu chủ đạo
+    final primaryColor = Colors.green.shade700;
 
     return SingleChildScrollView(
       controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
+          constraints: const BoxConstraints(maxWidth: 800),
           child: Column(
             children: [
-              const Text(
-                "🧠 Hệ thống chẩn đoán bệnh hại cây trồng ZestGuard",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+              // Header
+              Column(
+                children: [
+                  Text(
+                    "Chẩn đoán bệnh cây trồng",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade900,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "Sử dụng công nghệ AI tiên tiến để phát hiện bệnh sớm\nvà nhận tư vấn xử lý kịp thời.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.black54, height: 1.5),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              const Text(
-                "Tải ảnh lá hoặc quả — hệ thống AI sẽ phân tích bệnh và gợi ý cách xử lý.",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: Colors.black54),
-              ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 48),
 
+              // Action Buttons (Restored Original Style)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -260,6 +253,9 @@ class _DetectContentState extends State<DetectContent>
                     onPressed: _loading ? null : _pickImage,
                     icon: const Icon(Icons.photo_library),
                     label: const Text("Chọn ảnh từ thư viện"),
+                     style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    ),
                   ),
                   const SizedBox(width: 16),
                   FilledButton.icon(
@@ -276,47 +272,79 @@ class _DetectContentState extends State<DetectContent>
                   ),
                 ],
               ),
+              
+              const SizedBox(height: 32),
 
-              const SizedBox(height: 30),
-
-              if (_imageBytes != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.memory(
-                    _imageBytes!,
-                    width: 430,
-                    height: 300,
-                    fit: BoxFit.cover,
+              // Image Picker Area
+              Center( // Căn giữa
+                child: Container(
+                  width: 500, // Giới hạn chiều ngang
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: _imageBytes == null 
+                        ? Border.all(color: Colors.grey.shade300, width: 2)
+                        : null,
                   ),
-                ),
+                child: _imageBytes != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: Image.memory(
+                          _imageBytes!,
+                          fit: BoxFit.contain,
+                          height: 300,
+                          width: double.infinity,
+                        ),
+                      )
+                    : Container(
+                        height: 200,
+                        alignment: Alignment.center,
+                        child: Text("Chưa có ảnh được chọn", style: TextStyle(color: Colors.grey.shade400)),
+                    ),
+                  ),
+              ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
 
+              // Analyze Button (Original Style)
               FilledButton.icon(
                 onPressed: _loading ? null : _analyze,
-                icon: const Icon(Icons.analytics_outlined),
-                label: const Text("Phân tích bệnh"),
+                icon: _loading 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.analytics_outlined),
+                label: Text(_loading ? "Đang phân tích..." : "Phân tích bệnh"),
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.blueAccent,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 30,
                     vertical: 14,
                   ),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
 
-              const SizedBox(height: 35),
+              const SizedBox(height: 48),
 
-              if (_loading)
-                const CircularProgressIndicator()
-              else if (_error != null)
-                Text(
-                  _error!,
-                  style: const TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
-                )
-              else if (_apiJson != null)
-                _buildResultCard(theme),
+              // Error Message
+              if (_error != null)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade100),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.red.shade700),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(_error!, style: TextStyle(color: Colors.red.shade900))),
+                    ],
+                  ),
+                ),
+
+              // Result Section
+              if (_apiJson != null) _buildResultCard(context),
             ],
           ),
         ),
@@ -324,109 +352,146 @@ class _DetectContentState extends State<DetectContent>
     );
   }
 
-  /// Hiển thị kết quả: chỉ bệnh chính + độ tin cậy + tóm tắt & hướng dẫn từ LLM
-  Widget _buildResultCard(ThemeData theme) {
+  Widget _buildResultCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.check_circle, color: Colors.green.shade700),
+              ),
+              const SizedBox(width: 16),
+              const Text(
+                "Kết quả phân tích",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const Divider(height: 32),
+          _buildAnalysisContent(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalysisContent(BuildContext context) {
     final root = Map<String, dynamic>.from(_apiJson ?? const {});
-
-    final detectionsRaw = root['detections'] ?? [];
-    final List<Map<String, dynamic>> detections = [
-      for (final d in (detectionsRaw as List))
-        Map<String, dynamic>.from(d as Map),
-    ];
-
-    final explanation = root['explanation']?.toString();
-    final llm = root['llm'] as Map<String, dynamic>?;
-
-    final diseaseSummary = llm?['disease_summary']?.toString();
-    final careInstructions = llm?['care_instructions']?.toString();
-
+    final detections = (root['detections'] as List?) ?? [];
+    
     if (detections.isEmpty) {
-      return Container(
-        width: 760,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.green.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.shade200),
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Text("Không phát hiện bất thường nào trên cây trồng.", style: TextStyle(fontSize: 16)),
         ),
-        child: const Text("Không phát hiện bệnh trên ảnh này."),
       );
     }
 
-    // chọn detection có confidence cao nhất
-    detections.sort((a, b) {
+    // Sort confidence
+    final validDetections = detections.map((e) => Map<String, dynamic>.from(e)).toList();
+    validDetections.sort((a, b) {
       final ca = ((a['confidence'] ?? a['conf']) as num?)?.toDouble() ?? 0.0;
       final cb = ((b['confidence'] ?? b['conf']) as num?)?.toDouble() ?? 0.0;
       return cb.compareTo(ca);
     });
 
-    final best = detections.first;
-    final mainDisease = (best['class_name'] ?? 'Không xác định').toString();
-    final rawConf =
-        ((best['confidence'] ?? best['conf']) as num?)?.toDouble() ?? 0.0;
-    final confPercent = (rawConf * 100).toStringAsFixed(2);
+    final best = validDetections.first;
+    final diseaseName = best['class_name'] ?? 'Không xác định';
+    final confidence = ((best['confidence'] ?? best['conf']) as num?)?.toDouble() ?? 0.0;
 
-    return Container(
-      width: 760,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.green.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.shade200),
-      ),
-      child: Column(
+    final llm = root['llm'] as Map<String, dynamic>?;
+    final summary = llm?['disease_summary']?.toString();
+    final instructions = llm?['care_instructions']?.toString();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Main Result
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.green.shade100),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Bệnh được chẩn đoán", style: TextStyle(color: Colors.black54, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$diseaseName'.toUpperCase(),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  "${(confidence * 100).toStringAsFixed(1)}% tin cậy",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade700, fontSize: 13),
+                ),
+              )
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Info Sections
+        if (summary != null)
+          _buildInfoSection(Icons.info_outline, "Thông tin bệnh", summary),
+        if (instructions != null)
+          _buildInfoSection(Icons.medical_services_outlined, "Biện pháp xử lý", instructions),
+      ],
+    );
+  }
+
+  Widget _buildInfoSection(IconData icon, String title, String content) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("🔎 Kết quả chẩn đoán", style: theme.textTheme.titleLarge),
-          const Divider(),
-
-          Text(
-            "🌿 Bệnh chẩn đoán: $mainDisease",
-            style: const TextStyle(fontWeight: FontWeight.w600),
+          Icon(icon, size: 20, color: Colors.grey.shade400),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 8),
+                Text(content, style: TextStyle(color: Colors.grey.shade700, height: 1.5)),
+              ],
+            ),
           ),
-          Text("📈 Độ tin cậy: $confPercent%"),
-          const SizedBox(height: 16),
-
-          if (diseaseSummary != null && diseaseSummary.isNotEmpty) ...[
-            Text(
-              "🧠 Tình trạng:",
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              diseaseSummary,
-              style: const TextStyle(height: 1.4),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          if (careInstructions != null && careInstructions.isNotEmpty) ...[
-            Text(
-              "💊 Hướng dẫn chăm sóc:",
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              careInstructions,
-              style: const TextStyle(height: 1.4),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          if (explanation != null && explanation.isNotEmpty) ...[
-            Text(
-              "📌 Ghi chú kỹ thuật:",
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              explanation,
-              style: const TextStyle(fontSize: 13, color: Colors.black54),
-            ),
-          ],
         ],
       ),
     );
