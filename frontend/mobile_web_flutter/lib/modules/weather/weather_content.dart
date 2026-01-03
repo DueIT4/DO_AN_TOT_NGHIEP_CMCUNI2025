@@ -77,8 +77,8 @@ class _WeatherContentState extends State<WeatherContent>
             end: Alignment.bottomCenter,
             stops: [0.0, 0.4],
             colors: [
-              Color(0xFFE3F2FD), // Xanh rất nhạt ở trên
-              Color(0xFFFAFAFA), // Trắng ở dưới
+              Color(0xFFE3F2FD), 
+              Color(0xFFFAFAFA), 
             ],
           ),
         ),
@@ -86,28 +86,41 @@ class _WeatherContentState extends State<WeatherContent>
           ? const Center(child: CircularProgressIndicator(color: Colors.blue))
           : _error != null
             ? _buildErrorState()
-            : RefreshIndicator(
-                onRefresh: _loadWeather,
-                color: Colors.blue,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(24, 60, 24, 40),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          _buildHeader(),
-                          const SizedBox(height: 30),
-                          _buildMainWeatherCard(),
-                          const SizedBox(height: 40),
-                          _buildDetailedStats(),
-                          const SizedBox(height: 40),
-                          _buildForecastSection(),
-                        ],
-                      ),
-                    ),
+            : SafeArea(
+                child: RefreshIndicator(
+                  onRefresh: _loadWeather,
+                  color: Colors.blue,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: IntrinsicHeight( // Giúp layout giãn ra hết màn hình
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              child: Column(
+                                children: [
+                                  _buildHeader(),
+                                  Expanded( // Đẩy nội dung chính ra giữa
+                                    flex: 3,
+                                    child: _buildMainWeatherCard(),
+                                  ),
+                                  _buildDetailedStats(),
+                                  const SizedBox(height: 24),
+                                  Expanded( // Forecast chiếm phần còn lại
+                                    flex: 4,
+                                    child: _buildForecastSection(),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
                   ),
                 ),
               ),
@@ -116,41 +129,35 @@ class _WeatherContentState extends State<WeatherContent>
   }
 
   Widget _buildHeader() {
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.location_on, color: Colors.blue.shade700, size: 20),
-            const SizedBox(width: 8),
+             Row(
+              children: [
+                Icon(Icons.location_on, color: Colors.blue.shade700, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  _weatherData!['location'] ?? '...',
+                  style: TextStyle(
+                    color: Colors.blueGrey.shade800, 
+                    fontSize: 20, 
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
             Text(
-              _weatherData!['location'] ?? 'Đang định vị...',
-              style: TextStyle(
-                color: Colors.blueGrey.shade800, 
-                fontSize: 20, 
-                fontWeight: FontWeight.w600,
-              ),
+              '${DateTime.now().day} tháng ${DateTime.now().month}, ${DateTime.now().year}',
+              style: TextStyle(color: Colors.blueGrey.shade400, fontSize: 13),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blue.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              )
-            ]
-          ),
-          child: Text(
-            'Hôm nay, ${DateTime.now().day}/${DateTime.now().month}',
-            style: TextStyle(color: Colors.blue.shade700, fontSize: 13, fontWeight: FontWeight.w500),
-          ),
+        IconButton(
+          icon: Icon(Icons.refresh, color: Colors.blue.shade300),
+          onPressed: _loadWeather,
         )
       ],
     );
@@ -158,56 +165,41 @@ class _WeatherContentState extends State<WeatherContent>
 
   Widget _buildMainWeatherCard() {
     final w = _weatherData!;
-    return Stack(
-      alignment: Alignment.center,
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Background Glow hiệu ứng nhẹ
-        Container(
-          width: 200,
-          height: 200,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [Colors.blue.withOpacity(0.1), Colors.transparent],
-            ),
-          ),
+        Text(
+          '${w['icon'] ?? '🌤️'}',
+          style: const TextStyle(fontSize: 100),
         ),
-        Column(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-             // Icon có màu sắc - ĐIỂM NHẤN
-             Text(
-              '${w['icon'] ?? '🌤️'}',
-              style: const TextStyle(fontSize: 120),
-            ),
-            // Nhiệt độ - Màu đậm rõ ràng
-            ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ).createShader(bounds),
-              child: Text(
-                '${w['temperature'] ?? '--'}°',
-                style: const TextStyle(
-                  color: Colors.white, // Masked
-                  fontWeight: FontWeight.w300, 
-                  fontSize: 100,
-                  height: 1,
-                  letterSpacing: -5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
             Text(
-              '${w['description'] ?? ''}'.toUpperCase(),
-              style: TextStyle(
-                color: Colors.blueGrey.shade400,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 2,
+              '${w['temperature'] ?? '--'}',
+              style: const TextStyle(
+                color: Color(0xFF1565C0), // Masked
+                fontWeight: FontWeight.w300, 
+                fontSize: 90,
+                height: 1,
+                letterSpacing: -4,
               ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text('°', style: TextStyle(fontSize: 40, color: Color(0xFF1565C0))),
             ),
           ],
+        ),
+        Text(
+          '${w['description'] ?? ''}'.toUpperCase(),
+          style: TextStyle(
+            color: Colors.blueGrey.shade400,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 2,
+          ),
         ),
       ],
     );
@@ -216,148 +208,110 @@ class _WeatherContentState extends State<WeatherContent>
   Widget _buildDetailedStats() {
     final w = _weatherData!;
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: Colors.blue.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           )
         ],
       ),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _statItem(Icons.water_drop, '${w['humidity'] ?? '--'}%', 'Độ ẩm', Colors.blue),
-              _divider(),
-              _statItem(Icons.air, '${w['windSpeed'] ?? '--'} km/h', 'Gió', Colors.teal),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const Divider(height: 1, color: Color(0xFFF5F5F5)),
-          const SizedBox(height: 24),
-           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _statItem(Icons.wb_sunny, 'Cao', 'UV Index', Colors.orange),
-              _divider(),
-              _statItem(Icons.compress, '1012 hPa', 'Áp suất', Colors.purple),
-            ],
-          ),
+          _statItem(Icons.water_drop, '${w['humidity'] ?? '--'}%', 'Độ ẩm', Colors.blue),
+          _divider(),
+          _statItem(Icons.air, '${w['windSpeed'] ?? '--'} km/h', 'Gió', Colors.teal),
+          _divider(),
+          _statItem(Icons.wb_sunny, 'Cao', 'UV', Colors.orange),
         ],
       ),
     );
   }
 
   Widget _divider() {
-    return Container(
-      height: 40,
-      width: 1,
-      color: Colors.grey.shade100,
-    );
+    return Container(height: 24, width: 1, color: Colors.grey.shade200);
   }
 
   Widget _statItem(IconData icon, String value, String label, Color color) {
-    return SizedBox(
-      width: 80,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 12),
-          Text(value, style: TextStyle(color: Colors.blueGrey.shade900, fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: Colors.blueGrey.shade300, fontSize: 12, fontWeight: FontWeight.w500)),
-        ],
-      ),
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 6),
+        Text(value, style: TextStyle(color: Colors.blueGrey.shade900, fontWeight: FontWeight.bold, fontSize: 14)),
+        Text(label, style: TextStyle(color: Colors.blueGrey.shade300, fontSize: 11)),
+      ],
     );
   }
 
   Widget _buildForecastSection() {
     final forecast = (_weatherData!['forecast'] as List?) ?? const [];
+    // Chỉ lấy 3 ngày để fit màn hình
+    final shortForecast = forecast.take(3).toList(); 
+    
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Dự báo 5 ngày',
-                style: TextStyle(color: Colors.blueGrey.shade800, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Icon(Icons.calendar_month, color: Colors.blueGrey.shade300, size: 20),
-            ],
-          ),
+        Text(
+          'Dự báo 3 ngày',
+          style: TextStyle(color: Colors.blueGrey.shade800, fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              )
-            ],
-          ),
-          child: Column(
-            children: [
-               for (int i = 0; i < forecast.take(5).length; i++) ...[
-                _forecastRow(forecast[i], i),
-                if (i < forecast.take(5).length - 1)
-                   const Divider(height: 1, color: Color(0xFFF5F5F5)),
-              ]
-            ],
+        const SizedBox(height: 12),
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.blue.shade50),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Chia đều không gian
+              children: [
+                for (int i = 0; i < shortForecast.length; i++) ...[
+                  _forecastRow(shortForecast[i]),
+                  if (i < shortForecast.length - 1)
+                    const Divider(height: 1, color: Color(0xFFF5F5F5), indent: 16, endIndent: 16),
+                ]
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _forecastRow(dynamic day, int index) {
+  Widget _forecastRow(dynamic day) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           SizedBox(
-            width: 50,
+            width: 40,
             child: Text(
               '${day['day'] ?? ''}',
-              style: TextStyle(color: Colors.blueGrey.shade700, fontWeight: FontWeight.bold, fontSize: 15),
+              style: TextStyle(color: Colors.blueGrey.shade700, fontWeight: FontWeight.bold, fontSize: 14),
             ),
           ),
+          const SizedBox(width: 12),
+          Text('${day['icon'] ?? '☁️'}', style: const TextStyle(fontSize: 20)),
           const SizedBox(width: 16),
-          Text('${day['icon'] ?? '☁️'}', style: const TextStyle(fontSize: 22)),
-          const SizedBox(width: 20),
           Expanded(
             child: Text(
               '${day['desc'] ?? ''}',
-              style: TextStyle(color: Colors.blueGrey.shade400, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(color: Colors.blueGrey.shade400, fontSize: 13, fontWeight: FontWeight.w500),
             ),
           ),
           Text(
             '${day['high'] ?? '--'}°',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey.shade800, fontSize: 16),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey.shade800, fontSize: 14),
           ),
-          const SizedBox(width: 12),
           Text(
-            '${day['low'] ?? '--'}°',
-            style: TextStyle(color: Colors.blueGrey.shade300, fontSize: 16),
+            ' / ${day['low'] ?? '--'}°',
+            style: TextStyle(color: Colors.blueGrey.shade300, fontSize: 13),
           ),
         ],
       ),
