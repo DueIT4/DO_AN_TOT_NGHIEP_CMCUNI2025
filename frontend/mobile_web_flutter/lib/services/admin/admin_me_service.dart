@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart'; // ✅ Cần thiết để xác định loại file
 
-import 'package:mobile_web_flutter/core/api_base_app.dart';
+import 'package:mobile_web_flutter/core/api_base.dart';
 import 'package:mobile_web_flutter/models/admin/admin_user_me.dart';
 
 class AdminMeService {

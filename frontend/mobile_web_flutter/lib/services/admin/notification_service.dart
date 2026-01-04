@@ -1,4 +1,4 @@
-import 'package:mobile_web_flutter/core/api_base_app.dart';
+import 'package:mobile_web_flutter/core/api_base.dart';
 import 'package:mobile_web_flutter/models/admin/notification_models.dart';
 
 class NotificationService {

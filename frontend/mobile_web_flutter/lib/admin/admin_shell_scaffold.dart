@@ -5,7 +5,7 @@ import 'package:mobile_web_flutter/services/admin/admin_me_service.dart';
 import 'package:mobile_web_flutter/services/admin/user_service.dart';
 import 'package:mobile_web_flutter/modules/auth/auth_service.dart';
 import 'package:mobile_web_flutter/admin/admin_profile_dialog.dart';
-import 'package:mobile_web_flutter/core/api_base_app.dart';
+import 'package:mobile_web_flutter/core/api_base.dart';
 import 'package:mobile_web_flutter/models/admin/admin_user_me.dart';
 
 const Color _adminGreen = Color(0xFF3D7A3B);
