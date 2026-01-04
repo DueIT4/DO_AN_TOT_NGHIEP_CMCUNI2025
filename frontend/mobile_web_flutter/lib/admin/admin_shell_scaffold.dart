@@ -52,7 +52,7 @@ class _AdminShellScaffoldState extends State<AdminShellScaffold> {
 
   bool _canAccessAdminAreaExceptSupport(String role) {
     final r = role.toLowerCase();
-    return r == 'admin';
+    return r == 'admin' || r == 'support_admin';
   }
 
   bool _isViewer(String role) => role.toLowerCase() == 'viewer';
