@@ -1,7 +1,7 @@
 // lib/core/api_base.dart
 import 'dart:convert';
 import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+    show kIsWeb, defaultTargetPlatform, TargetPlatform, kReleaseMode;
 import 'package:http/http.dart' as http;
 
 /// Exception HTTP chuẩn để FE đọc được statusCode + body
