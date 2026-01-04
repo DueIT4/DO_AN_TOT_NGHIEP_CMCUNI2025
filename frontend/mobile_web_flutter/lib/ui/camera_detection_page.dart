@@ -361,8 +361,8 @@ class _DetectionCard extends StatelessWidget {
   const _DetectionCard({required this.record, required this.onTap});
 
   String _formattedDate() {
-    // Sửa timezone cho Việt Nam (UTC+7)
-    final vietnamTime = record.detectedAt.add(const Duration(hours: 7));
+    // Sửa timezone cho Việt Nam (UTC+7) -> dùng toLocal() để tự động theo máy
+    final vietnamTime = record.detectedAt.toLocal();
     return DateFormat('dd/MM/yyyy HH:mm').format(vietnamTime);
   }
 

@@ -42,7 +42,7 @@ class DetectionDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateText = DateFormat('dd/MM/yyyy HH:mm').format(record.detectedAt);
+    final dateText = DateFormat('dd/MM/yyyy HH:mm').format(record.detectedAt.toLocal());
     final percent = (record.accuracy * 100).toStringAsFixed(0);
     final sourceLabel =
         record.source == DetectionSource.camera ? 'Camera' : 'Thư viện';

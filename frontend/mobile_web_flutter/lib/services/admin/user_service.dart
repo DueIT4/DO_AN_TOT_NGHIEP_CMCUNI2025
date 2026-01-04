@@ -1,4 +1,4 @@
-import 'package:mobile_web_flutter/core/api_base.dart';
+import 'package:mobile_web_flutter/core/api_base_app.dart';
 
 /// Service để quản lý thông tin user hiện tại
 class UserService {

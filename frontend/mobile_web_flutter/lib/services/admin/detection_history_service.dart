@@ -1,7 +1,7 @@
 import 'dart:html' as html;
 
 import 'package:http/http.dart' as http;
-import 'package:mobile_web_flutter/core/api_base.dart';
+import 'package:mobile_web_flutter/core/api_base_app.dart';
 import 'package:mobile_web_flutter/models/admin/detection_history_models.dart';
 
 /// Số bản ghi mỗi trang (dùng chung cho FE)

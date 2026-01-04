@@ -268,7 +268,7 @@ class _HomeUserPageState extends State<HomeUserPage> {
             children: [
               // ================= HEADER =================
               Row(
-                mainAxisAlignment: MainAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -281,6 +281,17 @@ class _HomeUserPageState extends State<HomeUserPage> {
                       color: Color(0xFF7CCD2B),
                       size: 28,
                     ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const UserSettingsPage(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.person_outline),
                   ),
                 ],
               ),
@@ -372,7 +383,7 @@ class _HomeUserPageState extends State<HomeUserPage> {
                     children: [
                       // Nếu URL là MJPEG (DroidCam) → dùng DroicamView để convert thành HLS
                       if (camUrl != null && _looksLikeMjpeg(camUrl))
-                        DroicamView(url: camUrl!)
+                        DroicamView(url: camUrl!, deviceId: camId)
                       else
                         camera_widgets.CameraStreamPlayer(
                           deviceId: camId,
@@ -587,8 +598,9 @@ class _HomeUserPageState extends State<HomeUserPage> {
 /// hoặc phát trực tiếp qua CameraStreamPlayer với VideoPlayer plugin.
 class DroicamView extends StatefulWidget {
   final String url; // URL MJPEG của DroidCam
+  final int deviceId; // Device ID để start stream từ backend
 
-  const DroicamView({super.key, required this.url});
+  const DroicamView({super.key, required this.url, required this.deviceId});
 
   @override
   State<DroicamView> createState() => _DroicamViewState();
@@ -607,15 +619,20 @@ class _DroicamViewState extends State<DroicamView> {
   }
 
   Future<void> _initializeHls() async {
-    // Tạo HLS URL từ MJPEG URL bằng cách gọi backend API
-    // Backend sẽ convert MJPEG -> HLS bằng ffmpeg
+    // Start streaming from backend using device_id
+    // Backend will convert MJPEG -> HLS using ffmpeg
     try {
-      final mjpegUrl = Uri.encodeComponent(widget.url);
-      final uri =
-          Uri.parse('${ApiBase.host}/api/v1/stream/hls?mjpeg_url=$mjpegUrl');
+      final uri = ApiBase.uri('/streams/start');
 
       final resp = await http
-          .get(uri, headers: ApiClient.authHeaders())
+          .post(
+            uri,
+            headers: {
+              ...ApiClient.authHeaders(),
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({'device_id': widget.deviceId}),
+          )
           .timeout(const Duration(seconds: 30));
 
       if (!mounted) return;
@@ -735,7 +752,7 @@ class _DroicamViewState extends State<DroicamView> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: camera_widgets.CameraStreamPlayer(
-        deviceId: 0, // Dummy ID cho DroidCam
+        deviceId: widget.deviceId,
         deviceName: 'DroidCam',
         hlsUrl: _hlsUrl,
       ),

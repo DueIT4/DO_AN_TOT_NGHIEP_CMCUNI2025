@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:mobile_web_flutter/models/admin/admin_user_me.dart';
 import 'package:mobile_web_flutter/services/admin/admin_me_service.dart';
-import 'package:mobile_web_flutter/core/api_base.dart';
+import 'package:mobile_web_flutter/core/api_base_app.dart';
 import 'package:mobile_web_flutter/core/toast.dart';
 
 class AdminProfileDialog extends StatefulWidget {

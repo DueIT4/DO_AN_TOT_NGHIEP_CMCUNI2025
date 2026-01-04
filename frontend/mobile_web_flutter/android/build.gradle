@@ -1,3 +1,43 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.3.0'
+        classpath 'com.google.gms:google-services:4.4.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0"
+    }
+}
+
+// 1. Load local.properties
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterRoot = localProperties.getProperty('flutter.sdk')
+if (flutterRoot == null) {
+    // throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+}
+
+// ============================================================================
+// FIX QUAN TRỌNG: Shim cho plugins (geolocator, etc.)
+// Các plugin này tìm biến "flutter.compileSdkVersion" nhưng không thấy
+// nên ta phải định nghĩa thủ công ở rootProject.ext
+// ============================================================================
+rootProject.ext.flutter = [
+    compileSdkVersion: 35,
+    minSdkVersion: 23,
+    targetSdkVersion: 35,
+    versionCode: 1,
+    versionName: "1.0"
+]
+
+// 2. Standard AllProjects
 allprojects {
     repositories {
         google()
@@ -5,14 +45,32 @@ allprojects {
     }
 }
 
-rootProject.buildDir = "../build"
+rootProject.buildDir = '../build'
+
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
 subprojects {
-    project.evaluationDependsOn(":app")
+    project.evaluationDependsOn(':app')
 }
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
+}
+
+// ============================================================================
+// FIX TRIỆT ĐỂ: Ép version cho tất cả các plugins (library)
+// ============================================================================
+subprojects { subproject ->
+    subproject.plugins.withId("com.android.library") {
+        subproject.android {
+            // Ép buộc dùng SDK 35 (Android 15) để tương thích plugin mới
+            compileSdkVersion 35
+            
+            defaultConfig {
+                minSdkVersion 23
+                targetSdkVersion 35
+            }
+        }
+    }
 }

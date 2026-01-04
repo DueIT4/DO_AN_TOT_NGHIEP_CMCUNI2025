@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
-import 'package:mobile_web_flutter/core/api_base.dart';
+import 'package:mobile_web_flutter/core/api_base_app.dart';
 import 'package:mobile_web_flutter/models/admin/dashboard_models.dart';
 
 class DashboardService {

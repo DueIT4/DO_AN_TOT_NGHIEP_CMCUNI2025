@@ -1,5 +1,5 @@
 // lib/services/admin/device_service.dart
-import 'package:mobile_web_flutter/core/api_base.dart';
+import 'package:mobile_web_flutter/core/api_base_app.dart';
 
 class DeviceService {
   /// 1. Lấy danh sách TOÀN BỘ thiết bị (Dành cho Admin)

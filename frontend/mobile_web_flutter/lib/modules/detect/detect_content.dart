@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 // *** chỉ dùng được trên Web, nếu app mobile dùng chung file này thì nên tách riêng
+// *** chỉ dùng được trên Web, nếu app mobile dùng chung file này thì nên tách riêng
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
@@ -15,7 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 // *** nhớ thêm trong pubspec: uuid: ^4.2.2
 import 'package:uuid/uuid.dart';
 
-import '../../core/api_base.dart';
+import 'package:mobile_web_flutter/core/api_base.dart';
 
 class DetectContent extends StatefulWidget {
   const DetectContent({super.key});

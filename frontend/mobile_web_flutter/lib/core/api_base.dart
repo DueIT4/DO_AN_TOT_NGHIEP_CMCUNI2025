@@ -37,7 +37,13 @@ class ApiBase {
     }
     
     if (defaultTargetPlatform == TargetPlatform.android) {
-      // Khi deploy thật, bạn cũng nên đổi cái này sang https
+      // ✅ Release Mode: Ưu tiên dùng biến môi trường (dart-define)
+      if (kReleaseMode) {
+        const envHost = String.fromEnvironment('API_LAN_HOST');
+        if (envHost.isNotEmpty) return envHost;
+      }
+      
+      // Fallback cho hardcoded cũ (hoặc debug)
       return 'https://zestguard-api-38261474833.asia-southeast1.run.app';
     }
     return 'https://zestguard-api-38261474833.asia-southeast1.run.app';

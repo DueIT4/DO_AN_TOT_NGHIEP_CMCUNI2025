@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:mobile_web_flutter/core/api_base.dart'; // Import ApiBase của bạn
+import 'package:mobile_web_flutter/core/api_base_app.dart'; // Import ApiBase của bạn
 
 class WeatherApi {
   // ✅ Sửa: Sử dụng trực tiếp baseURL từ ApiBase để đảm bảo luôn dùng HTTPS

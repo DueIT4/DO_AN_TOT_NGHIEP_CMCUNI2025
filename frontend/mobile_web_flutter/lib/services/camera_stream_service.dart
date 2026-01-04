@@ -5,7 +5,7 @@ import '../core/api_base_app.dart';
 import 'api_client.dart';
 
 class CameraStreamService {
-  // 1. Lấy camera đang được chọn của người dùng hiện tại
+  // GET /devices/me/selected
   static Future<Map<String, dynamic>> getSelectedCamera() async {
     final uri = ApiBase.uri('/devices/me/selected');
     try {
@@ -19,15 +19,25 @@ class CameraStreamService {
       }
       return {
         'device_id': null,
-        'message': 'Không thể tải camera (${resp.statusCode})',
+        'message': 'Không thể tải camera được chọn (${resp.statusCode})',
+        'error': true,
+      };
+    } on TimeoutException {
+      return {
+        'device_id': null,
+        'message': 'Hết thời gian kết nối máy chủ',
         'error': true,
       };
     } catch (e) {
-      return {'device_id': null, 'message': 'Lỗi kết nối: $e', 'error': true};
+      return {
+        'device_id': null,
+        'message': 'Lỗi kết nối: $e',
+        'error': true,
+      };
     }
   }
 
-  // 2. Kiểm tra sức khỏe của Stream (FFmpeg đang chạy không? Có file .ts mới không?)
+  // GET /streams/health/{deviceId}
   static Future<Map<String, dynamic>> checkStreamHealth(int deviceId) async {
     final uri = ApiBase.uri('/streams/health/$deviceId');
     try {
@@ -39,15 +49,31 @@ class CameraStreamService {
         final data = jsonDecode(resp.body);
         return data is Map<String, dynamic> ? data : <String, dynamic>{};
       }
-      return {'healthy': false, 'running': false, 'error': 'Lỗi phản hồi (${resp.statusCode})'};
+      return {
+        'healthy': false,
+        'running': false,
+        'error': 'Không thể kiểm tra stream health (${resp.statusCode})',
+      };
+    } on TimeoutException {
+      return {
+        'healthy': false,
+        'running': false,
+        'error': 'Hết thời gian kết nối máy chủ',
+      };
     } catch (e) {
-      return {'healthy': false, 'running': false, 'error': 'Lỗi kết nối: $e'};
+      return {
+        'healthy': false,
+        'running': false,
+        'error': 'Lỗi kết nối: $e',
+      };
     }
   }
 
-  // 3. Yêu cầu Backend bắt đầu FFmpeg transcode từ RTSP sang HLS
+  // POST /streams/start (with retry logic)
   static Future<Map<String, dynamic>> startStream(int deviceId) async {
     final uri = ApiBase.uri('/streams/start');
+
+    // Retry up to 3 times with exponential backoff
     int retries = 3;
     Duration delay = const Duration(seconds: 1);
 
@@ -59,6 +85,7 @@ class CameraStreamService {
               headers: {
                 ...ApiClient.authHeaders(),
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
               },
               body: jsonEncode({'device_id': deviceId}),
             )
@@ -69,26 +96,52 @@ class CameraStreamService {
           return data is Map<String, dynamic> ? data : <String, dynamic>{};
         }
 
+        // If 404 and not last attempt, retry after delay
+        if (resp.statusCode == 404 && attempt < retries - 1) {
+          await Future.delayed(delay);
+          delay *= 2; // exponential backoff
+          continue;
+        }
+
+        return {
+          'hls_url': null,
+          'running': false,
+          'message': 'Không thể khởi động stream (${resp.statusCode})',
+        };
+      } on TimeoutException {
         if (attempt < retries - 1) {
           await Future.delayed(delay);
           delay *= 2;
           continue;
         }
-
-        return {'hls_url': null, 'running': false, 'message': 'Lỗi khởi động (${resp.statusCode})'};
+        return {
+          'hls_url': null,
+          'running': false,
+          'message': 'Hết thời gian kết nối máy chủ',
+        };
       } catch (e) {
         if (attempt < retries - 1) {
           await Future.delayed(delay);
           delay *= 2;
           continue;
         }
-        return {'hls_url': null, 'running': false, 'message': 'Lỗi: $e'};
+        return {
+          'hls_url': null,
+          'running': false,
+          'message': 'Lỗi kết nối: $e',
+        };
       }
     }
-    return {'hls_url': null, 'running': false, 'message': 'Thất bại sau nhiều lần thử'};
+
+    // Should never reach here, but just in case
+    return {
+      'hls_url': null,
+      'running': false,
+      'message': 'Không thể khởi động stream sau nhiều lần thử',
+    };
   }
 
-  // 4. Dừng Stream (Tắt FFmpeg để giải phóng tài nguyên CPU/RAM trên Cloud Run)
+  // POST /streams/stop
   static Future<bool> stopStream(int deviceId) async {
     final uri = ApiBase.uri('/streams/stop');
     try {
@@ -98,6 +151,7 @@ class CameraStreamService {
             headers: {
               ...ApiClient.authHeaders(),
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
             },
             body: jsonEncode({'device_id': deviceId}),
           )
@@ -108,8 +162,9 @@ class CameraStreamService {
     }
   }
 
-  // ✅ CẬP NHẬT: Đường dẫn HLS mới để khớp với cấu trúc /tmp/hls của Cloud Run
-  // Backend hiện serve /tmp/hls tại endpoint /api/v1/stream/hls/playlist/...
+  // Relative and absolute HLS URL builders
+  static String relativeHlsPath(int deviceId) =>
+      '/media/hls/$deviceId/index.m3u8';
   static String buildFullHlsUrl(int deviceId) =>
-      '${ApiBase.host}/api/v1/stream/hls/playlist/$deviceId/index.m3u8';
+      '${ApiBase.host}${relativeHlsPath(deviceId)}';
 }

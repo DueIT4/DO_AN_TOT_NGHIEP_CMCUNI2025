@@ -7,16 +7,16 @@ class LanguageService extends ChangeNotifier {
 
   static const supportedLocales = [
     Locale('vi'),
-    Locale('en'),
-    Locale('ja'),
-    Locale('zh'),
+    // Locale('en'),
+    // Locale('ja'),
+    // Locale('zh'),
   ];
 
   static const _languageNames = {
     'vi': 'Tiếng Việt',
-    'en': 'English',
-    'ja': '日本語',
-    'zh': '中文',
+    // 'en': 'English',
+    // 'ja': '日本語',
+    // 'zh': '中文',
   };
 
   Locale _locale = const Locale('vi');

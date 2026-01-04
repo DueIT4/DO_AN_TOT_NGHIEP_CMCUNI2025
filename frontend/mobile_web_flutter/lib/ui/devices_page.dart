@@ -344,29 +344,6 @@ class _DevicesPageState extends State<DevicesPage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  if (_devices.any((d) => d.category == DeviceCategory.camera))
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.info_outline, color: Color(0xFF7CCD2B)),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ..._visibleDevices.map((device) {
                     // Ưu tiên ID từ CameraProvider để phản ánh đổi camera ngay lập tức
                     final providerSelectedId =

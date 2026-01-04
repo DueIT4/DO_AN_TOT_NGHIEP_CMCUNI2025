@@ -1,4 +1,4 @@
-import 'package:mobile_web_flutter/core/api_base.dart';
+import 'package:mobile_web_flutter/core/api_base_app.dart';
 
 class DeviceTypeService {
   /// Lấy danh sách tất cả loại thiết bị

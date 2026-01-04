@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:typed_data';
 import 'package:http_parser/http_parser.dart'; // ✅ Thêm để xử lý MediaType
 
-import 'package:mobile_web_flutter/core/api_base.dart';
+import 'package:mobile_web_flutter/core/api_base_app.dart';
 import 'package:mobile_web_flutter/models/admin/admin_ticket_models.dart';
 
 class AdminTicketService {

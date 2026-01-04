@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import 'dart:async';
 
 import '../../services/camera_stream_service.dart';
+import '../../core/api_base_app.dart';
 
 /// Widget hiển thị camera stream HLS với error handling
 class CameraStreamPlayer extends StatefulWidget {
@@ -79,26 +80,38 @@ class _CameraStreamPlayerState extends State<CameraStreamPlayer> {
   }
 
   void _initializeVideo() {
-    // Build HLS URL: prefer provided URL; fallback to computed
+    // Build HLS URL: convert relative path to absolute URL
     final provided = widget.hlsUrl.trim();
-    final fullUrl = provided.isNotEmpty
-        ? provided
-        : CameraStreamService.buildFullHlsUrl(widget.deviceId);
+    String fullUrl;
+
+    if (provided.isEmpty) {
+      // No URL provided, build from device ID
+      fullUrl = CameraStreamService.buildFullHlsUrl(widget.deviceId);
+    } else if (provided.startsWith('http://') ||
+        provided.startsWith('https://')) {
+      // Already absolute URL
+      fullUrl = provided;
+    } else {
+      // Relative path like "/media/hls/28/index.m3u8" → convert to absolute
+      fullUrl = '${ApiBase.host}$provided';
+    }
 
     _videoController = VideoPlayerController.networkUrl(
       Uri.parse(fullUrl),
       formatHint: VideoFormat.hls, // HLS.js sẽ xử lý trên web
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     )..initialize().then((_) {
-        if (!mounted) return;
+        if (!mounted || !_videoController.value.isInitialized) return;
         setState(() {
           _isInitialized = true;
+          _errorMessage = null;
         });
         _videoController.play();
       }).catchError((e) {
         if (!mounted) return;
         setState(() {
           _errorMessage = 'Lỗi phát video: $e';
+          _isInitialized = false;
         });
       });
   }
@@ -136,10 +149,12 @@ class _CameraStreamPlayerState extends State<CameraStreamPlayer> {
     _healthCheckTimer?.cancel();
     _healthCheckTimer = null;
 
-    // Dù chưa initialize vẫn nên dispose để giải phóng tài nguyên
-    try {
-      _videoController.dispose();
-    } catch (_) {}
+    if (_isInitialized) {
+      try {
+        _videoController.dispose();
+      } catch (_) {}
+      _isInitialized = false;
+    }
   }
 
   @override
@@ -168,7 +183,15 @@ class _CameraStreamPlayerState extends State<CameraStreamPlayer> {
           children: [
             // Video player
             if (_isInitialized && _errorMessage == null)
-              VideoPlayer(_videoController)
+              Container(
+                color: Colors.black,
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: _videoController.value.aspectRatio,
+                    child: VideoPlayer(_videoController),
+                  ),
+                ),
+              )
             else
               Container(
                 color: Colors.grey[800],
