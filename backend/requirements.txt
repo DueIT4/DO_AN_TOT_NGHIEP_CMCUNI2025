@@ -63,7 +63,7 @@ networkx
 numpy
 onnx
 onnxruntime
-opencv-python-headless
+opencv-python
 packaging
 passlib
 pdfkit

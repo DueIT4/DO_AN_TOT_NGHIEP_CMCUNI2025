@@ -77,8 +77,10 @@ class _AdminShellScaffoldState extends State<AdminShellScaffold> {
     // support: chỉ support page
     if (r == 'support') return path == '/admin/support';
 
-    // support_admin: tất cả trừ support
-    if (r == 'support_admin') return path != '/admin/support';
+    // support_admin: tất cả trừ support VÀ dashboard
+    if (r == 'support_admin') {
+      return path != '/admin/support' && path != '/admin/dashboard';
+    }
 
     // admin: tất cả
     if (r == 'admin') return true;

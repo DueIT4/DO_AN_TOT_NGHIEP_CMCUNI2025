@@ -1,22 +1,20 @@
-FROM python:3.11-slim-bullseye
+FROM python:3.11-bullseye
 
 # Cài đặt các gói cần thiết
+# Thêm libgl1 để hỗ trợ opencv-python bản thường (có GUI dependencies)
 RUN apt-get update && apt-get install -y \
     wkhtmltopdf \
-    fonts-liberation \
-    libssl-dev \
     ffmpeg \
     libsm6 \
     libxext6 \
-    libglib2.0-0 \
-    libxrender1 \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip uninstall -y opencv-python || true
+# Cài đặt dependencies bình thường
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
