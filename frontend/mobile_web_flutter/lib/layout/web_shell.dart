@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'web_navbar.dart';
 
 class WebShell extends StatelessWidget {
