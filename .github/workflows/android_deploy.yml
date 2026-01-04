@@ -1,0 +1,47 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ] # Tự động chạy khi push vào nhánh main
+    paths:
+      - 'frontend/mobile_web_flutter/**' # Chỉ chạy khi có thay đổi trong thư mục mobile app
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. Cấu hình Java 17 (Bắt buộc cho Kotlin 2.1.0 và Gradle mới)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # 2. Cấu hình Flutter và bật Cache để build nhanh hơn
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # 3. Lấy các thư viện (phải trỏ vào thư mục làm việc)
+      - name: Install dependencies
+        working-directory: frontend/mobile_web_flutter
+        run: flutter pub get
+
+      # 4. Build APK Release
+      # Flag --no-tree-shake-icons để tránh lỗi font icon bạn gặp lúc nãy
+      - name: Build APK
+        working-directory: frontend/mobile_web_flutter
+        run: flutter build apk --release --no-tree-shake-icons -t lib/main_app.dart
+
+      # 5. Đẩy file APK lên mục Artifacts để tải về
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZestGuard-Mobile-App
+          path: frontend/mobile_web_flutter/build/app/outputs/flutter-apk/app-release.apk
