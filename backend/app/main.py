@@ -37,7 +37,7 @@ else:
     logger.warning("⚠️ CLOUDINARY_URL không tìm thấy trong file .env - Sẽ gây lỗi 500 khi upload")
 
 # Bắt buộc gọi trước khi tạo app nếu có relationships phức tạp
-configure_mappers()
+# configure_mappers()
 
 # ==== 3. Import Routers ====
 from app.api.v1.routes_health import router as health_router
