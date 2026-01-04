@@ -107,8 +107,8 @@ class HomeContent extends StatelessWidget {
                  const SizedBox(height: 24),
                  FilledButton.icon(
                     onPressed: () async {
-                      const url = 'https://play.google.com/store/apps/details?id=com.yourcompany.zestguard';
-                      await launchUrl(Uri.parse(url));
+                      const url = 'https://github.com/DueIT4/DO_AN_TOT_NGHIEP_CMCUNI2025/actions/runs/20697966778/artifacts/5018813027';
+                      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
                     },
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.white,
@@ -216,8 +216,8 @@ class HomeContent extends StatelessWidget {
             ),
             OutlinedButton.icon(
               onPressed: () async {
-                const url = 'https://play.google.com/store/apps/details?id=com.yourcompany.zestguard';
-                await launchUrl(Uri.parse(url));
+                const url = 'https://github.com/DueIT4/DO_AN_TOT_NGHIEP_CMCUNI2025/actions/runs/20697966778/artifacts/5018813027';
+                await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
               },
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),

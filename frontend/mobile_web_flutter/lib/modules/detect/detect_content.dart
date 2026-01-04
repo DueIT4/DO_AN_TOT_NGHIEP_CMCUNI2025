@@ -202,7 +202,7 @@ class _DetectContentState extends State<DetectContent>
   }
 
   Future<void> _openDownloadLink() async {
-    const url = "https://play.google.com/store/apps/details?id=com.yourcompany.zestguard";
+    const url = "https://github.com/DueIT4/DO_AN_TOT_NGHIEP_CMCUNI2025/actions/runs/20697966778/artifacts/5018813027";
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
