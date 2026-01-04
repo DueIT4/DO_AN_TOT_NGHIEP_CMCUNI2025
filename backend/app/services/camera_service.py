@@ -2,13 +2,11 @@
 """
 Service để lấy ảnh từ camera stream_url
 Hỗ trợ: HTTP snapshot, RTSP (cần ffmpeg/opencv), MJPEG stream, lấy frame từ HLS (.ts)
-Tối ưu hóa cho Google Cloud Run (/tmp storage)
 """
 import logging
-import time
 from io import BytesIO
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 import requests
 from PIL import Image
@@ -18,7 +16,7 @@ logger = logging.getLogger(__name__)
 # OpenCV chỉ import khi cần (cho RTSP/HLS)
 try:
     import cv2
-    import numpy as np
+    import numpy as np  # noqa: F401
     CV2_AVAILABLE = True
 except ImportError:
     CV2_AVAILABLE = False
@@ -27,7 +25,14 @@ except ImportError:
 def capture_image_from_stream(stream_url: str, timeout: int = 10) -> Optional[bytes]:
     """
     Lấy ảnh từ camera stream_url.
-    Hỗ trợ: HTTP snapshot, MJPEG stream, RTSP.
+
+    Hỗ trợ:
+    - HTTP snapshot: http://ip:port/snapshot.jpg
+    - MJPEG stream: http://ip:port/video.mjpg
+    - RTSP: rtsp://ip:port/stream (cần opencv)
+
+    Returns:
+        bytes: Dữ liệu ảnh (JPEG) hoặc None nếu lỗi
     """
     if not stream_url or not stream_url.strip():
         return None
@@ -47,13 +52,14 @@ def capture_image_from_stream(stream_url: str, timeout: int = 10) -> Optional[by
                 return resp.content
 
             if "multipart" in content_type or "mjpeg" in content_type:
-                # MJPEG stream - lấy frame đầu tiên
+                # MJPEG stream - lấy frame đầu tiên (đọc chunk)
                 return _extract_frame_from_mjpeg(resp)
 
             # Fallback: thử parse như ảnh
             img = Image.open(BytesIO(resp.content))
             output = BytesIO()
             img.save(output, format="JPEG", quality=85)
+            output.seek(0)
             return output.getvalue()
 
         # ===== RTSP STREAM =====
@@ -71,7 +77,10 @@ def capture_image_from_stream(stream_url: str, timeout: int = 10) -> Optional[by
         return None
 
 def _extract_frame_from_mjpeg(resp: requests.Response, max_bytes: int = 2_000_000) -> Optional[bytes]:
-    """Lấy frame đầu tiên từ MJPEG stream."""
+    """Lấy frame đầu tiên từ MJPEG stream bằng cách đọc theo chunk.
+
+    max_bytes: giới hạn đọc để tránh treo/ăn RAM.
+    """
     try:
         buffer = bytearray()
         start = -1
@@ -101,38 +110,55 @@ def _extract_frame_from_mjpeg(resp: requests.Response, max_bytes: int = 2_000_00
         return None
 
 def _capture_from_rtsp(rtsp_url: str, timeout: int = 10) -> Optional[bytes]:
-    """Lấy ảnh từ RTSP stream bằng OpenCV."""
+    """
+    Lấy ảnh từ RTSP stream bằng OpenCV.
+    Hỗ trợ DroidCam và các RTSP cameras khác.
+    Cần cài: pip install opencv-python-headless
+    """
     if not CV2_AVAILABLE:
         logger.warning("[Camera] OpenCV không có sẵn, không thể lấy RTSP stream")
         return None
 
     try:
+        # Cấu hình OpenCV cho RTSP tốt hơn
         cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
         
+        # Set các properties để tăng khả năng kết nối
         try:
             cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout * 1000)
             cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, timeout * 1000)
+            # Giảm buffer để lấy frame mới nhất
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        except Exception: pass
+            # Tăng tốc độ khởi tạo
+            cap.set(cv2.CAP_PROP_FPS, 30)
+        except Exception as e:
+            logger.debug(f"[Camera] Không set được timeout properties: {e}")
 
         if not cap.isOpened():
+            logger.warning(f"[Camera] Cannot open RTSP stream: {rtsp_url}")
             return None
 
+        # Thử đọc frame nhiều lần để đảm bảo lấy được frame ổn định
         ret, frame = False, None
-        for _ in range(3):
+        for attempt in range(3):
             ret, frame = cap.read()
             if ret and frame is not None:
                 break
+            logger.debug(f"[Camera] RTSP read attempt {attempt + 1}/3 failed")
         
         cap.release()
 
         if not ret or frame is None:
+            logger.warning(f"[Camera] Không đọc được frame từ RTSP: {rtsp_url}")
             return None
 
+        # Chuyển BGR sang RGB và encode thành JPEG
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(frame_rgb)
         output = BytesIO()
         img.save(output, format="JPEG", quality=85)
+        output.seek(0)
+        logger.info(f"[Camera] Successfully captured from RTSP: {rtsp_url}")
         return output.getvalue()
 
     except Exception as e:
@@ -140,20 +166,18 @@ def _capture_from_rtsp(rtsp_url: str, timeout: int = 10) -> Optional[bytes]:
         return None
 
 def _capture_image_from_hls(device_id: int) -> Optional[bytes]:
-    """
-    Lấy frame từ HLS. 
-    ✅ CẬP NHẬT: Sử dụng /tmp/hls để tương thích với Google Cloud Run.
+    """Lấy một frame từ HLS đã được stream_service tạo sẵn.
+    Ưu tiên dùng khi RTSP bị độc quyền bởi ffmpeg.
     """
     if not CV2_AVAILABLE:
         return None
 
     try:
-        # Sử dụng thư mục tạm /tmp thay vì media/
-        hls_dir = Path("/tmp/hls") / str(device_id)
+        import tempfile
+        hls_dir = Path(tempfile.gettempdir()) / "hls" / str(device_id)
         if not hls_dir.exists():
             return None
 
-        # Lấy segment (.ts) mới nhất dựa trên thời gian chỉnh sửa
         segments = sorted(
             hls_dir.glob("*.ts"),
             key=lambda p: p.stat().st_mtime,
@@ -163,7 +187,7 @@ def _capture_image_from_hls(device_id: int) -> Optional[bytes]:
             return None
 
         latest = segments[0]
-        cap = cv2.VideoCapture(str(latest.absolute()))
+        cap = cv2.VideoCapture(str(latest))
         if not cap.isOpened():
             return None
 
@@ -176,6 +200,7 @@ def _capture_image_from_hls(device_id: int) -> Optional[bytes]:
         img = Image.fromarray(frame_rgb)
         output = BytesIO()
         img.save(output, format="JPEG", quality=85)
+        output.seek(0)
         return output.getvalue()
 
     except Exception as e:
@@ -187,17 +212,28 @@ def capture_multiple_images(
     count: int = 3,
     interval: float = 1.0,
     device_id: Optional[int] = None,
-) -> List[bytes]:
-    """Lấy nhiều ảnh từ camera để tăng độ chính xác."""
-    images: List[bytes] = []
+) -> list[bytes]:
+    """
+    Lấy nhiều ảnh từ camera (để tăng độ chính xác).
+
+    Args:
+        stream_url: URL của camera stream
+        count: Số lượng ảnh cần lấy (mặc định 3)
+        interval: Khoảng thời gian giữa các lần lấy (giây)
+        device_id: nếu có, thử lấy từ HLS trước
+
+    Returns:
+        List các ảnh (bytes), có thể ít hơn count nếu lỗi
+    """
+    import time
+
+    images: list[bytes] = []
     for i in range(count):
         img_data = None
 
-        # Thử lấy từ HLS cache (/tmp) trước nếu có device_id
         if device_id is not None:
             img_data = _capture_image_from_hls(device_id)
 
-        # Nếu không có HLS hoặc thất bại, lấy trực tiếp từ stream URL
         if img_data is None:
             img_data = capture_image_from_stream(stream_url)
 
