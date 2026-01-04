@@ -30,6 +30,8 @@ def _normalize_file_url(raw: str | None) -> Optional[str]:
     p = raw.strip()
     if not p:
         return None
+    if p.startswith("http") or p.startswith("https"):
+        return p
     if p.startswith("/media/"):
         return p
     return "/media/" + p.lstrip("/")
@@ -143,7 +145,6 @@ def get_detection_history_for_user(
                 disease_name=disease.name if disease else None,
                 confidence=_normalize_confidence(det.confidence),
                 created_at=img.created_at,  # ✅ dùng created_at của ảnh để ổn định
-                source_type=img.source_type,  # ✅ Thêm source_type
             )
         )
 
@@ -254,7 +255,6 @@ def get_detection_history_all_users(
                 disease_name=disease.name if disease else None,
                 confidence=_normalize_confidence(det.confidence),
                 created_at=img.created_at,
-                source_type=img.source_type,  # ✅ Thêm source_type
                 user_id=uid,
                 username=username,
                 email=safe_email,

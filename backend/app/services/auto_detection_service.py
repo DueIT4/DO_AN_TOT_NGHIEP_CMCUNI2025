@@ -225,11 +225,16 @@ def detect_from_camera_auto(
                     bbox = None
                 else:
                     top = pred.get('detections', [])[0]
-                    class_name = top.get('class_key') or top.get('class_name') or 'Không xác định'
+                    # ✅ FIX: Ưu tiên class_name (đã dịch) từ inference_service
+                    # NẾU inference_service trả class_key (raw) vào class_name, thì mới dùng fallback
+                    class_key = top.get('class_key') or str(top.get('class_id', ''))
+                    class_name = top.get('class_name') or class_key or 'Không xác định'
+                    
                     confidence = float(top.get('confidence', 0.0))
                     bbox = top.get("bbox")
 
                 detection_item = {
+                    'class_key': class_key,
                     'class_name': class_name,
                     'confidence': confidence,
                     'bbox': bbox,
@@ -317,9 +322,9 @@ def detect_from_camera_auto(
                 disease_names = [d.get('class_name', '') for d in all_detections if d.get('class_name')]
                 disease_counts = Counter(disease_names)
                 if disease_counts:
-                    most_common_disease_key = disease_counts.most_common(1)[0][0]
-                    # Chuyển class key sang tên tiếng Việt
-                    most_common_disease = VN_LABELS.get(most_common_disease_key, most_common_disease_key)
+                    most_common_disease = disease_counts.most_common(1)[0][0]
+                    # most_common_disease giờ dã là Tiếng Việt do fix ở trên
+
 
                     title = f"⚠️ Phát hiện bệnh trên camera: {device.name or 'Camera'}"
                     description = f"""

@@ -61,7 +61,8 @@ class _AdminShellScaffoldState extends State<AdminShellScaffold> {
   String _homeForRole(String role) {
     final r = role.toLowerCase();
     if (r == 'support') return '/admin/support';
-    if (r == 'support_admin' || r == 'admin') return '/admin/dashboard';
+    if (r == 'admin') return '/admin/dashboard';
+    if (r == 'support_admin') return '/admin/devices';
     // viewer hoặc unknown -> login
     return '/login';
   }
@@ -192,8 +193,8 @@ class _AdminShellScaffoldState extends State<AdminShellScaffold> {
           ),
           const SizedBox(height: 32),
 
-          // ===== Dashboard (chỉ admin/support_admin) =====
-          if (showAdminExceptSupport) ...[
+          // ===== Dashboard (chỉ admin) =====
+          if (r == 'admin') ...[
             Text('Tổng quan', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
             const SizedBox(height: 8),
             _item(

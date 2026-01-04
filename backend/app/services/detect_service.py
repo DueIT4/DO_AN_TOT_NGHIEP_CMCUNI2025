@@ -66,26 +66,37 @@ def normalize_bbox(det: Dict[str, Any]) -> Dict[str, Any]:
 # MAIN SERVICE – hỗ trợ upload + stream
 # ======================================================
 
+from app.services.cloudinary_service import upload_image_to_cloudinary
+
 def save_detection_result(
     db: Session,
     *,
-    image_url: Optional[str],
-    filename: Optional[str],
+    image_url: Optional[str] = None,
+    filename: Optional[str] = None,
     yolo_result: Dict[str, Any],
     user_id: int,
     device_id: Optional[int] = None,
     is_stream: bool = False,
     model_version: str = "v1.0",
+    raw: Optional[bytes] = None,  # ✅ ADDED: Chấp nhận raw bytes
 ) -> Dict[str, Any]:
     """
     LƯU KẾT QUẢ DỰ ĐOÁN (CHUẨN CLOUD + STREAM)
 
     - Upload ảnh → image_url (Cloudinary / GCS)
-    - Stream camera → image_url có thể None
-    - Mỗi lần dự đoán:
-        + 1 Img
-        + 1 Detection
+    - Stream camera → image_url có thể None (nếu ko có raw) hoặc upload raw lên Cloudinary
     """
+
+    # ==================================================
+    # 0. Upload nếu cần (quan trọng cho auto-detect)
+    # ==================================================
+    if not image_url and raw:
+        try:
+            # Upload lên folder stream để phân loại
+            image_url = upload_image_to_cloudinary(raw, folder="zestguard/stream_detect")
+        except Exception:
+            # Nếu upload lỗi, vẫn tiếp tục lưu DB nhưng file_url=None (hoặc có thể raise)
+            pass
 
     # ==================================================
     # 1. Tạo bản ghi IMG
@@ -94,7 +105,7 @@ def save_detection_result(
         source_type="stream" if is_stream else ("upload" if device_id is None else "camera"),
         device_id=device_id,
         user_id=user_id,
-        file_url=image_url,     # stream có thể None
+        file_url=image_url,     # Đã có URL nếu upload thành công
         original_name=filename, # optional
     )
     db.add(img_row)
