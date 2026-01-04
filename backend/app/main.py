@@ -61,7 +61,7 @@ from app.api.v1.routes_weather import router as weather_router
 from app.api.v1.routes_news import router as news_router
 from app.api.v1.routes_chatbot import router as chatbot_router
 from app.api.v1.routes_stream import router as stream_router
-from app.api.v1.routes_streams import router as streams_router
+from app.api.v1.routes_stream import router as streams_router
 
 API_PREFIX = getattr(settings, "API_V1", "/api/v1")
 
