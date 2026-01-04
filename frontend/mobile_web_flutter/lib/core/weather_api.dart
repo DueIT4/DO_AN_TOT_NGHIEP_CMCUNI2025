@@ -11,15 +11,12 @@ class WeatherApi {
     required double lon,
     String lang = 'vi',
   }) async {
-    // ✅ Sửa: Dùng ApiBase.api để tự động thêm /api/v1
-    final String path = ApiBase.api('/weather');
-    final uri = Uri.parse('$baseUrl$path').replace(
-      queryParameters: {
-        'lat': lat.toString(),
-        'lon': lon.toString(),
-        'lang': lang,
-      },
-    );
+    // ✅ Sửa: Dùng ApiBase.uri để tạo URL chính xác (kèm query params)
+    final uri = ApiBase.uri('/weather', queryParameters: {
+      'lat': lat.toString(),
+      'lon': lon.toString(),
+      'lang': lang,
+    });
 
     // ✅ Sửa: Sử dụng Header có chứa Token từ ApiBase để tránh lỗi 401
     final res = await http.get(uri, headers: {
