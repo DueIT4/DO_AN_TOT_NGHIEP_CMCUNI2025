@@ -152,7 +152,7 @@
 #         "file_url": file_url,
 #     }
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from app.models.image_detection import Img, Detection, Disease
 
@@ -224,6 +224,7 @@ def save_detection_result(
     device_id: int | None = None,
     model_version: str = "v1.0",
     raw: Optional[bytes] = None,  # ✅ Restore: Chấp nhận raw bytes cho auto-detect
+    create_alert: bool = True,    # ✅ NEW: Control notification creation (default True)
 ) -> Dict[str, Any]:
     """
     LƯU vào DB chuẩn:
@@ -303,6 +304,47 @@ def save_detection_result(
     )
     db.add(det_row)
     
+    # 5) Tự động tạo thông báo (Notification) nếu là Camera + Có bệnh + Không spam (30p/lần)
+    if create_alert and device_id and primary_disease_id:
+        try:
+            # Lấy thông tin Disease
+            disease_record = db.query(Disease).filter(Disease.disease_id == primary_disease_id).first()
+            if disease_record:
+                d_name = disease_record.name.lower()
+                # Chỉ báo nếu KHÔNG PHẢI Healthy / Không xác định
+                if "healthy" not in d_name and "không xác định" not in d_name:
+                    
+                    # Rate Limit: Kiểm tra xem 30 phút qua đã báo bệnh này chưa
+                    cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+                    
+                    # Lấy tên Device để check trong title hoặc query
+                    # (Ở đây ta check user_id + bệnh tương tự để đơn giản)
+                    from app.models.notification import Notifications 
+                    
+                    recent_noti = db.query(Notifications).filter(
+                        Notifications.user_id == user_id,
+                        Notifications.created_at >= cutoff,
+                        Notifications.description.like(f"%{disease_record.name}%")
+                    ).first()
+                    
+                    if not recent_noti:
+                        # Lấy tên Device
+                        from app.models.devices import Device
+                        device_obj = db.query(Device).filter(Device.device_id == device_id).first()
+                        dev_name = device_obj.name if device_obj else f"Camera #{device_id}"
+                        
+                        new_noti = Notifications(
+                            user_id=user_id,
+                            title=f"⚠️ Cảnh báo: {disease_record.name}",
+                            description=f"Phát hiện tại {dev_name}.\n{description_text or 'Vui lòng kiểm tra cây trồng.'}",
+                            created_at=datetime.now(timezone.utc)
+                        )
+                        db.add(new_noti)
+                        db.commit()
+        except Exception as e:
+            # Không để lỗi notify làm hỏng luồng chính
+            print(f"[DetectService] Error creating notification: {e}")
+
     try:
         db.commit()
     except Exception as e:

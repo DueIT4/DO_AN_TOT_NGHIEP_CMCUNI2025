@@ -268,7 +268,34 @@ class _HomeUserPageState extends State<HomeUserPage> {
             children: [
               // ================= HEADER GAP =================
               // Spacer to prevent content from hitting the top edge, replacing the removed Header/Icon
-              const SizedBox(height: 48),
+              // ================= HEADER =================
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDFF0C8),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.spa_rounded,
+                      color: Color(0xFF7CCD2B),
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'ZestGuard',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900, // Logo font weight
+                      color: Color(0xFF2E5A1C),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
+              ),
+
               const SizedBox(height: 16),
 
               Text(

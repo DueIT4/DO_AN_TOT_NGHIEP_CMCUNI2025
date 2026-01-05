@@ -1,36 +1,26 @@
 {
   "project_info": {
-    "project_number": "527208522475",
-    "project_id": "ai-plant-health",
-    "storage_bucket": "ai-plant-health.firebasestorage.app"
+    "project_number": "38261474833",
+    "project_id": "ai-plant-health-65293",
+    "storage_bucket": "ai-plant-health-65293.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:527208522475:android:2038d6cf5e9ed29770d4ae",
+        "mobilesdk_app_id": "1:38261474833:android:8fb6c89dce2bb5a49e53b0",
         "android_client_info": {
           "package_name": "com.example.mobile_web_flutter"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "527208522475-mitfgpvvfrp6o8qq1firbpoksqve74n4.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB6JJXxksyZVZe8lb1EMnlRNKRCtLjEeSk"
+          "current_key": "AIzaSyBEnzWW7qAW81icpf65cSvTQYZ7-pqqtnU"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "527208522475-mitfgpvvfrp6o8qq1firbpoksqve74n4.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

@@ -304,7 +304,8 @@ def detect_from_camera_auto(
                     yolo_result=yolo_result,
                     user_id=device.user_id,
                     device_id=device.device_id,
-                    model_version="v1.0"
+                    model_version="v1.0",
+                    create_alert=False  # ✅ Tránh duplicate, vì service này tự tạo notification ở dưới
                 )
 
                 healthy_classes = {'pomelo_leaf_healthy', 'pomelo_fruit_healthy'}
