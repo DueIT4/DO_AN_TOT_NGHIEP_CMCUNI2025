@@ -60,11 +60,14 @@ async def detect_image(
         if not is_plant:
             gemini_says_no = True
             
-    # Logic kết hợp: Chỉ loại bỏ nếu Gemini bảo KHÔNG và YOLO không quá chắc chắn (< 65%)
-    # Nếu YOLO rất tự tin (> 65%) thì có thể Gemini sai (do chụp cận cảnh lá), ta vẫn giữ kết quả YOLO
-    max_conf_check = max((d.get("confidence", 0) for d in detections_list), default=0.0) if detections_list else 0.0
+    # Logic kết hợp: Gemini là trọng tài chính xác nhất về ngữ cảnh.
+    # Nếu Gemini bảo KHÔNG (gemini_says_no), ta sẽ hủy kết quả YOLO trừ khi YOLO cực kỳ chắc chắn (> 98%).
+    # Logo hoặc hình vẽ thường bị YOLO nhận nhầm với độ tin cậy cao (85-95%), nên ngưỡng 0.65 cũ quá thấp.
     
-    if gemini_says_no and max_conf_check < 0.65:
+    # 🔥 FIX: Tính lại max_conf_check (bị mất ở bước trước)
+    max_conf_check = max((d.get("confidence", 0) for d in detections_list), default=0.0) if detections_list else 0.0
+
+    if gemini_says_no and max_conf_check < 0.98:
             # Gemini bảo KHÔNG phải cây -> Hủy kết quả YOLO
             detections_list = []
             num_detections = 0

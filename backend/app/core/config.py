@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
-    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_ID: str = "38261474833-5lelavbcrc4eev78mjft9qv38k9cm6dt.apps.googleusercontent.com"
     GOOGLE_CLIENT_SECRET: str = ""
     FB_APP_ID: str = ""
     FB_APP_SECRET: str = ""

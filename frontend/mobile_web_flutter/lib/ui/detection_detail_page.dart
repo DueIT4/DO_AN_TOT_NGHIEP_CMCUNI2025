@@ -5,18 +5,50 @@ import 'package:intl/intl.dart';
 import '../models/detection_record.dart';
 import '../services/detection_service.dart';
 
-class DetectionDetailPage extends StatelessWidget {
+class DetectionDetailPage extends StatefulWidget {
   final DetectionRecord record;
 
   const DetectionDetailPage({super.key, required this.record});
 
-  int? get _detId => int.tryParse(record.id);
+  @override
+  State<DetectionDetailPage> createState() => _DetectionDetailPageState();
+}
+
+class _DetectionDetailPageState extends State<DetectionDetailPage> {
+  late DetectionRecord _record;
+
+  @override
+  void initState() {
+    super.initState();
+    _record = widget.record;
+  }
+
+  int? get _detId => int.tryParse(_record.id);
+
+  Future<void> _refresh() async {
+    final id = _detId;
+    if (id == null) return;
+    try {
+      final updated = await DetectionService.fetchHistoryDetail(id);
+      if (mounted) {
+        setState(() {
+          _record = updated;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi tải lại: $e')),
+        );
+      }
+    }
+  }
 
   Future<void> _confirmDelete(BuildContext context) async {
     final detId = _detId;
     if (detId == null || detId <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không xoá được: detection_id không hợp lệ (${record.id})')),
+        SnackBar(content: Text('Không xoá được: detection_id không hợp lệ (${_record.id})')),
       );
       return;
     }
@@ -42,15 +74,23 @@ class DetectionDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateText = DateFormat('dd/MM/yyyy HH:mm').format(record.detectedAt.toLocal());
-    final percent = (record.accuracy * 100).toStringAsFixed(0);
+    final dateText = DateFormat('dd/MM/yyyy HH:mm').format(_record.detectedAt.toLocal());
+    final percent = (_record.accuracy * 100).toStringAsFixed(0);
     final sourceLabel =
-        record.source == DetectionSource.camera ? 'Camera' : 'Thư viện';
+        _record.source == DetectionSource.camera ? 'Camera' : 'Thư viện';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(record.diseaseName),
+        title: Text(_record.diseaseName),
         actions: [
+          IconButton(
+            tooltip: 'Tải lại',
+            icon: const Icon(Icons.refresh),
+            onPressed: () { 
+                _refresh();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đang cập nhật...')));
+            }
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: () => _confirmDelete(context),
@@ -58,64 +98,68 @@ class DetectionDetailPage extends StatelessWidget {
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _RecordImage(record: record),
-              const SizedBox(height: 16),
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _RecordImage(record: _record),
+                const SizedBox(height: 16),
 
-              Text(
-                record.diseaseName,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _Chip(text: '$percent% tin cậy'),
-                  const SizedBox(width: 8),
-                  _Chip(text: sourceLabel),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                dateText,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.black54,
-                      fontStyle: FontStyle.italic,
-                    ),
-              ),
+                Text(
+                  _record.diseaseName,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _Chip(text: '$percent% tin cậy'),
+                    const SizedBox(width: 8),
+                    _Chip(text: sourceLabel),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  dateText,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.black54,
+                        fontStyle: FontStyle.italic,
+                      ),
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              _InfoCard(title: 'Tóm tắt tình trạng', body: record.cause),
-              const SizedBox(height: 12),
-              _InfoCard(
-                title: 'Khuyến nghị xử lý / chăm sóc',
-                body: record.solution,
-                asBullets: true,
-              ),
-              const SizedBox(height: 12),
-
-              if ((record.explanation ?? '').trim().isNotEmpty) ...[
+                _InfoCard(title: 'Tóm tắt tình trạng', body: _record.cause),
+                const SizedBox(height: 12),
                 _InfoCard(
-                  title: 'Giải thích từ hệ thống',
-                  body: record.explanation!.trim(),
+                  title: 'Khuyến nghị xử lý / chăm sóc',
+                  body: _record.solution,
+                  asBullets: true,
                 ),
                 const SizedBox(height: 12),
-              ],
 
-              if (record.detections.isNotEmpty) ...[
-                _DetectionsCard(items: record.detections),
-                const SizedBox(height: 12),
+                if ((_record.explanation ?? '').trim().isNotEmpty) ...[
+                  _InfoCard(
+                    title: 'Giải thích từ hệ thống',
+                    body: _record.explanation!.trim(),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                if (_record.detections.isNotEmpty) ...[
+                  _DetectionsCard(items: _record.detections),
+                  const SizedBox(height: 12),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

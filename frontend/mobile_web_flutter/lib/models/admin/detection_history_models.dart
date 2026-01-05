@@ -35,7 +35,7 @@ class DetectionHistoryItem {
       confidence: json['confidence'] == null
           ? null
           : (json['confidence'] as num).toDouble(),
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: _parseUtcDate(json['created_at'] as String),
       userId: json['user_id'] as int?,
       username: json['username'] as String?,
       email: json['email'] as String?,
@@ -66,3 +66,11 @@ class DetectionHistoryList {
     );
   }
 }
+
+DateTime _parseUtcDate(String dateStr) {
+  if (!dateStr.endsWith('Z') && !dateStr.contains('+')) {
+    return DateTime.parse('${dateStr}Z');
+  }
+  return DateTime.parse(dateStr);
+}
+

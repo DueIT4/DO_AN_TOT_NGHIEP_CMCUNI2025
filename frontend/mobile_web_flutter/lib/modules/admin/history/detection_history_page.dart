@@ -3,8 +3,19 @@ import 'package:mobile_web_flutter/services/admin/detection_history_service.dart
 import 'package:mobile_web_flutter/core/api_base.dart';
 import 'dart:html' as html; // chỉ dùng cho Flutter Web
 import 'package:mobile_web_flutter/models/admin/detection_history_models.dart';
+import 'package:intl/intl.dart';
 
 import 'package:mobile_web_flutter/core/toast.dart'; // ✅ toast
+
+DateTime _adminParseUtc(DateTime dt) {
+  // Bản thân dt có thể đã parse nhầm thành local nếu string gốc thiếu Z
+  // Tuy nhiên DetectionHistoryItem.createdAt là DateTime, nên ta nên convert String -> DateTime ở Model thì tốt hơn.
+  // Ở đây ta cứ dùng toLocal() nếu model đã làm đúng.
+  // Nhưng user bảo vẫn lệch, nghĩa là model parse đang bị hiểu là Local thay vì UTC.
+  if (dt.isUtc) return dt.toLocal();
+  return dt; // Nếu đã là local thì giữ nguyên? Không, vấn đề là DateTime.parse("2024-01-05 10:00") nó hiểu là 10:00 Local, trong khi đó là UTC.
+}
+
 
 class AdminDetectionHistoryPage extends StatefulWidget {
   const AdminDetectionHistoryPage({super.key});
@@ -366,7 +377,7 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                                       style: const TextStyle(fontSize: 12),
                                     ),
                                   Text(
-                                    'Thời gian: ${it.createdAt.toLocal()}',
+                                    'Thời gian: ${DateFormat('dd/MM/yyyy HH:mm').format(it.createdAt.toLocal())}',
                                     style: const TextStyle(fontSize: 12),
                                   ),
                                   const SizedBox(height: 4),

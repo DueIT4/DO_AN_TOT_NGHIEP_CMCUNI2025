@@ -9,6 +9,13 @@ import '../models/detection_record.dart';
 import '../services/detection_service.dart';
 import 'detection_detail_page.dart';
 
+DateTime _parseUtcDate(String dateStr) {
+  if (!dateStr.endsWith('Z') && !dateStr.contains('+')) {
+    return DateTime.parse('${dateStr}Z');
+  }
+  return DateTime.parse(dateStr);
+}
+
 class CameraDetectionPage extends StatefulWidget {
   const CameraDetectionPage({super.key});
 
@@ -359,7 +366,7 @@ class _DetectionCard extends StatelessWidget {
 
   String _formattedDate() {
     // Sửa timezone cho Việt Nam (UTC+7) -> dùng toLocal() để tự động theo máy
-    final vietnamTime = record.detectedAt.toLocal();
+    final vietnamTime = record.detectedAt.toLocal(); // detectedAt đã được parse đúng trong service
     return DateFormat('dd/MM/yyyy HH:mm').format(vietnamTime);
   }
 

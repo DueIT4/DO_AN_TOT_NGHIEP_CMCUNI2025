@@ -100,12 +100,12 @@ class _LoginPageState extends State<LoginPage> {
 
         // ✅ Web: cần clientId
         clientId: kIsWeb
-            ? '273639086728-e4feis81rvsstgodqb0nmne6q5i99s6q.apps.googleusercontent.com'
+            ? '38261474833-5lelavbcrc4eev78mjft9qv38k9cm6dt.apps.googleusercontent.com'
             : null,
 
         // ✅ Android/iOS (sau này): để lấy idToken gửi backend verify
         serverClientId: !kIsWeb
-            ? '273639086728-e4feis81rvsstgodqb0nmne6q5i99s6q.apps.googleusercontent.com'
+            ? '38261474833-5lelavbcrc4eev78mjft9qv38k9cm6dt.apps.googleusercontent.com'
             : null,
       );
 
