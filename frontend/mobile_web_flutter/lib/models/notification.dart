@@ -43,8 +43,16 @@ class AppNotification {
 }
 
 DateTime _parseUtcDate(String dateStr) {
+  DateTime dt;
   if (!dateStr.endsWith('Z') && !dateStr.contains('+')) {
-    return DateTime.parse('${dateStr}Z');
+    dt = DateTime.parse('${dateStr}Z');
+  } else {
+    dt = DateTime.parse(dateStr);
   }
-  return DateTime.parse(dateStr);
+  
+  // Force UTC if parsed as Local
+  if (!dt.isUtc) {
+    return DateTime.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.millisecond, dt.microsecond);
+  }
+  return dt;
 }

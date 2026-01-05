@@ -88,6 +88,7 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
   }
 
   // Hỗ trợ cả DateTime? và String? (phòng khi model bạn parse theo kiểu nào)
+  // Hỗ trợ cả DateTime? và String? (phòng khi model bạn parse theo kiểu nào)
   String _formatDate(Object? value) {
     if (value == null) return '-';
 
@@ -102,6 +103,14 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
       }
     } else {
       return '$value';
+    }
+
+    if (dt == null) return '-';
+
+    // ✅ FIX: Nếu DateTime đang là Local (do parse thiếu Z) nhưng giá trị thực là UTC
+    // thì ta phải ép nó về UTC trước khi toLocal() để nó +7h (VN)
+    if (!dt.isUtc) {
+      dt = DateTime.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
     }
 
     dt = dt.toLocal();

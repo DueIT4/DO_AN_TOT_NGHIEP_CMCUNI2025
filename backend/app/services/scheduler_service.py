@@ -33,6 +33,10 @@ def scan_all_cameras():
         
         for device in devices:
             try:
+                # ✅ ADD: Ngủ 2s giữa các lần quét để tránh 429 Too Many Requests từ Gemini
+                import time
+                time.sleep(2)
+
                 logger.info(f"[Scheduler] Quét camera: {device.name} (ID: {device.device_id})")
                 # ✅ OPTIMIZED: Thu thập 1 ảnh và phân tích, KHÔNG stop stream đang được dùng
                 # auto_stop_stream=False để không làm gián đoạn video đang xem

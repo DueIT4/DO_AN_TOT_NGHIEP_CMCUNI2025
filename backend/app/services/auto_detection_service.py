@@ -4,7 +4,7 @@ Service tự động phát hiện bệnh từ camera với kết hợp nhiều n
 """
 from typing import Dict, Any, List, Optional, Tuple
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import Counter
 import logging
 
@@ -115,7 +115,10 @@ def build_enhanced_prompt(
     lines.append("Thông tin thiết bị:")
     lines.append(f"- Tên: {device_info.name or 'N/A'}")
     lines.append(f"- Vị trí: {device_info.location or 'N/A'}")
-    lines.append(f"- Thời gian: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # ✅ FIX: Timezone Vietnam for LLM Config
+    vn_tz = datetime.now(timezone.utc) + timedelta(hours=7)
+    lines.append(f"- Thời gian: {vn_tz.strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append("")
 
     if sensor_data:
@@ -328,11 +331,15 @@ def detect_from_camera_auto(
                     # most_common_disease giờ dã là Tiếng Việt do fix ở trên
 
 
+                    # ✅ FIX: Chuyển đổi sang giờ Việt Nam (UTC+7) cho hiển thị trong text
+                    vn_tz = timezone(timedelta(hours=7))
+                    vn_now = datetime.now(vn_tz)
+                    
                     title = f"⚠️ Phát hiện bệnh trên camera: {device.name or 'Camera'}"
                     description = f"""
 Phát hiện bệnh: {most_common_disease}
 Vị trí: {device.location or 'N/A'}
-Thời gian: {datetime.now().strftime('%d/%m/%Y %H:%M')}
+Thời gian: {vn_now.strftime('%d/%m/%Y %H:%M')}
 
 {disease_summary or 'Vui lòng chụp thêm ảnh để phân tích thêm'}
 
