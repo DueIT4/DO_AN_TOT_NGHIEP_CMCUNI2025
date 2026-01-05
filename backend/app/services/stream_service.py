@@ -100,7 +100,7 @@ def _capture_loop(device_id: int, rtsp_url: str, stop_event: threading.Event):
             db = SessionLocal()
             try:
                 # Query device để lấy user_id
-                from app.models.device import Device
+                from app.models.devices import Device
                 device = db.query(Device).filter(Device.device_id == device_id).first()
                 if not device or not device.user_id:
                     logger.warning(f"[Capture] Device {device_id} has no owner, skipping save.")
