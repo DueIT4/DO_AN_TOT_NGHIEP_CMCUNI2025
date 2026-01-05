@@ -55,8 +55,9 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
   }
 
   String _formatDate(DateTime date) {
+    final localDate = date.toLocal();
     final now = DateTime.now();
-    final difference = now.difference(date);
+    final difference = now.difference(localDate);
 
     if (difference.inDays == 0) {
       if (difference.inHours == 0) {
@@ -71,7 +72,7 @@ class _NotificationsListPageState extends State<NotificationsListPage> {
     } else if (difference.inDays < 7) {
       return '${difference.inDays} ngày trước';
     } else {
-      return DateFormat('dd/MM/yyyy').format(date);
+      return DateFormat('dd/MM/yyyy').format(localDate);
     }
   }
 

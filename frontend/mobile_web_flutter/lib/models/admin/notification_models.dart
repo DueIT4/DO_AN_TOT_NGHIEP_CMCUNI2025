@@ -43,7 +43,7 @@ class NotificationItem {
       final s = '$v';
       if (s.isEmpty) return null;
       try {
-        return DateTime.parse(s);
+        return _parseUtcDate(s);
       } catch (_) {
         return null;
       }
@@ -79,3 +79,11 @@ class NotificationItem {
   /// tiện nếu nơi nào cần string iso
   String? get createdAtIso => createdAt?.toIso8601String();
 }
+
+DateTime _parseUtcDate(String dateStr) {
+  if (!dateStr.endsWith('Z') && !dateStr.contains('+')) {
+    return DateTime.parse('${dateStr}Z');
+  }
+  return DateTime.parse(dateStr);
+}
+

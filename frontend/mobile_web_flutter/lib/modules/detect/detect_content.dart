@@ -403,7 +403,7 @@ class _DetectContentState extends State<DetectContent>
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 24),
-          child: Text("Không phát hiện bất thường nào trên cây trồng.", style: TextStyle(fontSize: 16)),
+          child: Text("Hình ảnh không hỗ trợ phân tích bệnh.", style: TextStyle(fontSize: 16)),
         ),
       );
     }

@@ -23,9 +23,9 @@ class AppNotification {
       userId: json['user_id'] as int,
       title: json['title'] as String,
       description: json['description'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: _parseUtcDate(json['created_at'] as String),
       readAt: json['read_at'] != null
-          ? DateTime.parse(json['read_at'] as String)
+          ? _parseUtcDate(json['read_at'] as String)
           : null,
     );
   }
@@ -40,4 +40,11 @@ class AppNotification {
       'read_at': readAt?.toIso8601String(),
     };
   }
+}
+
+DateTime _parseUtcDate(String dateStr) {
+  if (!dateStr.endsWith('Z') && !dateStr.contains('+')) {
+    return DateTime.parse('${dateStr}Z');
+  }
+  return DateTime.parse(dateStr);
 }
