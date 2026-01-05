@@ -289,17 +289,7 @@ class _DevicesPageState extends State<DevicesPage> {
                       ),
                       Row(
                         children: [
-                          IconButton(
-                            onPressed: _loading ? null : _loadDevices,
-                            icon: _loading
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.refresh),
-                          ),
+                          // Removed refresh button as requested
                           const SizedBox(width: 4),
                           // Removed add button as requested
                         ],

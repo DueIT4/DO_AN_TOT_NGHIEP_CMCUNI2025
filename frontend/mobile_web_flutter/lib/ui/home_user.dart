@@ -266,25 +266,9 @@ class _HomeUserPageState extends State<HomeUserPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ================= HEADER =================
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Removed left icon as requested
-                  const SizedBox(width: 8), 
-                  IconButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const UserSettingsPage(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.person_outline),
-                  ),
-                ],
-              ),
+              // ================= HEADER GAP =================
+              // Spacer to prevent content from hitting the top edge, replacing the removed Header/Icon
+              const SizedBox(height: 48),
               const SizedBox(height: 16),
 
               Text(

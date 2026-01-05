@@ -110,10 +110,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                         .titleLarge
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  IconButton(
-                    onPressed: _loadHistory,
-                    icon: const Icon(Icons.refresh),
-                  ),
+                  // Removed refresh button as requested
                 ],
               ),
             ),

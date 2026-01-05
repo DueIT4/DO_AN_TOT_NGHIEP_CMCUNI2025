@@ -51,6 +51,18 @@ class DetectionService {
     return v.clamp(0.0, 1.0);
   }
 
+  // ✅ Helper: Parse UTC date correctly even if 'Z' is missing
+  static DateTime _parseUtcDate(dynamic raw) {
+    if (raw == null) return DateTime.now();
+    String s = raw.toString();
+    if (s.isEmpty) return DateTime.now();
+    // Assuming backend sends UTC but might miss 'Z'
+    if (!s.endsWith('Z') && !s.contains('+')) {
+       s += 'Z';
+    }
+    return DateTime.tryParse(s)?.toLocal() ?? DateTime.now();
+  }
+
   // =========================
   // ✅ LIST HISTORY: GET /detection-history/me
   // =========================
@@ -92,7 +104,7 @@ class DetectionService {
           id: (m['detection_id'] ?? m['id'] ?? '0').toString(),
           diseaseName: (m['disease_name'] ?? 'Không xác định').toString(),
           accuracy: _normalizeConfidence(m['confidence']),
-          detectedAt: DateTime.tryParse(m['created_at']?.toString() ?? '') ?? DateTime.now(),
+          detectedAt: _parseUtcDate(m['created_at']),
           cause: '',
           solution: '',
           source: (m['source_type']?.toString() == 'upload') ? DetectionSource.upload : DetectionSource.camera,
@@ -122,7 +134,7 @@ class DetectionService {
       id: detectionId.toString(),
       diseaseName: (m['disease_name'] ?? 'Không xác định').toString(),
       accuracy: _normalizeConfidence(m['confidence']),
-      detectedAt: DateTime.tryParse(m['created_at']?.toString() ?? '') ?? DateTime.now(),
+      detectedAt: _parseUtcDate(m['created_at']),
       // Lấy summary và guideline từ LLM Gemini
       cause: m['description'] ?? 'Đang phân tích...',
       solution: m['treatment_guideline'] ?? 'Vui lòng kiểm tra lại sau.',

@@ -122,7 +122,7 @@ def list_messages(ticket_id: int, db: Session = Depends(get_db), user: Users = D
 @router.post("/messages/create_message", response_model=SupportMessageOut, status_code=status.HTTP_201_CREATED)
 async def create_message(
     ticket_id: int = Form(...),
-    message: str = Form(...),
+    message: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     user: Users = Depends(get_current_user)

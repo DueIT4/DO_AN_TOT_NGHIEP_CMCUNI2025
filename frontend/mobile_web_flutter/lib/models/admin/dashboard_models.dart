@@ -6,7 +6,7 @@ class DetectionTimePoint {
 
   factory DetectionTimePoint.fromJson(Map<String, dynamic> json) {
     return DetectionTimePoint(
-      date: DateTime.parse(json['date'] as String),
+      date: _parseUtcDate(json['date'] as String),
       count: json['count'] as int? ?? 0,
     );
   }
@@ -66,7 +66,7 @@ class RecentDetectionItem {
       confidence: json['confidence'] == null
           ? null
           : (json['confidence'] as num).toDouble(),
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: _parseUtcDate(json['created_at'] as String),
     );
   }
 }
@@ -95,7 +95,7 @@ class RecentTicketItem {
       username: json['username'] as String?,
       status: json['status'] as String?,
       title: json['title'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: _parseUtcDate(json['created_at'] as String),
     );
   }
 }
@@ -169,4 +169,16 @@ class DashboardSummary {
           .toList(),
     );
   }
+}
+
+// ✅ Helper: Parse UTC date correctly even if 'Z' is missing
+DateTime _parseUtcDate(dynamic raw) {
+  if (raw == null) return DateTime.now();
+  String s = raw.toString();
+  if (s.isEmpty) return DateTime.now();
+  // Assuming backend sends UTC but might miss 'Z'
+  if (!s.endsWith('Z') && !s.contains('+')) {
+    s += 'Z';
+  }
+  return DateTime.tryParse(s)?.toLocal() ?? DateTime.now();
 }

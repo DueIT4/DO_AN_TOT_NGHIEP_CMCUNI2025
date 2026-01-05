@@ -5,9 +5,6 @@ import 'dart:async';
 
 import '../services/support_service.dart';
 
-XFile? _selectedFile;
-final ImagePicker _imagePicker = ImagePicker();
-
 class SupportDetailPage extends StatefulWidget {
   final Map<String, dynamic> ticket;
 
@@ -18,7 +15,10 @@ class SupportDetailPage extends StatefulWidget {
 }
 
 class _SupportDetailPageState extends State<SupportDetailPage> {
-  late Future<List<dynamic>> _messagesFuture;
+  List<dynamic> _messages = [];
+  bool _isLoading = true;
+  String? _error;
+
   final _messageCtrl = TextEditingController();
   bool _isSending = false;
 
@@ -47,13 +47,30 @@ class _SupportDetailPageState extends State<SupportDetailPage> {
     _loadMessages();
   }
 
-  void _loadMessages() {
+  Future<void> _loadMessages() async {
     final ticketId = _ticketId;
-    setState(() {
-      _messagesFuture = ticketId == null
-          ? Future.value(<dynamic>[])
-          : SupportService.fetchMessages(ticketId);
-    });
+    if (ticketId == null) {
+      setState(() {
+        _messages = [];
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final msgs = await SupportService.fetchMessages(ticketId);
+      if (!mounted) return;
+      setState(() {
+        _messages = msgs;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _sendMessage() async {
@@ -65,20 +82,21 @@ class _SupportDetailPageState extends State<SupportDetailPage> {
 
     setState(() => _isSending = true);
     try {
-      await SupportService.createMessage(
+      final newMessage = await SupportService.createMessage(
         ticketId: ticketId,
-        message: message,
-        file: _selectedFile, // ✅ XFile
+        message: message.isEmpty ? 'Đã gửi một ảnh đính kèm' : message,
+        file: _selectedFile,
       );
 
       if (!mounted) return;
+      
+      // ✅ Cập nhật UI ngay lập tức
+      setState(() {
+        _messages.add(newMessage);
+        _selectedFile = null;
+      });
       _messageCtrl.clear();
-      setState(() => _selectedFile = null);
-      _loadMessages();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gửi tin nhắn thành công')),
-      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -124,6 +142,17 @@ class _SupportDetailPageState extends State<SupportDetailPage> {
     }
   }
 
+  // ✅ Helper: Parse UTC date correctly
+  DateTime _parseUtcDate(dynamic raw) {
+    if (raw == null) return DateTime.now();
+    String s = raw.toString();
+    if (s.isEmpty) return DateTime.now();
+    if (!s.endsWith('Z') && !s.contains('+')) {
+      s += 'Z';
+    }
+    return DateTime.tryParse(s)?.toLocal() ?? DateTime.now();
+  }
+
   @override
   void dispose() {
     _messageCtrl.dispose();
@@ -134,6 +163,28 @@ class _SupportDetailPageState extends State<SupportDetailPage> {
   Widget build(BuildContext context) {
     final title = widget.ticket['title'] ?? 'Hỗ trợ';
     final description = widget.ticket['description'] ?? '';
+
+    // Convert raw messages to UI format
+    final normalizedMessages = _messages.map((m) {
+      final mm = (m as Map).cast<String, dynamic>();
+      return {
+        'content': mm['message'] ?? '',
+        'is_user': _asInt(mm['sender_id']) == _ownerUserId,
+        'created_at': mm['created_at']?.toString() ?? '',
+        'attachment_url': mm['attachment_url']?.toString(),
+      };
+    }).toList();
+
+    // Add description as the first message
+    final allMessages = [
+      {
+        'content': description,
+        'is_user': true,
+        'created_at': widget.ticket['created_at']?.toString() ?? '',
+        'attachment_url': null,
+      },
+      ...normalizedMessages,
+    ];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F9E9),
@@ -159,251 +210,171 @@ class _SupportDetailPageState extends State<SupportDetailPage> {
       body: Column(
         children: [
           Expanded(
-            child: FutureBuilder<List<dynamic>>(
-              future: _messagesFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(child: Text(_error!))
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ...allMessages.map((msg) {
+                              final isUser = msg['is_user'] ?? false;
+                              final content = msg['content'] ?? '';
+                              final createdAt = msg['created_at'] ?? '';
 
-                if (snapshot.hasError) {
-                  return Center(child: Text(snapshot.error.toString()));
-                }
+                              String formattedTime = '';
+                              try {
+                                if (createdAt.isNotEmpty) {
+                                  // ✅ Fix timezone here
+                                  final date = _parseUtcDate(createdAt);
+                                  formattedTime = DateFormat('HH:mm dd/MM/yyyy').format(date);
+                                }
+                              } catch (_) {
+                                formattedTime = createdAt;
+                              }
 
-                final messages = snapshot.data ?? [];
+                              final attachmentUrl = msg['attachment_url']?.toString();
 
-                final normalizedMessages = messages.map((m) {
-                  final mm = (m as Map).cast<String, dynamic>();
-                  return {
-                    'content': mm['message'] ?? '',
-                    'is_user': _asInt(mm['sender_id']) == _ownerUserId,
-                    'created_at': mm['created_at']?.toString() ?? '',
-                    // SupportService đã normalize absolute URL rồi
-                    'attachment_url': mm['attachment_url']?.toString(),
-                  };
-                }).toList();
-
-                final allMessages = [
-                  {
-                    'content': description,
-                    'is_user': true,
-                    'created_at': widget.ticket['created_at']?.toString() ?? '',
-                    'attachment_url': null,
-                  },
-                  ...normalizedMessages,
-                ];
-
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ...allMessages.map((msg) {
-                        final isUser = msg['is_user'] ?? false;
-                        final content = msg['content'] ?? '';
-                        final createdAt = msg['created_at'] ?? '';
-
-                        String formattedTime = '';
-                        try {
-                          if (createdAt.isNotEmpty) {
-                            final date = DateTime.parse(createdAt);
-                            formattedTime =
-                                DateFormat('HH:mm dd/MM/yyyy').format(date);
-                          }
-                        } catch (_) {
-                          formattedTime = createdAt;
-                        }
-
-                        final attachmentUrl = msg['attachment_url']?.toString();
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Row(
-                            mainAxisAlignment: isUser
-                                ? MainAxisAlignment.end
-                                : MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (!isUser)
-                                const CircleAvatar(
-                                  backgroundColor: Color(0xFF7CCD2B),
-                                  radius: 18,
-                                  child: Icon(
-                                    Icons.support_agent,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                              if (!isUser) const SizedBox(width: 8),
-                              Flexible(
-                                child: Column(
-                                  crossAxisAlignment: isUser
-                                      ? CrossAxisAlignment.end
-                                      : CrossAxisAlignment.start,
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Row(
+                                  mainAxisAlignment: isUser
+                                      ? MainAxisAlignment.end
+                                      : MainAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      constraints: BoxConstraints(
-                                        maxWidth:
-                                            MediaQuery.of(context).size.width *
-                                                0.7,
+                                    if (!isUser)
+                                      const CircleAvatar(
+                                        backgroundColor: Color(0xFF7CCD2B),
+                                        radius: 18,
+                                        child: Icon(
+                                          Icons.support_agent,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
                                       ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: isUser
-                                            ? const Color(0xFF7CCD2B)
-                                            : Colors.white,
-                                        borderRadius: BorderRadius.circular(16),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color:
-                                                Colors.black.withOpacity(0.05),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
+                                    if (!isUser) const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Column(
+                                        crossAxisAlignment: isUser
+                                            ? CrossAxisAlignment.end
+                                            : CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            constraints: BoxConstraints(
+                                              maxWidth: MediaQuery.of(context).size.width * 0.7,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: isUser
+                                                  ? const Color(0xFFE8F4D9)
+                                                  : Colors.white,
+                                              borderRadius: BorderRadius.circular(16),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.05),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                if (content.isNotEmpty)
+                                                  Text(
+                                                    content,
+                                                    style: const TextStyle(
+                                                      color: Colors.black87,
+                                                      fontSize: 15,
+                                                      height: 1.4,
+                                                    ),
+                                                  ),
+                                                if (attachmentUrl != null && attachmentUrl.isNotEmpty) ...[
+                                                  if (content.isNotEmpty) const SizedBox(height: 8),
+                                                  ClipRRect(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    child: Image.network(
+                                                      attachmentUrl,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context, error, stackTrace) {
+                                                        return Container(
+                                                          padding: const EdgeInsets.all(8),
+                                                          decoration: BoxDecoration(
+                                                            color: isUser
+                                                                ? Colors.white.withOpacity(0.2)
+                                                                : Colors.grey[200],
+                                                            borderRadius: BorderRadius.circular(8),
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            children: [
+                                                              Icon(
+                                                                Icons.attach_file,
+                                                                size: 16,
+                                                                color: isUser ? Colors.white : Colors.black54,
+                                                              ),
+                                                              const SizedBox(width: 4),
+                                                              Flexible(
+                                                                child: Text(
+                                                                  attachmentUrl.split('/').last,
+                                                                  style: TextStyle(
+                                                                    color: isUser ? Colors.white : Colors.black54,
+                                                                    fontSize: 12,
+                                                                  ),
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        );
+                                                      },
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                                            child: Text(
+                                              formattedTime,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
                                           ),
                                         ],
                                       ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (content.isNotEmpty)
-                                            Text(
-                                              content,
-                                              style: TextStyle(
-                                                color: isUser
-                                                    ? Colors.white
-                                                    : Colors.black87,
-                                                fontSize: 15,
-                                                height: 1.4,
-                                              ),
-                                            ),
-                                          if (attachmentUrl != null &&
-                                              attachmentUrl.isNotEmpty) ...[
-                                            if (content.isNotEmpty)
-                                              const SizedBox(height: 8),
-                                            ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              child: Image.network(
-                                                attachmentUrl,
-                                                fit: BoxFit.cover,
-                                                loadingBuilder: (context, child,
-                                                    loadingProgress) {
-                                                  if (loadingProgress == null) {
-                                                    return child;
-                                                  }
-                                                  return Container(
-                                                    height: 150,
-                                                    alignment: Alignment.center,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                      value: loadingProgress
-                                                                  .expectedTotalBytes !=
-                                                              null
-                                                          ? loadingProgress
-                                                                  .cumulativeBytesLoaded /
-                                                              loadingProgress
-                                                                  .expectedTotalBytes!
-                                                          : null,
-                                                    ),
-                                                  );
-                                                },
-                                                errorBuilder: (context, error,
-                                                    stackTrace) {
-                                                  return Container(
-                                                    padding:
-                                                        const EdgeInsets.all(8),
-                                                    decoration: BoxDecoration(
-                                                      color: isUser
-                                                          ? Colors.white
-                                                              .withOpacity(0.2)
-                                                          : Colors.grey[200],
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        Icon(
-                                                          Icons.attach_file,
-                                                          size: 16,
-                                                          color: isUser
-                                                              ? Colors.white
-                                                              : Colors.black54,
-                                                        ),
-                                                        const SizedBox(
-                                                            width: 4),
-                                                        Flexible(
-                                                          child: Text(
-                                                            attachmentUrl
-                                                                .split('/')
-                                                                .last,
-                                                            style: TextStyle(
-                                                              color: isUser
-                                                                  ? Colors.white
-                                                                  : Colors
-                                                                      .black54,
-                                                              fontSize: 12,
-                                                            ),
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                },
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                      ),
-                                      child: Text(
-                                        formattedTime,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey[600],
+                                    if (isUser) const SizedBox(width: 8),
+                                    if (isUser)
+                                      const CircleAvatar(
+                                        backgroundColor: Color(0xFF2E7D32),
+                                        radius: 18,
+                                        child: Icon(
+                                          Icons.person,
+                                          color: Colors.white,
+                                          size: 20,
                                         ),
                                       ),
-                                    ),
                                   ],
                                 ),
-                              ),
-                              if (isUser) const SizedBox(width: 8),
-                              if (isUser)
-                                const CircleAvatar(
-                                  backgroundColor: Color(0xFF2E7D32),
-                                  radius: 18,
-                                  child: Icon(
-                                    Icons.person,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                );
-              },
-            ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
           ),
 
-          // Preview file selected (giữ UI)
+          // Preview file selected
           if (_selectedFile != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -450,7 +421,7 @@ class _SupportDetailPageState extends State<SupportDetailPage> {
               ),
             ),
 
-          // Composer (giữ UI)
+          // Composer
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(

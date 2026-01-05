@@ -260,15 +260,9 @@ def save_detection_result(
         best_det = max(detections_list, key=lambda x: x.get("confidence", 0))
         max_conf = best_det.get("confidence", 0)
     
-    # Logic Unknown: Nếu max_conf < 40% (0.4)
     if max_conf < 0.4:
-        # Override giá trị để hiển thị "Không xác định"
-        # 0% tin cậy
-        max_conf = 0.0 
-        
-        # Nội dung fix cứng
-        description_text = "Không phát hiện bệnh hoặc độ tin cậy thấp."
-        guideline_text = "Vui lòng chụp đúng chủ thể cây trồng, tránh chụp quá xa hoặc bị mờ. Không giải thích lan man."
+        guideline_text = "Vui lòng chụp lại ảnh rõ nét, đúng chủ thể (lá/quả) và đủ sáng."
+        description_text = "Không phát hiện bệnh cây trồng trên ảnh, vui lòng chụp lại."
         
         # Disease ID = None (hoặc 1 loại disease 'Unknown' nếu muốn)
         # Ở đây ta để None, FE sẽ hiển thị diseaseName dựa vào logic fallback hoặc ta tạo disease "Không xác định"

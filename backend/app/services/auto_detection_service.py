@@ -298,6 +298,7 @@ def detect_from_camera_auto(
 
                 saved_result = save_detection_result(
                     db=db,
+                    image_url=None,  # ✅ FIX: Missing required argument. This triggers auto-upload logic in detect_service.
                     raw=images[0],
                     filename=f"auto_scan_{device.device_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
                     yolo_result=yolo_result,

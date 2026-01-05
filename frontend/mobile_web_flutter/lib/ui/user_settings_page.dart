@@ -310,6 +310,8 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
       body: SafeArea(
         child: Column(
           children: [
+            // Added top spacing as requested
+            const SizedBox(height: 48),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
@@ -322,10 +324,7 @@ class _UserSettingsPageState extends State<UserSettingsPage> {
                         .titleLarge
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  IconButton(
-                    onPressed: _refreshProfile,
-                    icon: const Icon(Icons.refresh),
-                  ),
+                  // Removed refresh button as requested
                 ],
               ),
             ),

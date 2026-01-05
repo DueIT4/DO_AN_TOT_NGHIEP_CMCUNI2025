@@ -22,7 +22,7 @@ class AdminTicketItem {
       username: json['username'] as String?,
       title: json['title'] as String,
       status: json['status'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: _parseUtcDate(json['created_at'] as String),
     );
   }
 }
@@ -61,7 +61,7 @@ class AdminSupportMessage {
       senderName: json['sender_name'] as String?,
       message: json['message'] as String,
       attachmentUrl: json['attachment_url'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: _parseUtcDate(json['created_at'] as String),
     );
   }
 }
@@ -101,8 +101,20 @@ class AdminTicketDetail {
       title: json['title'] as String,
       description: json['description'] as String?,
       status: json['status'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: _parseUtcDate(json['created_at'] as String),
       messages: msgs,
     );
   }
+}
+
+// ✅ Helper: Parse UTC date correctly even if 'Z' is missing
+DateTime _parseUtcDate(dynamic raw) {
+  if (raw == null) return DateTime.now();
+  String s = raw.toString();
+  if (s.isEmpty) return DateTime.now();
+  // Assuming backend sends UTC but might miss 'Z'
+  if (!s.endsWith('Z') && !s.contains('+')) {
+    s += 'Z';
+  }
+  return DateTime.tryParse(s)?.toLocal() ?? DateTime.now();
 }

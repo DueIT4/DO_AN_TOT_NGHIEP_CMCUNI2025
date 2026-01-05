@@ -9,20 +9,19 @@ from typing import List, Dict, Any, Tuple, Optional
 
 # SDK MỚI – Google GenAI
 from google import genai 
-from dotenv import load_dotenv
+# SDK MỚI – Google GenAI
+from google import genai 
 
 # Setup logging để theo dõi lỗi trên Cloud Run dễ hơn
 logger = logging.getLogger(__name__)
 
-# Load .env
-load_dotenv()
+# =====================================================
+# 1. LẤY API KEY + MODEL TỪ SETTINGS (Chuẩn hóa)
+# =====================================================
+from app.core.config import settings
 
-# =====================================================
-# 1. LẤY API KEY + MODEL TỪ .env
-# =====================================================
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") 
-# Sửa lại thành 2.0-flash để đảm bảo chạy được
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_API_KEY = settings.GEMINI_API_KEY
+GEMINI_MODEL = settings.GEMINI_MODEL
 
 # =====================================================
 # 2. TẠO CLIENT
@@ -164,3 +163,48 @@ def summarize_detections_with_llm(
     except Exception as e:
         logger.error(f"LLM ERROR: {e}")
         return None, None
+
+
+# =====================================================
+# 6. VERIFY PLANT (Kiểm tra ảnh có phải cây bưởi không)
+# =====================================================
+from PIL import Image
+from io import BytesIO
+
+def verify_image_is_plant(raw_bytes: bytes) -> bool:
+    """
+    Gửi ảnh cho Gemini để kiểm tra xem có phải là cây/lá/quả bưởi hay không.
+    Trả về True nếu là cây, False nếu là giày/dép/người/đồ vật khác.
+    """
+    if client is None:
+        # Nếu không có API Key, mặc định tin tưởng YOLO (tránh block app)
+        return True
+
+    try:
+        img = Image.open(BytesIO(raw_bytes))
+        
+        prompt = (
+            "Look at this image. check if it contains any parts of a **pomelo/grapefruit plant** "
+            "(leaves, fruit, branches, tree) or generally a plant crop?\n"
+            "If it is clearly a non-plant object (like shoes, floor, human, car, furniture), answer NO.\n"
+            "If it contains plant parts, answer YES.\n"
+            "Answer only YES or NO."
+        )
+
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[prompt, img]
+        )
+        
+        result = (response.text or "").strip().upper()
+        logger.info(f"[LLM Check] Is Plant? -> {result}")
+        
+        if "NO" in result:
+            return False
+            
+        return True
+
+    except Exception as e:
+        logger.error(f"[LLM Check] Error verifying image: {e}")
+        # Gặp lỗi thì fallback về True (cho phép YOLO quyết định)
+        return True

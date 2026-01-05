@@ -355,42 +355,26 @@ class _LoginPageState extends State<LoginPage> {
                     ]),
                     const SizedBox(height: 12),
 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _loading ? null : _handleGoogle,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12, horizontal: 8),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _loading ? null : _handleGoogle,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 8),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.g_mobiledata, size: 20),
+                              label: Flexible(
+                                  child: Text(l10n.translate('google'),
+                                      overflow: TextOverflow.ellipsis)),
                             ),
-                            icon: const Icon(Icons.g_mobiledata, size: 20),
-                            label: Flexible(
-                                child: Text(l10n.translate('google'),
-                                    overflow: TextOverflow.ellipsis)),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _loading ? null : _handleFacebook,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12, horizontal: 8),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                            icon: const Icon(Icons.facebook, size: 20),
-                            label: Flexible(
-                                child: Text(l10n.translate('facebook'),
-                                    overflow: TextOverflow.ellipsis)),
-                          ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
 
                     const SizedBox(height: 16),
                     TextButton(

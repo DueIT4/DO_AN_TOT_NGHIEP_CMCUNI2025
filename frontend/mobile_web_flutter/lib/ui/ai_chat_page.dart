@@ -285,9 +285,8 @@ class _AIChatPageState extends State<AIChatPage> {
                             ? Alignment.centerRight
                             : Alignment.centerLeft;
                         final bubbleColor =
-                            msg.isUser ? const Color(0xFF7CCD2B) : Colors.white;
-                        final textColor =
-                            msg.isUser ? Colors.white : Colors.black87;
+                            msg.isUser ? const Color(0xFFE8F4D9) : Colors.white;
+                        final textColor = Colors.black87;
 
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4),
