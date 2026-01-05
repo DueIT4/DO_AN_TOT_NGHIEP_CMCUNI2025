@@ -148,7 +148,7 @@ class _SupportCreatePageState extends State<SupportCreatePage> {
                       child: Text(
                         _selectedFile != null 
                             ? _selectedFile!.name 
-                            : 'Đính kèm hình ảnh (nếu có)', # Translate if needed
+                            : 'Đính kèm hình ảnh (nếu có)', // Translate if needed
                         style: TextStyle(
                           color: _selectedFile != null ? Colors.black87 : Colors.black54,
                         ),

@@ -11,7 +11,7 @@ plugins {
 
 android {
     namespace = "com.example.mobile_web_flutter"
-    compileSdk = 35
+    compileSdk = 36
     // ndkVersion = flutter.ndkVersion
     ndkVersion = "25.1.8937393"
 
@@ -28,7 +28,7 @@ android {
         applicationId = "com.example.mobile_web_flutter"
 
         minSdk = 23
-        targetSdk = 35
+        targetSdk = 36
 
         versionCode = flutter.versionCode
         versionName = flutter.versionName
