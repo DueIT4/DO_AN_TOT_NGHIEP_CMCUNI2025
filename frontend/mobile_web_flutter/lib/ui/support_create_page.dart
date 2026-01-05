@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/support_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 class SupportCreatePage extends StatefulWidget {
   const SupportCreatePage({super.key});
@@ -41,7 +42,11 @@ class _SupportCreatePageState extends State<SupportCreatePage> {
     setState(() => _isLoading = true);
 
     try {
-      await SupportService.createTicket(title: title, description: description);
+      await SupportService.createTicket(
+        title: title, 
+        description: description,
+        imgFile: _selectedFile,
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -122,6 +127,45 @@ class _SupportCreatePageState extends State<SupportCreatePage> {
                 ),
               ),
             ),
+            const SizedBox(height: 20),
+            
+            // ✅ Image Picker UI
+            InkWell(
+              onTap: _pickImage,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.black12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.image_outlined, color: Color(0xFF7CCD2B)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _selectedFile != null 
+                            ? _selectedFile!.name 
+                            : 'Đính kèm hình ảnh (nếu có)', # Translate if needed
+                        style: TextStyle(
+                          color: _selectedFile != null ? Colors.black87 : Colors.black54,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (_selectedFile != null)
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.red),
+                        onPressed: () => setState(() => _selectedFile = null),
+                      )
+                  ],
+                ),
+              ),
+            ),
+
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
@@ -147,5 +191,20 @@ class _SupportCreatePageState extends State<SupportCreatePage> {
         ),
       ),
     );
+  }
+
+  // ✅ Image Picker Implementation
+  XFile? _selectedFile;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickImage() async {
+    try {
+      final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+      if (file != null) {
+        setState(() => _selectedFile = file);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi chọn ảnh: $e')));
+    }
   }
 }

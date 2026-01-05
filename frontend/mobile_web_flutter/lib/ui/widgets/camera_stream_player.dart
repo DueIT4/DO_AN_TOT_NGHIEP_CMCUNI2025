@@ -118,7 +118,7 @@ class _CameraStreamPlayerState extends State<CameraStreamPlayer> {
 
   void _startHealthCheck() {
     _healthCheckTimer?.cancel();
-    _healthCheckTimer = Timer.periodic(Duration(seconds: 30), (_) async {
+    _healthCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
       if (!mounted) return;
 
       final health =
@@ -127,12 +127,30 @@ class _CameraStreamPlayerState extends State<CameraStreamPlayer> {
 
       if (!mounted) return;
 
-      if (!isHealthy && _errorMessage == null) {
+      if (!isHealthy) {
+        // ⚠️ Stream is Down -> Auto Reconnect instead of just showing error
+        if (_isInitialized) {
+          _cleanupVideo(); // Cleanup old player
+        }
+        
+        // Log info debug
+        debugPrint('[StreamPlayer] Stream unhealthy, auto-reconnecting in 5s...');
+
+        // Show temporary status but don't stop
         setState(() {
-          _errorMessage =
-              health['error']?.toString() ?? 'Camera không hoạt động';
+            _errorMessage = 'Mất kết nối. Đang tự động kết nối lại...';
+            _isInitialized = false;
         });
+
+        // Retry logic
+        Future.delayed(const Duration(seconds: 5), () {
+             if (mounted) {
+               _startStreamAndInitVideo();
+             }
+        });
+
       } else if (isHealthy && _errorMessage != null) {
+        // Stream back online
         setState(() {
           _errorMessage = null;
         });

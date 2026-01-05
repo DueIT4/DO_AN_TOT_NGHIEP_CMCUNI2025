@@ -301,16 +301,7 @@ class _DevicesPageState extends State<DevicesPage> {
                                 : const Icon(Icons.refresh),
                           ),
                           const SizedBox(width: 4),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF7CCD2B),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: IconButton(
-                              onPressed: _handleAddDevice,
-                              icon: const Icon(Icons.add, color: Colors.white),
-                            ),
-                          ),
+                          // Removed add button as requested
                         ],
                       ),
                     ],

@@ -152,6 +152,7 @@
 #         "file_url": file_url,
 #     }
 from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.models.image_detection import Img, Detection, Disease
 
@@ -213,6 +214,7 @@ def _normalize_bbox(det: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 from app.services.cloudinary_service import upload_image_to_cloudinary
+
 def save_detection_result(
     db: Session,
     image_url: str | None,
@@ -248,36 +250,62 @@ def save_detection_result(
 
     # 2) Chuẩn bị dữ liệu từ YOLO và LLM
     detections_list = yolo_result.get("detections", [])
-    llm = yolo_result.get("llm") or {}
-    description_text = llm.get("disease_summary") or yolo_result.get("explanation")
-    guideline_text = llm.get("care_instructions")
-
-    # 3) Xác định bệnh "chính" để lưu vào disease_id (Bệnh có confidence cao nhất)
-    primary_disease_id = None
+    
+    # 3) Xử lý logic Confidence thấp (< 0.4) -> Unknown
+    # Tìm box có độ tin tưởng cao nhất
     max_conf = 0.0
+    primary_disease_id = None
     
     if detections_list:
-        # Tìm box có độ tin tưởng cao nhất
         best_det = max(detections_list, key=lambda x: x.get("confidence", 0))
         max_conf = best_det.get("confidence", 0)
-        class_name_vi = best_det.get("class_name")
+    
+    # Logic Unknown: Nếu max_conf < 40% (0.4)
+    if max_conf < 0.4:
+        # Override giá trị để hiển thị "Không xác định"
+        # 0% tin cậy
+        max_conf = 0.0 
         
-        disease_obj = ensure_disease(db, class_name_vi) if class_name_vi else None
-        if disease_obj:
-            primary_disease_id = disease_obj.disease_id
+        # Nội dung fix cứng
+        description_text = "Không phát hiện bệnh hoặc độ tin cậy thấp."
+        guideline_text = "Vui lòng chụp đúng chủ thể cây trồng, tránh chụp quá xa hoặc bị mờ. Không giải thích lan man."
+        
+        # Disease ID = None (hoặc 1 loại disease 'Unknown' nếu muốn)
+        # Ở đây ta để None, FE sẽ hiển thị diseaseName dựa vào logic fallback hoặc ta tạo disease "Không xác định"
+        # Tốt nhất: Tìm/Tạo disease tên "Không xác định" để FE hiện title
+        unknown_disease = ensure_disease(db, "Không xác định")
+        primary_disease_id = unknown_disease.disease_id if unknown_disease else None
+        
+        # Xóa detections list để không vẽ box linh tinh
+        detections_list = []
+        
+    else:
+        # Logic bình thường (> 0.4)
+        llm = yolo_result.get("llm") or {}
+        description_text = llm.get("disease_summary") or yolo_result.get("explanation")
+        guideline_text = llm.get("care_instructions")
+        
+        if detections_list:
+            best_det = max(detections_list, key=lambda x: x.get("confidence", 0))
+            class_name_vi = best_det.get("class_name")
+            
+            disease_obj = ensure_disease(db, class_name_vi) if class_name_vi else None
+            if disease_obj:
+                primary_disease_id = disease_obj.disease_id
 
     # 4) Lưu DUY NHẤT một dòng vào bảng Detection
-    # Gộp toàn bộ bbox vào một cột để tránh lặp dữ liệu
     det_row = Detection(
         img_id=img_row.img_id,
         disease_id=primary_disease_id,
         confidence=max_conf,
         description=description_text,
         treatment_guideline=guideline_text,
-        # Lưu toàn bộ list detections vào cột bbox (giả định cột này lưu JSON)
+        # Lưu toàn bộ list detections vào cột bbox
         bbox={"all_detections": detections_list}, 
         review_status="pending",
         model_version=model_version,
+        # ✅ FIX DATE: Dùng UTC để endpoint mobile hiển thị đúng giờ local
+        created_at=datetime.now(timezone.utc) 
     )
     db.add(det_row)
     

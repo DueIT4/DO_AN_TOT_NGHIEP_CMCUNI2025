@@ -5,11 +5,17 @@ from typing import Optional
 from pathlib import Path
 import shutil
 import logging
+import time
+import cv2  # OpenCV
+
+from app.core.database import SessionLocal
+from app.services import detect_service, inference_service
 
 logger = logging.getLogger(__name__)
 
 _procs = {}  # {device_id: {'proc': Popen, 'rtsp_url': str, 'log_file': file_obj}}
 _temp_procs = {}  # {key: {'proc': Popen, 'rtsp_url': str, 'log_file': file_obj}}
+_capture_threads = {} # {device_id: {'stop_event': Event, 'thread': Thread}}
 _lock = threading.Lock()
 
 HLS_ROOT = Path("media/hls")
@@ -34,6 +40,97 @@ def _hls_temp_dir(key: str) -> Path:
 
 def hls_url_for_temp(key: str) -> str:
     return f"/media/hls/temp-{key}/index.m3u8"
+
+
+# =========================================================================
+# ✅ BACKGROUND AUTO-CAPTURE LOOP
+# =========================================================================
+def _capture_loop(device_id: int, rtsp_url: str, stop_event: threading.Event):
+    """
+    Chạy ngầm: cứ 10s capture 1 frame và chạy detection + lưu lịch sử.
+    """
+    logger.info(f"[Capture] Started auto-capture loop for device {device_id}")
+    
+    cap = None
+    last_capture_time = 0
+    capture_interval = 60.0 # seconds
+    
+    while not stop_event.is_set():
+        try:
+            current_time = time.time()
+            
+            # Chỉ capture nếu đã qua interval
+            if current_time - last_capture_time < capture_interval:
+                time.sleep(1) # Sleep ngắn để check stop_event
+                continue
+                
+            # Khởi tạo/Reconnect OpenCV
+            if cap is None or not cap.isOpened():
+                cap = cv2.VideoCapture(rtsp_url)
+                if not cap.isOpened():
+                    logger.warning(f"[Capture] Cannot open stream {rtsp_url}, retrying in 5s...")
+                    time.sleep(5)
+                    continue
+            
+            # Đọc frame
+            ret, frame = cap.read()
+            if not ret:
+                logger.warning(f"[Capture] Failed to grab frame, reconnecting...")
+                cap.release()
+                cap = None
+                continue
+            
+            # Success grab
+            last_capture_time = current_time
+            
+            # Encode jpg
+            _, buffer = cv2.imencode(".jpg", frame)
+            raw_bytes = buffer.tobytes()
+            
+            # Chạy Detection (Logic giống routes_detect)
+            # 1. Predict
+            detector = inference_service.detector
+            if not detector:
+                logger.error("[Capture] Detector model not loaded")
+                continue
+                
+            yolo_result = detector.predict_bytes(raw_bytes=raw_bytes, conf=0.5, iou=0.5)
+            
+            # 2. Save to DB
+            db = SessionLocal()
+            try:
+                # Query device để lấy user_id
+                from app.models.device import Device
+                device = db.query(Device).filter(Device.device_id == device_id).first()
+                if not device or not device.user_id:
+                    logger.warning(f"[Capture] Device {device_id} has no owner, skipping save.")
+                else:
+                    filename = f"autocap_{device_id}_{int(current_time)}.jpg"
+                    
+                    detect_service.save_detection_result(
+                        db=db,
+                        image_url=None, # Tự upload nếu cấu hình
+                        filename=filename,
+                        yolo_result=yolo_result,
+                        user_id=device.user_id,
+                        device_id=device_id,
+                        raw=raw_bytes
+                    )
+                    logger.info(f"[Capture] Saved history for device {device_id}")
+                    
+            except Exception as e:
+                logger.error(f"[Capture] Error saving result: {e}")
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"[Capture] Loop error: {e}")
+            time.sleep(5)
+            
+    # Cleanup
+    if cap and cap.isOpened():
+        cap.release()
+    logger.info(f"[Capture] Stopped loop for device {device_id}")
 
 
 def start_stream(device_id: int, rtsp_url: str) -> Optional[str]:
@@ -119,6 +216,13 @@ def start_stream(device_id: int, rtsp_url: str) -> Optional[str]:
             'rtsp_url': rtsp_url,
             'log_file': log_file
         }
+
+        # ✅ START AUTO-CAPTURE THREAD
+        stop_evt = threading.Event()
+        t = threading.Thread(target=_capture_loop, args=(device_id, rtsp_url, stop_evt), daemon=True)
+        t.start()
+        _capture_threads[device_id] = {'stop_event': stop_evt, 'thread': t}
+
         return hls_url_for(device_id)
 
 
@@ -194,11 +298,15 @@ def start_stream_temp(key: str, rtsp_url: str) -> Optional[str]:
 
 
 def stop_stream(device_id: int) -> bool:
-    """Stop stream for device.
-    
-    ✅ FIX: Close log_file và cleanup properly
-    """
+    """Stop stream for device."""
     with _lock:
+        # ✅ Stop Capture Thread
+        if device_id in _capture_threads:
+            logger.info(f"[Stream] Stopping capture thread for device {device_id}")
+            _capture_threads[device_id]['stop_event'].set()
+            # Don't join() here to avoid blocking
+            del _capture_threads[device_id]
+
         return _cleanup_proc(device_id)
 
 

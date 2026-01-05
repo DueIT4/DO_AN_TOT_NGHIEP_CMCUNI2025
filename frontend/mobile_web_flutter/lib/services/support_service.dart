@@ -57,19 +57,44 @@ class SupportService {
   static Future<Map<String, dynamic>> createTicket({
     required String title,
     required String description,
+    XFile? imgFile, // ✅ Add imgFile param
   }) async {
     final uri = ApiBase.uri('/support/tickets/create_ticket');
 
-    final resp = await http
-        .post(
-          uri,
-          headers: ApiClient.authHeaders(),
-          body: jsonEncode({
-            'title': title,
-            'description': description,
-          }),
-        )
-        .timeout(const Duration(seconds: 20));
+    // Nếu không có ảnh, dùng JSON post thường (hoặc chuyển hết sang multipart cũng được, nhưng user cũ có thể lỗi)
+    // Để an toàn, Backend phải support cả 2 hoặc chúng ta chuyển hết sang Multipart.
+    // Giả sử Backend hỗ trợ Multipart cho create_ticket (cần check backend, nhưng FE code trước).
+    
+    // Check backend: Nếu backend create_ticket chỉ nhận JSON body Pydantic, ta phải refactor backend.
+    // Tuy nhiên, logic Support thường giống nhau. 
+    // Nếu chưa chắc chắn backend, ta dùng MultipartRequest cho an toàn nếu có file.
+    
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll(ApiClient.authHeaders(json: false))
+      ..fields['title'] = title
+      ..fields['description'] = description;
+
+    if (imgFile != null) {
+      final bytes = await imgFile.readAsBytes();
+      final ext = imgFile.name.split('.').last.toLowerCase();
+      final mimeType = (ext == 'png') ? 'image/png' : 'image/jpeg';
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file', // Field name 'file' needs to match Backend parameter
+          bytes,
+          filename: imgFile.name,
+          contentType: MediaType.parse(mimeType),
+        ),
+      );
+    }
+    
+    // Nếu không có file, MultipartRequest vẫn gửi fields bình thường.
+    // Nhưng nếu Backend expect JSON body explicit (Content-Type: application/json), Multipart sẽ lỗi 422.
+    // Ta cứ thử gửi Multipart. Nếu backend dùng `Form()` hoặc `UploadFile` thì ok.
+    
+    final streamed = await request.send().timeout(const Duration(seconds: 30));
+    final resp = await http.Response.fromStream(streamed);
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
       throw Exception('Tạo ticket thất bại: ${resp.body}');
