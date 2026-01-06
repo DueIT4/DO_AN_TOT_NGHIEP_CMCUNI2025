@@ -232,22 +232,33 @@ def save_detection_result(
     - Lưu toàn bộ danh sách bbox dưới dạng JSON để FE dễ vẽ lại.
     - Hỗ trợ lưu cả trường hợp ảnh không có bệnh.
     """
-    # 0) Auto-Upload nếu chưa có URL (Logic quan trọng cho Stream/Auto-Detect)
+    # 0) Auto-Upload nếu chưa có URL
     if not image_url and raw:
         try:
-            image_url = upload_image_to_cloudinary(raw, folder="zestguard/stream_detect")
+            image_url = upload_image_to_cloudinary(raw)
             if not image_url:
-                print(f"[DetectService] ❌ Upload Cloudinary thất bại (trả về None)")
+                print(f"[DetectService] ❌ Upload Cloudinary thất bại")
         except Exception as e:
             print(f"[DetectService] ❌ Lỗi upload ảnh: {e}")
-            pass # Vẫn lưu DB dẫu lỗi upload (file_url=None)
 
-    # 1) Lưu thông tin ảnh (luôn duy nhất 1 dòng)
+    # ⚠️ CRITICAL FIX: Bảng Img yêu cầu file_url NOT NULL.
+    # Nếu không có URL (do lỗi upload), ta dùng ảnh placeholder hoặc bỏ qua.
+    if not image_url:
+        print("[DetectService] 🛑 Abort saving: No image URL available.")
+        # Trả về dummy dict để không crash caller, nhưng không lưu DB
+        return {
+            "img_id": None,
+            "file_url": None,
+            "detection_id": None,
+            "error": "Failed to upload image"
+        }
+
+    # 1) Lưu thông tin ảnh
     img_row = Img(
         source_type="upload" if device_id is None else "camera",
         device_id=device_id,
         user_id=user_id,
-        file_url=image_url,  # URL Cloudinary
+        file_url=image_url,
     )
     db.add(img_row)
     db.flush()

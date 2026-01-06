@@ -24,47 +24,10 @@ import 'ui/home_shell.dart';
 import 'ui/forgot_password_page.dart';
 import 'ui/verify_otp_page.dart';
 import 'ui/reset_password_page.dart';
+import 'ui/splash_page.dart'; // ✅ NEW
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  /// ===============================
-  /// 1️⃣ BASE API – BẮT BUỘC (DEPLOY)
-  /// ===============================
-  // ApiBase.setBaseURL = ... (Đã được cấu hình cứng trong api_base_app.dart)
-
-  /// ===============================
-  /// 2️⃣ FIREBASE INIT
-  /// ===============================
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  /// ===============================
-  /// 3️⃣ FACEBOOK AUTH (OPTIONAL)
-  /// ===============================
-  try {
-    await FacebookAuth.instance
-        .webAndDesktopInitialize(
-          appId: '1884651265804315',
-          cookie: true,
-          xfbml: true,
-          version: 'v18.0',
-        )
-        .timeout(const Duration(seconds: 5));
-  } catch (e) {
-    debugPrint('⚠️ FacebookAuth init skipped: $e');
-  }
-
-  /// ===============================
-  /// 4️⃣ RESTORE TOKEN (CỰC QUAN TRỌNG)
-  /// ===============================
-  // await AuthService.restoreBearer(); // REMOVED: Admin-only
-  await ApiClient.restoreToken();
-
-  // Đồng bộ token cho toàn hệ thống (API + stream)
-  ApiBase.bearer = ApiClient.authToken;
-
   runApp(const ZestGuardMobileApp());
 }
 
@@ -105,14 +68,9 @@ class ZestGuardMobileApp extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
-
-            /// ===============================
-            /// 5️⃣ ĐIỀU HƯỚNG THEO TOKEN
-            /// ===============================
-            home: (ApiClient.authToken != null &&
-                    ApiClient.authToken!.isNotEmpty)
-                ? const HomeShell()
-                : const LoginPage(),
+            
+            // 5️⃣ SỬ DỤNG SPLASH SCREEN ĐỂ KHỞI TẠO LOGIC
+            home: const SplashPage(),
 
             routes: {
               '/login': (_) => const LoginPage(),

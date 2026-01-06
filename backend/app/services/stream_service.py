@@ -64,72 +64,87 @@ def _capture_loop(device_id: int, rtsp_url: str, stop_event: threading.Event):
                 time.sleep(1) # Sleep ngắn để check stop_event
                 continue
                 
-            # Khởi tạo/Reconnect OpenCV
-            if cap is None or not cap.isOpened():
-                cap = cv2.VideoCapture(rtsp_url)
-                if not cap.isOpened():
-                    logger.warning(f"[Capture] Cannot open stream {rtsp_url}, retrying in 5s...")
+            # Khởi tạo/Reconnect OpenCV -> REPLACED WITH FFMPEG SINGLE FRAME GRAB
+            # cv2.VideoCapture often fails with HTTP/Ngrok headers.
+            # We use ffmpeg to grab 1 frame directly to memory.
+            
+            cmd = [
+                "ffmpeg", 
+                "-headers", "ngrok-skip-browser-warning: 69420\r\nUser-Agent: FFMPEG",
+                "-y",
+                "-i", rtsp_url,
+                "-vframes", "1",
+                "-f", "image2",
+                "-pipe:1" # Output to stdout
+            ]
+            
+            try:
+                # Run ffmpeg to grab 1 frame
+                # Timeout 10s to prevent hanging
+                raw_bytes = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=10)
+                
+                if not raw_bytes:
+                    logger.warning("[Capture] FFmpeg returned empty bytes")
                     time.sleep(5)
                     continue
-            
-            # Đọc frame
-            ret, frame = cap.read()
-            if not ret:
-                logger.warning(f"[Capture] Failed to grab frame, reconnecting...")
-                cap.release()
-                cap = None
-                continue
-            
-            # Success grab
-            last_capture_time = current_time
-            
-            # Encode jpg
-            _, buffer = cv2.imencode(".jpg", frame)
-            raw_bytes = buffer.tobytes()
-            
-            # Chạy Detection (Logic giống routes_detect)
-            # 1. Predict
-            detector = inference_service.detector
-            if not detector:
-                logger.error("[Capture] Detector model not loaded")
-                continue
+                    
+                # Success grab
+                last_capture_time = current_time
                 
-            yolo_result = detector.predict_bytes(raw_bytes=raw_bytes, conf=0.5, iou=0.5)
-            
-            # 2. Save to DB
-            db = SessionLocal()
-            try:
-                # Query device để lấy user_id
-                from app.models.devices import Device
-                device = db.query(Device).filter(Device.device_id == device_id).first()
-                if not device or not device.user_id:
-                    logger.warning(f"[Capture] Device {device_id} has no owner, skipping save.")
-                else:
-                    filename = f"autocap_{device_id}_{int(current_time)}.jpg"
+                # Check valid JPEG header (FF D8)
+                if not raw_bytes.startswith(b'\xff\xd8'):
+                     logger.warning("[Capture] Invalid JPEG data received")
+                     continue
+
+                # Chạy Detection (Logic giống routes_detect)
+                # 1. Predict
+                detector = inference_service.detector
+                if not detector:
+                    logger.error("[Capture] Detector model not loaded")
+                    continue
                     
-                    detect_service.save_detection_result(
-                        db=db,
-                        image_url=None, # Tự upload nếu cấu hình
-                        filename=filename,
-                        yolo_result=yolo_result,
-                        user_id=device.user_id,
-                        device_id=device_id,
-                        raw=raw_bytes
-                    )
-                    logger.info(f"[Capture] Saved history for device {device_id}")
-                    
+                yolo_result = detector.predict_bytes(raw_bytes=raw_bytes, conf=0.5, iou=0.5)
+                
+                # 2. Save to DB
+                db = SessionLocal()
+                try:
+                    # Query device để lấy user_id
+                    from app.models.devices import Device
+                    device = db.query(Device).filter(Device.device_id == device_id).first()
+                    if not device or not device.user_id:
+                        logger.warning(f"[Capture] Device {device_id} has no owner, skipping save.")
+                    else:
+                        filename = f"autocap_{device_id}_{int(current_time)}.jpg"
+                        
+                        # upload_image_to_cloudinary is handled inside save_detection_result (we fixed it to not crash)
+                        detect_service.save_detection_result(
+                            db=db,
+                            image_url=None, 
+                            filename=filename,
+                            yolo_result=yolo_result,
+                            user_id=device.user_id,
+                            device_id=device_id,
+                            raw=raw_bytes,
+                            create_alert=True 
+                        )
+                        logger.info(f"[Capture] Saved history for device {device_id}")
+                        
+                except Exception as e:
+                    logger.error(f"[Capture] Error saving result: {e}")
+                finally:
+                    db.close()
+
+            except subprocess.TimeoutExpired:
+                logger.warning("[Capture] FFmpeg timed out grabbing frame")
+                time.sleep(2)
             except Exception as e:
-                logger.error(f"[Capture] Error saving result: {e}")
-            finally:
-                db.close()
-                
+                 # logger.error(f"[Capture] FFmpeg error: {e}") 
+                 # Reduce log noise
+                 time.sleep(5)
+
         except Exception as e:
             logger.error(f"[Capture] Loop error: {e}")
             time.sleep(5)
-            
-    # Cleanup
-    if cap and cap.isOpened():
-        cap.release()
     logger.info(f"[Capture] Stopped loop for device {device_id}")
 
 
@@ -170,8 +185,13 @@ def start_stream(device_id: int, rtsp_url: str) -> Optional[str]:
         if url_lower.startswith('rtsp://'):
             cmd += ["-rtsp_transport", "tcp"]
         else:
-            # DroidCam / HTTP MJPEG streams need explicit demuxer
-            cmd += ["-f", "mjpeg", "-analyzeduration", "0", "-probesize", "32"]
+            # DroidCam / HTTP MJPEG streams need explicit demuxer AND headers for Ngrok
+            cmd += [
+                "-headers", "ngrok-skip-browser-warning: 69420\r\nUser-Agent: FFMPEG", 
+                "-f", "mjpeg", 
+                "-analyzeduration", "0", 
+                "-probesize", "32"
+            ]
         cmd += [
             "-i", rtsp_url,
             "-c:v",
@@ -251,7 +271,12 @@ def start_stream_temp(key: str, rtsp_url: str) -> Optional[str]:
         if url_lower.startswith('rtsp://'):
             cmd += ["-rtsp_transport", "tcp"]
         else:
-            cmd += ["-f", "mjpeg", "-analyzeduration", "0", "-probesize", "32"]
+             cmd += [
+                "-headers", "ngrok-skip-browser-warning: 69420\r\nUser-Agent: FFMPEG", 
+                "-f", "mjpeg", 
+                "-analyzeduration", "0", 
+                "-probesize", "32"
+            ]
         cmd += [
             "-i", rtsp_url,
             "-c:v",
