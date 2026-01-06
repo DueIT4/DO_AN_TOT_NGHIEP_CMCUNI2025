@@ -47,11 +47,10 @@ def hls_url_for_temp(key: str) -> str:
 # =========================================================================
 def _capture_loop(device_id: int, rtsp_url: str, stop_event: threading.Event):
     """
-    Chạy ngầm: cứ 10s capture 1 frame và chạy detection + lưu lịch sử.
+    Chạy ngầm: cứ 60s capture 1 frame và chạy detection + lưu lịch sử.
     """
     logger.info(f"[Capture] Started auto-capture loop for device {device_id}")
     
-    cap = None
     last_capture_time = 0
     capture_interval = 60.0 # seconds
     

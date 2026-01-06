@@ -305,8 +305,8 @@ def save_detection_result(
                 primary_disease_id = disease_obj.disease_id
 
     # 4) Lưu DUY NHẤT một dòng vào bảng Detection
-    # ✅ FIX: Đảm bảo description và class_name luôn là tiếng Việt
-    from app.services.inference_service import VN_LABELS # Import ở đầu file hoặc tại đây
+    # Dữ liệu từ inference_service đã được map sang tiếng Việt (hoặc giữ nguyên tên gốc)
+    # nên ta lưu thẳng vào DB.
 
     det_row = Detection(
         img_id=img_row.img_id,
@@ -315,10 +315,7 @@ def save_detection_result(
         description=description_text,
         treatment_guideline=guideline_text,
         # Lưu toàn bộ list detections vào cột bbox
-        bbox={"all_detections": [
-            {**d, "class_name": VN_LABELS.get(d.get("class_name"), d.get("class_name"))} 
-            for d in detections_list
-        ]}, 
+        bbox={"all_detections": detections_list}, 
         review_status="pending",
         model_version=model_version,
         # ✅ FIX DATE: Dùng UTC để endpoint mobile hiển thị đúng giờ local

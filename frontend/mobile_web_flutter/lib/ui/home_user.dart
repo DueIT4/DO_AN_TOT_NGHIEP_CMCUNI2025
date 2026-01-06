@@ -631,6 +631,7 @@ class _DroicamViewState extends State<DroicamView> {
             headers: {
               ...ApiClient.authHeaders(),
               'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true', // ✅ NEW Header
             },
             body: jsonEncode({'device_id': widget.deviceId}),
           )

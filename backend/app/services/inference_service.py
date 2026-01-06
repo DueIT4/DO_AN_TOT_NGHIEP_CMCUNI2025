@@ -2,22 +2,20 @@
 import os
 from io import BytesIO
 from typing import List, Dict, Any
-from pathlib import Path  # Nên dùng Pathlib cho chuyên nghiệp
+from pathlib import Path
 
 from ultralytics import YOLO
 from PIL import Image
 
-# 1. Xác định đường dẫn gốc của thư mục 'app'
-# File này ở: backend/app/services/inference_service.py
-# .parent -> services/
-# .parent.parent -> app/
+# 1. Xác định đường dẫn gốc
 APP_ROOT = Path(__file__).resolve().parent.parent
 
-# 2. Cấu hình đường dẫn Model
-# Nếu bạn đã copy best.pt vào backend/app/weights/best.pt
+# 2. Cấu hình đường dẫn Model & Labels
 DEFAULT_MODEL_PATH = str(APP_ROOT / "weights" / "best.pt")
+LABEL_PATH = str(APP_ROOT / "weights" / "labels.txt")
 
 MODEL_PATH = os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH)
+
 # 🔹 Map nhãn YOLO -> tên tiếng Việt
 VN_LABELS = {
     "pomelo_leaf_healthy": "Lá bưởi khỏe mạnh",
@@ -27,14 +25,27 @@ VN_LABELS = {
     "pomelo_fruit_scorch": "Quả bưởi bị cháy / nám vỏ",
 }
 
-
 class YoloDetector:
-    def __init__(self, model_path: str = MODEL_PATH):
+    def __init__(self, model_path: str = MODEL_PATH, label_path: str = LABEL_PATH):
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model not found: {model_path}")
 
-        self.model = YOLO(model_path)    # YOLO sẽ tự xử lý toàn bộ ảnh
-        self.names = self.model.names    # id -> class_name
+        self.model = YOLO(model_path)
+        
+        # 🟢 Load Labels from file if exists (User Request)
+        self.class_names = []
+        if os.path.exists(label_path):
+            try:
+                with open(label_path, "r", encoding="utf-8") as f:
+                    self.class_names = [line.strip() for line in f.readlines() if line.strip()]
+                print(f"✅ Loaded {len(self.class_names)} labels from {label_path}")
+            except Exception as e:
+                print(f"⚠️ Error loading labels.txt: {e}")
+                self.class_names = []
+        
+        # Fallback to model names if file empty/missing
+        if not self.class_names:
+            self.class_names = self.model.names
 
     def predict_bytes(
         self,
@@ -43,8 +54,12 @@ class YoloDetector:
         iou: float = 0.5,
     ) -> Dict[str, Any]:
         """Predict + tự tạo giải thích nếu không phát hiện được bệnh"""
-
-        img = Image.open(BytesIO(raw_bytes)).convert("RGB")
+        
+        try:
+            img = Image.open(BytesIO(raw_bytes)).convert("RGB")
+        except Exception:
+            # Nếu bytes lỗi
+            return self._no_detection_explanation()
 
         results = self.model.predict(
             img,
@@ -55,8 +70,8 @@ class YoloDetector:
         )
 
         detections: List[Dict[str, Any]] = []
+        
         if not results:
-            # trường hợp YOLO không trả output
             return self._no_detection_explanation()
 
         r = results[0]
@@ -72,7 +87,18 @@ class YoloDetector:
             conf_val = float(box.conf[0].item())
             x1, y1, x2, y2 = box.xyxy[0].tolist()
 
-            class_key = self.names.get(cls_id, str(cls_id))
+            # ✅ FIX: Lookup Safely using loaded class_names list/dict
+            # self.class_names could be a list or dict depending on source
+            class_key = "unknown"
+            
+            if isinstance(self.class_names, list) and 0 <= cls_id < len(self.class_names):
+                class_key = self.class_names[cls_id]
+            elif isinstance(self.class_names, dict) and cls_id in self.class_names:
+                class_key = self.class_names[cls_id]
+            else:
+                class_key = str(cls_id)
+
+            # Map to Vietnamese
             class_vi = VN_LABELS.get(class_key, class_key)
 
             detections.append({
@@ -88,12 +114,9 @@ class YoloDetector:
         return {
             "num_detections": len(detections),
             "detections": detections,
-            "explanation": None  # Có bệnh → Không cần giải thích lỗi
+            "explanation": None
         }
 
-    # ============================================
-    # 🔥 Hàm sinh giải thích khi không phát hiện được bệnh
-    # ============================================
     def _no_detection_explanation(self) -> Dict[str, Any]:
         return {
             "num_detections": 0,
@@ -101,53 +124,20 @@ class YoloDetector:
             "explanation": (
                 "Hệ thống không phát hiện được triệu chứng bệnh rõ ràng trên hình ảnh.\n"
                 "\n"
-                "📌 **Có thể do một trong các nguyên nhân sau:**\n"
-                "• Lá hoặc quả đang khỏe mạnh.\n"
-                "• Ảnh chụp quá xa, vùng bệnh quá nhỏ để AI nhận diện.\n"
-                "• Ảnh bị mờ, thiếu sáng hoặc bị nén (ảnh JPEG nén mạnh).\n"
-                "• Ảnh screenshot (không phải ảnh gốc từ camera).\n"
-                "• Bệnh không nằm trong các nhóm bệnh mà mô hình đã được huấn luyện.\n"
-                "\n"
-                "👉 **Gợi ý để hệ thống nhận diện chính xác hơn:**\n"
-                "• Chụp gần vùng nghi là có bệnh (cách 15–25 cm).\n"
-                "• Chụp trong điều kiện đủ sáng, không rung tay.\n"
-                "• Tránh để nhiều lá/đối tượng khác trong ảnh.\n"
-                "• Dùng ảnh gốc từ camera, không chụp lại màn hình.\n"
-                "\n"
-                "Bạn có thể thử chụp lại và gửi ảnh mới để hệ thống phân tích chính xác hơn."
+                "📌 **Có thể do:** Lá/quả khỏe mạnh, ảnh mờ, hoặc chụp quá xa.\n"
+                "👉 **Gợi ý:** Chụp gần (15-25cm), đủ sáng, rõ nét."
             )
         }
 
-# ... (Giữ nguyên phần code phía trên của bạn cho đến hết class YoloDetector)
-
 # ============================================
-# 🔥 Khởi tạo instance dùng chung kèm Log chi tiết
+# 🔥 Khởi tạo instance dùng chung
 # ============================================
 detector: YoloDetector | None = None
 
-print(f"--- Đang kiểm tra Model tại: {MODEL_PATH} ---")
-
-if not os.path.exists(MODEL_PATH):
-    print(f"❌ LỖI NGHIÊM TRỌNG: Không tìm thấy file model tại {MODEL_PATH}")
-    # Liệt kê các file đang có trong thư mục weights để kiểm tra
-    weights_dir = os.path.dirname(MODEL_PATH)
-    if os.path.exists(weights_dir):
-        print(f"Danh sách file trong {weights_dir}: {os.listdir(weights_dir)}")
-    else:
-        print(f"Thư mục {weights_dir} cũng không tồn tại!")
-else:
-    print(f"✅ Đã thấy file model. Bắt đầu nạp vào YOLO...")
-
+print(f"--- Init Detector ---")
 try:
-    # Thử nạp model
     detector = YoloDetector(MODEL_PATH)
-    print("🚀 YOLO Detector đã khởi tạo thành công!")
-except FileNotFoundError as e:
-    print(f"❌ Lỗi FileNotFoundError: {e}")
-    detector = None
+    print("🚀 YOLO Detector Ready!")
 except Exception as e:
-    # Bắt tất cả các lỗi khác (ví dụ: thiếu thư viện cv2, torch, v.v.)
-    print(f"❌ LỖI HỆ THỐNG khi nạp Model: {str(e)}")
-    import traceback
-    traceback.print_exc() # In chi tiết lỗi hệ thống ra Log
+    print(f"❌ Error init detector: {e}")
     detector = None
