@@ -243,15 +243,10 @@ def save_detection_result(
 
     # ⚠️ CRITICAL FIX: Bảng Img yêu cầu file_url NOT NULL.
     # Nếu không có URL (do lỗi upload), ta dùng ảnh placeholder hoặc bỏ qua.
+    # ⚠️ CRITICAL FIX: Nếu upload thất bại, DÙNG ẢNH PLACEHOLDER để vẫn lưu được lịch sử
     if not image_url:
-        print("[DetectService] 🛑 Abort saving: No image URL available.")
-        # Trả về dummy dict để không crash caller, nhưng không lưu DB
-        return {
-            "img_id": None,
-            "file_url": None,
-            "detection_id": None,
-            "error": "Failed to upload image"
-        }
+        print("[DetectService] ⚠️ Upload failed. Using placeholder to save detection result.")
+        image_url = "https://placehold.co/600x400?text=Check+History+Details"
 
     # 1) Lưu thông tin ảnh
     img_row = Img(

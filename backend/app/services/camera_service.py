@@ -46,8 +46,9 @@ def capture_image_from_stream(stream_url: str, timeout: int = 20) -> Optional[by
                 "ngrok-skip-browser-warning": "69420",
                 "User-Agent": "ZestGuard-Backend"
             }
-            # ✅ FIX: verify=False để tránh lỗi SSLEOFError với Ngrok
-            resp = requests.get(stream_url, timeout=timeout, stream=True, verify=False, headers=headers)
+            # ✅ FIX: Explicit connect/read timeout to prevent hanging
+            # timeout=(connect_timeout, read_timeout)
+            resp = requests.get(stream_url, timeout=(5, timeout), stream=True, verify=False, headers=headers)
             resp.raise_for_status()
 
             content_type = (resp.headers.get("content-type") or "").lower()
@@ -234,19 +235,29 @@ def capture_multiple_images(
     import time
 
     images: list[bytes] = []
+    logger.info(f"[Capture] Start collecting {count} images for device {device_id} from {stream_url}")
+
     for i in range(count):
         img_data = None
-
+        
+        # 1. Try HLS First
         if device_id is not None:
+            logger.debug(f"[Capture] Attempt {i+1}: Trying HLS...")
             img_data = _capture_image_from_hls(device_id)
 
+        # 2. Fallback to Stream
         if img_data is None:
-            img_data = capture_image_from_stream(stream_url)
+            logger.debug(f"[Capture] Attempt {i+1}: HLS failed/unavailable. Trying Stream...")
+            img_data = capture_image_from_stream(stream_url, timeout=10) # Enforce 10s timeout
 
         if img_data:
+            logger.debug(f"[Capture] Attempt {i+1}: Success ({len(img_data)} bytes)")
             images.append(img_data)
+        else:
+            logger.warning(f"[Capture] Attempt {i+1}: Failed to capture image.")
 
         if i < count - 1:
             time.sleep(interval)
-
+    
+    logger.info(f"[Capture] Finished. Captured {len(images)}/{count} images.")
     return images
