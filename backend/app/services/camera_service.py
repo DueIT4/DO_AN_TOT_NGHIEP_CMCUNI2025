@@ -22,7 +22,7 @@ except ImportError:
     CV2_AVAILABLE = False
     logger.warning("OpenCV không có sẵn, RTSP/HLS sẽ không hoạt động")
 
-def capture_image_from_stream(stream_url: str, timeout: int = 10) -> Optional[bytes]:
+def capture_image_from_stream(stream_url: str, timeout: int = 20) -> Optional[bytes]:
     """
     Lấy ảnh từ camera stream_url.
 
@@ -42,7 +42,12 @@ def capture_image_from_stream(stream_url: str, timeout: int = 10) -> Optional[by
     try:
         # ===== HTTP SNAPSHOT / MJPEG =====
         if stream_url.startswith("http://") or stream_url.startswith("https://"):
-            resp = requests.get(stream_url, timeout=timeout, stream=True)
+            headers = {
+                "ngrok-skip-browser-warning": "69420",
+                "User-Agent": "ZestGuard-Backend"
+            }
+            # ✅ FIX: verify=False để tránh lỗi SSLEOFError với Ngrok
+            resp = requests.get(stream_url, timeout=timeout, stream=True, verify=False, headers=headers)
             resp.raise_for_status()
 
             content_type = (resp.headers.get("content-type") or "").lower()
