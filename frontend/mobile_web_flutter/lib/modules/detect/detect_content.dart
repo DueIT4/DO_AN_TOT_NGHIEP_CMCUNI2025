@@ -5,7 +5,7 @@ import 'dart:typed_data';
 
 // *** chỉ dùng được trên Web, nếu app mobile dùng chung file này thì nên tách riêng
 // *** chỉ dùng được trên Web, nếu app mobile dùng chung file này thì nên tách riêng
-import 'dart:html' as html;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -48,15 +48,15 @@ class _DetectContentState extends State<DetectContent>
     super.dispose();
   }
 
-  String _ensureClientKey() {
+  Future<String> _ensureClientKey() async {
     if (_clientKeyCache != null && _clientKeyCache!.isNotEmpty) {
       return _clientKeyCache!;
     }
-    final storage = html.window.localStorage;
-    var key = storage['client_key'];
+    final prefs = await SharedPreferences.getInstance();
+    var key = prefs.getString('client_key');
     if (key == null || key.isEmpty) {
       key = const Uuid().v4();
-      storage['client_key'] = key;
+      await prefs.setString('client_key', key);
     }
     _clientKeyCache = key;
     return key;
@@ -103,7 +103,7 @@ class _DetectContentState extends State<DetectContent>
       final uri = Uri.parse('${ApiBase.baseURL}$_detectPath');
       final req = http.MultipartRequest("POST", uri);
 
-      final clientKey = _ensureClientKey();
+      final clientKey = await _ensureClientKey();
       req.headers['X-Client-Key'] = clientKey;
 
       if (ApiBase.bearerToken != null && ApiBase.bearerToken!.isNotEmpty) {
