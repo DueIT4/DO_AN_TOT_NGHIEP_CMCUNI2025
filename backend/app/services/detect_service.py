@@ -236,7 +236,10 @@ def save_detection_result(
     if not image_url and raw:
         try:
             image_url = upload_image_to_cloudinary(raw, folder="zestguard/stream_detect")
-        except Exception:
+            if not image_url:
+                print(f"[DetectService] ❌ Upload Cloudinary thất bại (trả về None)")
+        except Exception as e:
+            print(f"[DetectService] ❌ Lỗi upload ảnh: {e}")
             pass # Vẫn lưu DB dẫu lỗi upload (file_url=None)
 
     # 1) Lưu thông tin ảnh (luôn duy nhất 1 dòng)
@@ -282,13 +285,18 @@ def save_detection_result(
         
         if detections_list:
             best_det = max(detections_list, key=lambda x: x.get("confidence", 0))
-            class_name_vi = best_det.get("class_name")
+            # ✅ FIX: Map sang tiếng Việt
+            raw_class_name = best_det.get("class_name")
+            class_name_vi = VN_LABELS.get(raw_class_name, raw_class_name)
             
             disease_obj = ensure_disease(db, class_name_vi) if class_name_vi else None
             if disease_obj:
                 primary_disease_id = disease_obj.disease_id
 
     # 4) Lưu DUY NHẤT một dòng vào bảng Detection
+    # ✅ FIX: Đảm bảo description và class_name luôn là tiếng Việt
+    from app.services.inference_service import VN_LABELS # Import ở đầu file hoặc tại đây
+
     det_row = Detection(
         img_id=img_row.img_id,
         disease_id=primary_disease_id,
@@ -296,7 +304,10 @@ def save_detection_result(
         description=description_text,
         treatment_guideline=guideline_text,
         # Lưu toàn bộ list detections vào cột bbox
-        bbox={"all_detections": detections_list}, 
+        bbox={"all_detections": [
+            {**d, "class_name": VN_LABELS.get(d.get("class_name"), d.get("class_name"))} 
+            for d in detections_list
+        ]}, 
         review_status="pending",
         model_version=model_version,
         # ✅ FIX DATE: Dùng UTC để endpoint mobile hiển thị đúng giờ local

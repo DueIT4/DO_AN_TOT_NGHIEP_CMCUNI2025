@@ -447,6 +447,36 @@ def check_stream_health(device_id: int) -> dict:
         proc_info = _procs.get(device_id)
         
         if not proc_info:
+            # ✅ FALLBACK: Check OpenCV Stream (New Approach)
+            # Chúng ta cần tra cứu URL từ DB để lấy session_id
+            try:
+                db = SessionLocal()
+                from app.models.devices import Device
+                import hashlib
+                from app.services.opencv_hls_service import get_stream_status
+                
+                device = db.query(Device).filter(Device.device_id == device_id).first()
+                if device and device.stream_url:
+                    session_id = hashlib.md5(device.stream_url.encode()).hexdigest()[:8]
+                    status = get_stream_status(session_id)
+                    
+                    if status:
+                        # Map OpenCV status to Health dict
+                        return {
+                            'healthy': status['running'] and status['playlist_exists'],
+                            'running': status['running'],
+                            'error': status.get('error'),
+                            'hls_exists': status['playlist_exists'],
+                            'last_update': status['uptime'],
+                            'type': 'opencv'
+                        }
+            except Exception as e:
+                logger.error(f"[StreamHealth] Error checking OpenCV stream: {e}")
+            finally:
+                if 'db' in locals():
+                    db.close()
+
+            # Nếu không tìm thấy ở cả 2 nơi
             return {
                 'healthy': False,
                 'running': False,

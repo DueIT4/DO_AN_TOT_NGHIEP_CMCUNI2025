@@ -54,27 +54,27 @@ async def detect_image(
     explanation = yolo_result.get("explanation")
 
     # 🔥 AI CROSS-CHECK: Restore logic (with fixed Client)
-    gemini_says_no = False
-    if detections_list:
-        is_plant = verify_image_is_plant(raw)
-        if not is_plant:
-            gemini_says_no = True
+    # gemini_says_no = False
+    # if detections_list:
+    #     is_plant = verify_image_is_plant(raw)
+    #     if not is_plant:
+    #         gemini_says_no = True
             
     # Logic kết hợp: Gemini là trọng tài chính xác nhất về ngữ cảnh.
     # Nếu Gemini bảo KHÔNG (gemini_says_no), ta sẽ hủy kết quả YOLO trừ khi YOLO cực kỳ chắc chắn (> 98%).
     # Logo hoặc hình vẽ thường bị YOLO nhận nhầm với độ tin cậy cao (85-95%), nên ngưỡng 0.65 cũ quá thấp.
     
     # 🔥 FIX: Tính lại max_conf_check (bị mất ở bước trước)
-    max_conf_check = max((d.get("confidence", 0) for d in detections_list), default=0.0) if detections_list else 0.0
+    # max_conf_check = max((d.get("confidence", 0) for d in detections_list), default=0.0) if detections_list else 0.0
 
-    if gemini_says_no and max_conf_check < 0.98:
-            # Gemini bảo KHÔNG phải cây -> Hủy kết quả YOLO
-            detections_list = []
-            num_detections = 0
-            explanation = "Không phát hiện bệnh cây trồng trên ảnh (Ảnh không hợp lệ), vui lòng chụp lại."
-            yolo_result["detections"] = []
-            yolo_result["num_detections"] = 0
-            yolo_result["explanation"] = explanation
+    # if gemini_says_no and max_conf_check < 0.98:
+    #         # Gemini bảo KHÔNG phải cây -> Hủy kết quả YOLO
+    #         detections_list = []
+    #         num_detections = 0
+    #         explanation = "Không phát hiện bệnh cây trồng trên ảnh (Ảnh không hợp lệ), vui lòng chụp lại."
+    #         yolo_result["detections"] = []
+    #         yolo_result["num_detections"] = 0
+    #         yolo_result["explanation"] = explanation
 
     # 3. Gọi LLM để tóm tắt và hướng dẫn (Chỉ gọi nếu confidence >= 0.4)
     max_conf = 0.0

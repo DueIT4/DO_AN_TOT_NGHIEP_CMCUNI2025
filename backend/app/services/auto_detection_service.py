@@ -84,7 +84,12 @@ def analyze_disease_trend(recent_detections: List[Dict[str, Any]]) -> Dict[str, 
 
     for det in recent_detections:
         disease_name = det.get('disease_name')
-        if disease_name and disease_name not in ['Không xác định', 'pomelo_leaf_healthy', 'pomelo_fruit_healthy']:
+        # ✅ FIX: Thêm tên tiếng Việt vào danh sách loại trừ
+        if disease_name and disease_name not in [
+            'Không xác định', 
+            'pomelo_leaf_healthy', 'Lá bưởi khỏe mạnh',
+            'pomelo_fruit_healthy', 'Quả bưởi khỏe mạnh'
+        ]:
             disease_counts[disease_name] += 1
             disease_confidences.setdefault(disease_name, []).append(det.get('confidence', 0.0))
 
@@ -313,8 +318,9 @@ def detect_from_camera_auto(
 
                 healthy_classes = {'pomelo_leaf_healthy', 'pomelo_fruit_healthy'}
                 for det in all_detections:
-                    class_name = det.get('class_name', '')
-                    if class_name and class_name not in healthy_classes:
+                    # ✅ FIX: Kiểm tra class_key (key gốc tiếng Anh) thay vì class_name (đã dịch tiếng Việt)
+                    class_key = det.get('class_key', '')
+                    if class_key and class_key not in healthy_classes:
                         has_disease = True
                         break
             except Exception as e:
@@ -323,8 +329,17 @@ def detect_from_camera_auto(
         notification_created = False
         if has_disease and device.user_id:
             try:
-                # ✅ Lấy tên bệnh và chuyển sang tiếng Việt
-                disease_names = [d.get('class_name', '') for d in all_detections if d.get('class_name')]
+                # ✅ FIX: Lấy tên bệnh và chuyển sang tiếng Việt dùng VN_LABELS
+                from app.services.inference_service import VN_LABELS
+                
+                disease_names = []
+                for d in all_detections:
+                    raw_name = d.get('class_name', '')
+                    if raw_name:
+                        # Map sang tiếng Việt nếu là key tiếng Anh, hoặc giữ nguyên nếu đã là TV
+                        vi_name = VN_LABELS.get(raw_name, raw_name)
+                        disease_names.append(vi_name)
+                        
                 disease_counts = Counter(disease_names)
                 if disease_counts:
                     most_common_disease = disease_counts.most_common(1)[0][0]

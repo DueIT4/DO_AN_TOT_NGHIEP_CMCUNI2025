@@ -25,7 +25,6 @@ VN_LABELS = {
     "pomelo_leaf_yellowing": "Lá bưởi bị vàng lá",
     "pomelo_fruit_healthy": "Quả bưởi khỏe mạnh",
     "pomelo_fruit_scorch": "Quả bưởi bị cháy / nám vỏ",
-    "unknown": "Không xác định",
 }
 
 
