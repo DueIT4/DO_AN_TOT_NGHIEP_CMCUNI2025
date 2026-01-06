@@ -78,7 +78,7 @@ def capture_image_from_stream(stream_url: str, timeout: int = 20) -> Optional[by
         logger.error(f"[Camera] Error fetching from {stream_url}: {e}")
         return None
     except Exception as e:
-        logger.error(f"[Camera] Unexpected error: {e}")
+        logger.error(f"[Camera] Unexpected error capturing {stream_url}: {e}")
         return None
 
 def _extract_frame_from_mjpeg(resp: requests.Response, max_bytes: int = 2_000_000) -> Optional[bytes]:
@@ -206,6 +206,7 @@ def _capture_image_from_hls(device_id: int) -> Optional[bytes]:
         output = BytesIO()
         img.save(output, format="JPEG", quality=85)
         output.seek(0)
+        logger.info(f"[Camera] Successfully captured context from HLS for device {device_id}")
         return output.getvalue()
 
     except Exception as e:

@@ -29,12 +29,15 @@ from app.models import user, role, auth_account  # noqa: F401
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-# Kiểm tra log xem đã nhận được Cloudinary URL chưa (Giải quyết lỗi 500)
+# Kiểm tra log xem đã nhận được Cloudinary URL hoặc API Key chưa
 c_url = os.getenv("CLOUDINARY_URL")
+api_key = os.getenv("CLOUDINARY_API_KEY")
 if c_url:
-    logger.info(f"🚀 Cloudinary Configured: {c_url[:20]}...")
+    logger.info(f"🚀 Cloudinary Configured via URL: {c_url[:20]}...")
+elif api_key:
+    logger.info(f"🚀 Cloudinary Configured via API Key: {api_key[:5]}*****")
 else:
-    logger.warning("⚠️ CLOUDINARY_URL không tìm thấy trong file .env - Sẽ gây lỗi 500 khi upload")
+    logger.warning("⚠️ CLOUDINARY configuration missing in .env - Uploads will fail!")
 
 # Bắt buộc gọi trước khi tạo app nếu có relationships phức tạp
 # configure_mappers()

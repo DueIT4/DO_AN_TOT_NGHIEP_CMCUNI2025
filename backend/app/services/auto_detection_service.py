@@ -194,7 +194,7 @@ def detect_from_camera_auto(
             device.stream_url,
             count=num_images,
             interval=1.0,
-            device_id=None,  # Lấy trực tiếp từ stream_url
+            device_id=device.device_id,  # ✅ FIX: Truyền device_id để ưu tiên lấy từ HLS (nếu đang stream)
         )
 
         if not images:

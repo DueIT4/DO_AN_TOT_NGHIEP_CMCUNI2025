@@ -101,12 +101,12 @@ def start_scheduler():
         logger.warning("[Scheduler] Scheduler đã chạy rồi!")
         return
 
-    # Thu thập ảnh từ camera mỗi 30 giây
+    # Thu thập ảnh từ camera mỗi 1 phút
     scheduler.add_job(
         scan_all_cameras,
-        trigger=IntervalTrigger(seconds=30),
+        trigger=IntervalTrigger(minutes=1),
         id='auto_scan_every_30s',
-        name='Thu thập ảnh từ camera mỗi 30 giây',
+        name='Thu thập ảnh từ camera mỗi 1 phút',
         replace_existing=True,
         max_instances=1,
         coalesce=True,
@@ -137,7 +137,7 @@ def start_scheduler():
 
     scheduler.start()
     logger.info("[Scheduler] Đã khởi động scheduler:")
-    logger.info("  - Thu thập ảnh từ camera mỗi 30 giây")
+    logger.info("  - Thu thập ảnh từ camera mỗi 1 phút")
     logger.info("  - Cleanup HLS sessions mỗi 10 phút")
     logger.info("  - Kiểm tra cảnh báo sensor mỗi 30 giây")
 

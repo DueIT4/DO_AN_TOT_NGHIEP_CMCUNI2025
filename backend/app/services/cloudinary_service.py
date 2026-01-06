@@ -15,16 +15,23 @@ cloudinary.config(
 
 def upload_image_to_cloudinary(raw_bytes: bytes, folder: str = "zestguard/general") -> str:
     """Dành cho ảnh (Avatar, Detection)"""
-    try:
-        response = cloudinary.uploader.upload(
-            raw_bytes,
-            folder=folder, #
-            resource_type="image" #
-        )
-        return response.get("secure_url")
-    except Exception as e:
-        logger.error(f"❌ Cloudinary Image Upload Error: {str(e)}")
-        return None
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = cloudinary.uploader.upload(
+                raw_bytes,
+                folder=folder, #
+                resource_type="image" #
+            )
+            return response.get("secure_url")
+        except Exception as e:
+            logger.warning(f"⚠️ Cloudinary Upload Failed (Attempt {attempt+1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2)  # Wait 2 seconds before retry
+            else:
+                logger.error(f"❌ Cloudinary Image Upload Error after {max_retries} attempts: {str(e)}")
+                return None
 
 def upload_dataset_to_cloudinary(raw_bytes: bytes, filename: str, folder: str = "zestguard/datasets") -> str:
     """
