@@ -321,6 +321,17 @@ def save_detection_result(
     db.flush()
     print(f"[DetectService] Added Detection ID: {det_row.detection_id}, Disease ID: {primary_disease_id}")
     
+    # ✅ FIX: Commit Detection ngay lập tức để đảm bảo lịch sử được lưu
+    # kể cả khi Notification bị lỗi sau đó.
+    try:
+        db.commit()
+        db.refresh(det_row) # Refresh để lấy ID và các trường default
+        print(f"[DetectService] ✅ Saved Detection ID: {det_row.detection_id}")
+    except Exception as e:
+        print(f"[DetectService] ❌ Failed to commit detection: {e}")
+        db.rollback()
+        raise e
+
     # 5) Tự động tạo thông báo (Notification) nếu là Camera + Có bệnh + Không spam (30p/lần)
     if create_alert and device_id and primary_disease_id:
         try:
@@ -358,15 +369,12 @@ def save_detection_result(
                         )
                         db.add(new_noti)
                         db.commit()
+                        print(f"[DetectService] ✅ Created Notification for Detection {det_row.detection_id}")
         except Exception as e:
             # Không để lỗi notify làm hỏng luồng chính
             print(f"[DetectService] Error creating notification: {e}")
-
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise e
+            # Quan trọng: Rollback phần notification nếu lỗi để session sạch sẽ
+            db.rollback()
 
     return {
         "img_id": img_row.img_id,
