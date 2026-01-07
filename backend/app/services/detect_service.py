@@ -179,34 +179,55 @@ def save_detection_result(
             disease_record = db.query(Disease).filter(Disease.disease_id == primary_disease_id).first()
             if disease_record:
                 d_name = disease_record.name.lower()
-                # Chỉ báo nếu KHÔNG PHẢI Healthy / Không xác định
-                if "healthy" not in d_name and "không xác định" not in d_name:
+                dev_name = "Camera"
+                # Lấy tên Device
+                device_obj = db.query(Device).filter(Device.device_id == device_id).first()
+                if device_obj:
+                     dev_name = device_obj.name
+
+                # Rate Limit Check (chung cho mọi loại thông báo để tránh spam)
+                cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+                recent_noti = db.query(Notifications).filter(
+                    Notifications.user_id == user_id,
+                    Notifications.created_at >= cutoff,
+                    Notifications.description.like(f"%{disease_record.name}%")
+                ).first()
+
+                if not recent_noti:
+                    # CASE 1: Bệnh Khỏe -> KHÔNG GỬI
+                    if "healthy" in d_name or "khỏe" in d_name:
+                        logger.info(f"[DetectService] Skip notification for healthy: {disease_record.name}")
                     
-                    # Rate Limit: Kiểm tra xem 30 phút qua đã báo bệnh này chưa
-                    cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
-                    
-                    recent_noti = db.query(Notifications).filter(
-                        Notifications.user_id == user_id,
-                        Notifications.created_at >= cutoff,
-                        Notifications.description.like(f"%{disease_record.name}%")
-                    ).first()
-                    
-                    if not recent_noti:
-                        # Lấy tên Device
-                        device_obj = db.query(Device).filter(Device.device_id == device_id).first()
-                        dev_name = device_obj.name if device_obj else f"Camera #{device_id}"
-                        
+                    # CASE 2: Không xác định -> Gửi thông báo ảnh không hỗ trợ
+                    elif "không xác định" in d_name or "unknown" in d_name:
                         new_noti = Notifications(
                             user_id=user_id,
-                            title=f"⚠️ Cảnh báo: {disease_record.name}",
-                            description=f"Phát hiện tại {dev_name}.\n{description_text or 'Vui lòng kiểm tra cây trồng.'}",
+                            title="📷 Thông báo ảnh tự động",
+                            description=f"Hình ảnh thu được từ {dev_name} hệ thống không hỗ trợ phát hiện bệnh.",
                             created_at=datetime.now(timezone.utc)
                         )
                         db.add(new_noti)
-                        logger.info(f"[DetectService] ✅ Created notification for user {user_id}: {disease_record.name}")
+                        db.commit()
+                        logger.info(f"[DetectService] Created 'Unknown' notification for user {user_id}")
+
+                    # CASE 3: Có bệnh -> Gửi thông báo hiện trạng
+                    else:
+                        new_noti = Notifications(
+                            user_id=user_id,
+                            title="📢 Thông báo hiện trạng vườn",
+                            description=f"Đang phát hiện {disease_record.name} tại {dev_name}.\nVui lòng kiểm tra chi tiết trong lịch sử trang Phân tích.",
+                            created_at=datetime.now(timezone.utc)
+                        )
+                        db.add(new_noti)
+                        db.commit()
+                        logger.info(f"[DetectService] Created 'Disease' notification for user {user_id}: {disease_record.name}")
+
         except Exception as e:
             # Không để lỗi notify làm hỏng luồng chính
             logger.error(f"[DetectService] Error creating notification: {e}", exc_info=True)
+            # Quan trọng: Rollback phần notification nếu lỗi để session sạch sẽ
+            db.rollback()
+            raise e
 
     try:
         db.commit()

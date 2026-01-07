@@ -141,8 +141,11 @@ async def detect_image(
         response_data["file_url"] = saved.get("file_url")
         response_data["img"]["img_id"] = saved.get("img_id")
         response_data["img"]["file_url"] = saved.get("file_url")
+        # ✅ Truyền detection_id về FE để highlight
+        response_data["detection_id"] = saved.get("detection_id")
+        response_data["id"] = saved.get("detection_id") # Hỗ trợ cả 2 key cho chắc/tương thích model cũ
 
-        logger.info(f"[Detect API] Saved for user {current_user.user_id}: {best_disease} ({max_conf:.2f})")
+        logger.info(f"[DetectService] Saved for user {current_user.user_id}: {best_disease} ({max_conf:.2f})")
         
     except Exception as e:
         # ✅ CRITICAL: Không để lỗi lưu DB làm crash API

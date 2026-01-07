@@ -188,7 +188,7 @@ class DetectionService {
 
       // Xử lý dữ liệu trả về từ tổ hợp YOLO + Gemini
       return DetectionRecord(
-        id: requestId,
+        id: (data['detection_id'] ?? requestId).toString(),
         diseaseName: (data['disease_name'] ?? 'Không xác định').toString(),
         accuracy: _normalizeConfidence(data['confidence']),
         detectedAt: DateTime.now(),

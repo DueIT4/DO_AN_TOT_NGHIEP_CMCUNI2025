@@ -43,10 +43,10 @@ class HomeShellState extends State<HomeShell> {
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), label: 'Camera'),
-          BottomNavigationBarItem(icon: Icon(Icons.sensors_outlined), label: 'Devices'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+          BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), label: 'Phân tích'),
+          BottomNavigationBarItem(icon: Icon(Icons.sensors_outlined), label: 'Thiết bị'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Tài khoản'),
         ],
       ),
     );

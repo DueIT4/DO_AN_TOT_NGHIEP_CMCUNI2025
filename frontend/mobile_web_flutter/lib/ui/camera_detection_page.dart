@@ -31,6 +31,9 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
 
   List<DetectionRecord> _history = const [];
 
+  // ✅ Add highlight ID state
+  String? _highlightId;
+
   @override
   void initState() {
     super.initState();
@@ -72,11 +75,15 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       );
 
       if (!mounted) return;
+      
+      // ✅ Set highlight for the new record
       setState(() {
-        _history = [record, ..._history]; // hiển thị ngay
+        _highlightId = record.id;
+        // Prepend temporarily for immediate feedback
+        _history = [record, ..._history]; 
       });
 
-      // ✅ quan trọng: đồng bộ lại list để lấy detection_id thật + % thật
+      // ✅ Re-fetch to ensure data consistency
       await _loadHistory();
 
       if (!mounted) return;
@@ -112,13 +119,12 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Camera & Nhận diện',
+                    'Phân tích bệnh',
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  // Removed refresh button as requested
                 ],
               ),
             ),
@@ -195,7 +201,13 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                       ..._history.map(
                         (record) => _DetectionCard(
                           record: record,
+                          isHighlighted: record.id == _highlightId, // ✅ Pass highlight status
                           onTap: () async {
+                            // ✅ Clear highlight on tap
+                            if (record.id == _highlightId) {
+                                setState(() => _highlightId = null);
+                            }
+
                             try {
                               final detId = _parseDetectionId(record);
                               if (detId == null) {
@@ -362,12 +374,16 @@ class _CameraPreviewBox extends StatelessWidget {
 class _DetectionCard extends StatelessWidget {
   final DetectionRecord record;
   final VoidCallback onTap;
+  final bool isHighlighted; // ✅ New Parameter
 
-  const _DetectionCard({required this.record, required this.onTap});
+  const _DetectionCard({
+    required this.record, 
+    required this.onTap,
+    this.isHighlighted = false, // Default false
+  });
 
   String _formattedDate() {
-    // Sửa timezone cho Việt Nam (UTC+7) -> dùng toLocal() để tự động theo máy
-    final vietnamTime = record.detectedAt.toLocal(); // detectedAt đã được parse đúng trong service
+    final vietnamTime = record.detectedAt.toLocal();
     return DateFormat('dd/MM/yyyy HH:mm').format(vietnamTime);
   }
 
@@ -403,8 +419,9 @@ class _DetectionCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isHighlighted ? const Color(0xFFF0FDF4) : Colors.white, // ✅ Light green bg if highlighted
           borderRadius: BorderRadius.circular(18),
+          border: isHighlighted ? Border.all(color: const Color(0xFF4B8D1F), width: 2) : null, // ✅ Green border if highlighted
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -413,70 +430,94 @@ class _DetectionCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(width: 72, height: 72, child: _buildImage()),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(width: 72, height: 72, child: _buildImage()),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          record.diseaseName,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 15),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F4D9),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          sourceLabel,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF4B8D1F),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              record.diseaseName,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600, 
+                                  fontSize: 15,
+                                  color: isHighlighted ? const Color(0xFF2E7D32) : Colors.black87 // ✅ Darker text if highlighted
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F4D9),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              sourceLabel,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF4B8D1F),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formattedDate(),
-                    style: const TextStyle(color: Colors.black54, fontSize: 13),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.speed, size: 16, color: Colors.orange),
-                      const SizedBox(width: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        '$percent% độ chính xác',
-                        style: const TextStyle(
-                          color: Colors.black87,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        _formattedDate(),
+                        style: const TextStyle(color: Colors.black54, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.speed, size: 16, color: Colors.orange),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$percent% độ chính xác',
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+            // ✅ "Mới" Badge
+            if (isHighlighted)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: const BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.only(
+                      topRight: Radius.circular(16), // Match container radius - border width
+                      bottomLeft: Radius.circular(12),
+                    ),
+                  ),
+                  child: const Text('MỚI', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ),
+          ]
         ),
       ),
     );

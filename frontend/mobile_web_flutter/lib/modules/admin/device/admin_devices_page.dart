@@ -482,8 +482,8 @@ Widget _buildRoleChip(String? roleType) {
                                 DataColumn(label: Text('Tên')),
                                 DataColumn(label: Text('Serial')),
                                 DataColumn(label: Text('Loại')),
-                                DataColumn(label: Text('IP / Stream URL')), // Thêm cột này
-                                DataColumn(label: Text('Cập nhật lúc')),     // Thêm cột này
+                                DataColumn(label: Text('IP / Stream URL')), 
+                                DataColumn(label: Text('Cập nhật lúc')),     
                                 DataColumn(label: Text('Trạng thái')),
                                 DataColumn(label: Text('Vị trí')),
                                 DataColumn(label: Text('Hành động')),
@@ -491,8 +491,8 @@ Widget _buildRoleChip(String? roleType) {
                               rows: devices.map((d) {
                                 final id = d['device_id'] as int;
                                 final name = (d['name'] ?? '').toString();
-                                final streamUrl = (d['stream_url'] ?? 'Chưa cấu hình').toString(); // Lấy từ DB
-                                final updatedAt = (d['updated_at'] ?? '-').toString();           // Lấy từ DB
+                                final streamUrl = (d['stream_url'] ?? 'Chưa cấu hình').toString(); 
+                                final updatedAtRaw = (d['updated_at'] ?? '').toString();           
                                 final serial = (d['serial_no'] ?? '').toString();
                                 final typeName = (d['device_type_name'] ??
                                         d['device_type_id']?.toString() ??
@@ -501,6 +501,21 @@ Widget _buildRoleChip(String? roleType) {
                                 final status = (d['status'] ?? '').toString();
                                 final location = (d['location'] ?? '').toString();
 
+                                // ✅ Helper convert UTC -> Local
+                                String formatTime(String iso) {
+                                  if (iso.isEmpty || iso == '-') return '-';
+                                  try {
+                                    // Thêm 'Z' nếu thiếu để parse đúng UTC
+                                    if (!iso.endsWith('Z') && !iso.contains('+')) {
+                                       iso += 'Z';
+                                    }
+                                    final dt = DateTime.parse(iso).toLocal();
+                                    return '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year} ${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
+                                  } catch (_) {
+                                    return iso;
+                                  }
+                                }
+
                                 return DataRow(
                                   cells: [
                                     DataCell(Text('$id')),
@@ -508,7 +523,7 @@ Widget _buildRoleChip(String? roleType) {
                                     DataCell(SizedBox(width: 160, child: Text(serial, overflow: TextOverflow.ellipsis))),
                                     DataCell(SizedBox(width: 150, child: Text(typeName, overflow: TextOverflow.ellipsis))),
                                     DataCell(Text(streamUrl, style: const TextStyle(color: Colors.blue, fontSize: 12))),
-                                    DataCell(Text(updatedAt.split('T')[0])), // Chỉ lấy phần ngày cho gọn
+                                    DataCell(Text(formatTime(updatedAtRaw))), // ✅ Hiển thị giờ Local
                                     DataCell(_buildDeviceStatusChip(status)),
                                     DataCell(SizedBox(width: 160, child: Text(location, overflow: TextOverflow.ellipsis))),
                                     DataCell(
@@ -527,13 +542,6 @@ Widget _buildRoleChip(String? roleType) {
                                             color: Colors.red,
                                             onPressed: () => _deleteDevice(id),
                                           ),
-
-                                          // ❌ BỎ NÚT LOG TẠM THỜI THEO YÊU CẦU
-                                          // IconButton(
-                                          //   tooltip: 'Xem log thiết bị',
-                                          //   icon: const Icon(Icons.list_alt, size: 18, color: Colors.grey),
-                                          //   onPressed: () { ... },
-                                          // ),
                                         ],
                                       ),
                                     ),
