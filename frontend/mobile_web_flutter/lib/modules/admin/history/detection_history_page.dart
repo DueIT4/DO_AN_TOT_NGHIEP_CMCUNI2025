@@ -260,12 +260,25 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                       .withOpacity(0.8),
                   child: Row(
                     children: [
-                      Text(
-                        'Lịch sử dự đoán',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'Lịch sử dự đoán',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (total > 0)
+                              TextSpan(
+                                text: ' ($total)',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.bold
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                       const Spacer(),
                       Tooltip(
@@ -275,20 +288,32 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                           icon: const Icon(Icons.download, size: 20),
                         ),
                       ),
-
                       const SizedBox(width: 12),
-
                       SizedBox(
-                        width: 260,
+                        width: 280,
                         child: TextField(
                           controller: _searchCtrl,
                           decoration: InputDecoration(
-                            hintText: 'Tìm theo bệnh, user, email, SĐT...',
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 12),
+                            hintText: 'Tìm bệnh, user, email...',
+                            isDense: true,
+                            prefixIcon: const Icon(Icons.search, size: 18),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            filled: true,
+                            fillColor: Colors.white,
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide.none,
                             ),
+                            suffixIcon: _searchCtrl.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 16),
+                                    onPressed: () {
+                                      _searchCtrl.clear();
+                                      _search = '';
+                                      _fetch(page: 1); 
+                                    },
+                                  )
+                                : null,
                           ),
                           onSubmitted: (_) {
                             _search = _searchCtrl.text.trim();
@@ -297,22 +322,17 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                         ),
                       ),
                       const SizedBox(width: 8),
-
-                      FilledButton(
+                      IconButton(
+                        tooltip: 'Tìm kiếm',
                         onPressed: _loading
                             ? null
                             : () {
                                 _search = _searchCtrl.text.trim();
                                 _fetch(page: 1);
                               },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                        ),
-                        child: const Icon(Icons.search, size: 20),
+                        icon: const Icon(Icons.search),
                       ),
                       const SizedBox(width: 8),
-
                       IconButton(
                         tooltip: 'Tải lại',
                         onPressed: _loading ? null : () => _fetch(page: _currentPage),
@@ -323,23 +343,32 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                 ),
                 const Divider(height: 1),
 
+                // Body
                 if (_loading)
                   const Padding(
-                    padding: EdgeInsets.all(32),
+                    padding: EdgeInsets.all(40),
                     child: Center(child: CircularProgressIndicator()),
                   )
                 else if (_error != null)
                   Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'Lỗi: $_error',
-                      style: const TextStyle(color: Colors.red),
+                    child: Center(
+                      child: Text(
+                        'Lỗi: $_error',
+                        style: const TextStyle(color: Colors.red),
+                      ),
                     ),
                   )
                 else if (items.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text('Chưa có lịch sử dự đoán nào.'),
+                  Padding(
+                    padding: const EdgeInsets.all(40),
+                    child: Column(
+                      children: [
+                        Icon(Icons.history_toggle_off, size: 48, color: Colors.grey.shade300),
+                        const SizedBox(height: 12),
+                        const Text('Chưa có lịch sử dự đoán nào.'),
+                      ],
+                    ),
                   )
                 else
                   Padding(
@@ -411,12 +440,14 @@ class _AdminDetectionHistoryPageState extends State<AdminDetectionHistoryPage> {
                           },
                         ),
                         const SizedBox(height: 12),
+                        
+                        // Pagination
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               'Tổng: $total bản ghi • Trang $_currentPage / $totalPages',
-                              style: const TextStyle(fontSize: 12),
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                             Row(
                               children: [

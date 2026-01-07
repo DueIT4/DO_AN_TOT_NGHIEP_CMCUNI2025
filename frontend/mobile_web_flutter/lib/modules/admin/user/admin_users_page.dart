@@ -266,219 +266,242 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               borderRadius: BorderRadius.circular(16),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header card
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceVariant
-                      .withOpacity(0.8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Quản lý người dùng',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _future,
+              builder: (context, snap) {
+                // 1. Handle Loading (Initial)
+                if (snap.connectionState == ConnectionState.waiting && !_isSearching) {
+                  return const Padding(
+                    padding: EdgeInsets.all(50),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                // 2. Handle Error
+                if (snap.hasError) {
+                  return Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: Text(
+                        'Lỗi tải danh sách: ${snap.error}',
+                        style: const TextStyle(color: Colors.red),
                       ),
-                      Row(
+                    ),
+                  );
+                }
+
+                // 3. Prepare Data
+                final users = _isSearching ? _searchResult : (snap.data ?? []);
+                
+                // 4. Build Content (Header + List)
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ===== HEADER =====
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          SizedBox(
-                            width: 260,
-                            child: TextField(
-                              controller: _searchCtrl,
-                              decoration: InputDecoration(
-                                hintText: 'Tìm theo tên, email, SĐT...',
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
+                          Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: 'Quản lý người dùng',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onSubmitted: (_) => _search(),
+                                if (users.isNotEmpty)
+                                  TextSpan(
+                                    text: ' (${users.length})',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.bold
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          FilledButton(
-                            onPressed: _search,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
+                          Row(
+                            children: [
+                              SizedBox(
+                                width: 280,
+                                child: TextField(
+                                  controller: _searchCtrl,
+                                  decoration: InputDecoration(
+                                    hintText: 'Tìm người dùng...',
+                                    isDense: true,
+                                    prefixIcon: const Icon(Icons.search, size: 18),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    suffixIcon: _searchCtrl.text.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear, size: 16),
+                                            onPressed: () {
+                                              _searchCtrl.clear();
+                                              _search(); 
+                                            },
+                                          )
+                                        : null,
+                                  ),
+                                  onSubmitted: (_) => _search(),
+                                ),
                               ),
-                            ),
-                            child: const Icon(Icons.search, size: 20),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            tooltip: 'Tạo người dùng',
-                            onPressed: _openCreateUserDialog,
-                            icon: const Icon(Icons.person_add),
-                          ),
-                          IconButton(
-                            tooltip: 'Tải lại',
-                            onPressed: _reload,
-                            icon: const Icon(Icons.refresh),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                tooltip: 'Tìm kiếm',
+                                onPressed: _search,
+                                icon: const Icon(Icons.search),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                tooltip: 'Tạo người dùng',
+                                onPressed: _openCreateUserDialog,
+                                icon: const Icon(Icons.person_add, color: Colors.blue),
+                              ),
+                              IconButton(
+                                tooltip: 'Tải lại',
+                                onPressed: _reload,
+                                icon: const Icon(Icons.refresh),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
+                    ),
+                    const Divider(height: 1),
 
-                // Nội dung
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: FutureBuilder<List<Map<String, dynamic>>>(
-                    future: _future,
-                    builder: (context, snap) {
-                      if (snap.connectionState == ConnectionState.waiting &&
-                          !_isSearching) {
-                        return const Padding(
-                          padding: EdgeInsets.all(32),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      if (snap.hasError) {
-                        return Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Lỗi tải danh sách người dùng: ${snap.error}',
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                        );
-                      }
-
-                      final users =
-                          _isSearching ? _searchResult : (snap.data ?? []);
-                      if (users.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text('Chưa có người dùng nào trong hệ thống.'),
-                        );
-                      }
-
-                      return Scrollbar(
-                        thumbVisibility: true,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columnSpacing: 28,
-                            headingRowHeight: 40,
-                            dataRowHeight: 48,
-                            columns: const [
-                              DataColumn(label: Text('ID')),
-                              DataColumn(label: Text('Tên đăng nhập')),
-                              DataColumn(label: Text('SĐT')),
-                              DataColumn(label: Text('Email')),
-                              DataColumn(label: Text('Vai trò')),
-                              DataColumn(label: Text('Trạng thái')),
-                              DataColumn(label: Text('Hành động')),
-                            ],
-                            rows: users.map((u) {
-                              final id = u['user_id'] as int;
-                              final username = u['username'] ?? '';
-                              final phone = u['phone'] ?? '';
-                              final email = u['email'] ?? '';
-                              final role = u['role_type'] ?? '';
-                              final status = u['status'] ?? '';
-
-                              return DataRow(
-                                cells: [
-                                  DataCell(Text('$id')),
-                                  DataCell(
-                                    Row(
-                                      children: [
-                                        const CircleAvatar(
-                                          radius: 14,
-                                          child: Icon(Icons.person, size: 16),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(username),
-                                      ],
-                                    ),
-                                  ),
-                                  DataCell(Text(phone)),
-                                  DataCell(
-                                    SizedBox(
-                                      width: 200,
-                                      child: Text(
-                                        email,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                    // ===== LIST =====
+                    if (users.isEmpty)
+                       Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: Column(
+                          children: [
+                            Icon(Icons.search_off, size: 48, color: Colors.grey.shade300),
+                            const SizedBox(height: 12),
+                            const Text('Không tìm thấy người dùng nào phù hợp.'),
+                          ],
+                        ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Scrollbar(
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              columnSpacing: 28,
+                              headingRowHeight: 44,
+                              dataRowHeight: 52,
+                              columns: const [
+                                DataColumn(label: Text('ID')),
+                                DataColumn(label: Text('Tên đăng nhập')),
+                                DataColumn(label: Text('SĐT')),
+                                DataColumn(label: Text('Email')),
+                                DataColumn(label: Text('Vai trò')),
+                                DataColumn(label: Text('Trạng thái')),
+                                DataColumn(label: Text('Hành động')),
+                              ],
+                              rows: users.map((u) {
+                                final id = u['user_id'] as int;
+                                final username = u['username'] ?? '';
+                                final phone = u['phone'] ?? '';
+                                final email = u['email'] ?? '';
+                                final role = u['role_type'] ?? '';
+                                final status = u['status'] ?? '';
+                                return DataRow(
+                                  cells: [
+                                    DataCell(Text('$id')),
+                                    DataCell(
+                                      Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 14,
+                                            backgroundColor: Colors.blue.shade50,
+                                            child: Icon(Icons.person, size: 16, color: Colors.blue.shade700),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(username, style: const TextStyle(fontWeight: FontWeight.w500)),
+                                        ],
                                       ),
                                     ),
-                                  ),
-                                  DataCell(_buildRoleChip(role)),
-                                  DataCell(_buildStatusChip(status)),
-                                  DataCell(
-                                    PopupMenuButton<String>(
-                                      onSelected: (value) {
-                                        if (value == 'view') {
-                                          _showInfo(u);
-                                        } else if (value == 'edit') {
-                                          _openEditUserDialog(u);
-                                        } else if (value == 'active') {
-                                          _setStatus(id, 'active');
-                                        } else if (value == 'inactive') {
-                                          _setStatus(id, 'inactive');
-                                        }
-                                      },
-                                      itemBuilder: (context) => const [
-                                        PopupMenuItem(
-                                          value: 'view',
-                                          child: ListTile(
-                                            leading: Icon(Icons.info_outline),
-                                            title: Text('Xem chi tiết'),
-                                          ),
+                                    DataCell(Text(phone)),
+                                    DataCell(
+                                      SizedBox(
+                                        width: 180,
+                                        child: Text(
+                                          email,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        PopupMenuItem(
-                                          value: 'edit',
-                                          child: ListTile(
-                                            leading: Icon(Icons.edit),
-                                            title: Text('Sửa'),
-                                          ),
-                                        ),
-                                        PopupMenuDivider(),
-                                        PopupMenuItem(
-                                          value: 'active',
-                                          child: ListTile(
-                                            leading: Icon(
-                                                Icons.check_circle_outline),
-                                            title: Text('Kích hoạt'),
-                                          ),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'inactive',
-                                          child: ListTile(
-                                            leading: Icon(Icons.block),
-                                            title: Text('Ngưng hoạt động'),
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
+                                    DataCell(_buildRoleChip(role)),
+                                    DataCell(_buildStatusChip(status)),
+                                    DataCell(
+                                      PopupMenuButton<String>(
+                                        onSelected: (value) {
+                                          if (value == 'view') {
+                                            _showInfo(u);
+                                          } else if (value == 'edit') {
+                                            _openEditUserDialog(u);
+                                          } else if (value == 'active') {
+                                            _setStatus(id, 'active');
+                                          } else if (value == 'inactive') {
+                                            _setStatus(id, 'inactive');
+                                          }
+                                        },
+                                        itemBuilder: (context) => const [
+                                          PopupMenuItem(
+                                            value: 'view',
+                                            child: ListTile(
+                                              leading: Icon(Icons.info_outline),
+                                              title: Text('Xem chi tiết'),
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'edit',
+                                            child: ListTile(
+                                              leading: Icon(Icons.edit),
+                                              title: Text('Sửa'),
+                                            ),
+                                          ),
+                                          PopupMenuDivider(),
+                                          PopupMenuItem(
+                                            value: 'active',
+                                            child: ListTile(
+                                              leading: Icon(Icons.check_circle_outline, color: Colors.green),
+                                              title: Text('Kích hoạt'),
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'inactive',
+                                            child: ListTile(
+                                              leading: Icon(Icons.block, color: Colors.red),
+                                              title: Text('Ngưng hoạt động'),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ),

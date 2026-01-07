@@ -112,18 +112,24 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 if getattr(settings, "APP_ENV", "dev") == "prod":
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
+import tempfile
+
 # ==== 6. Static / Media / HLS Directories ====
 MEDIA_DIR = Path("media")
 AVT_DIR = MEDIA_DIR / "avatars"
 UPLOADS_DIR = Path("uploads") / "support"
-HLS_TMP_DIR = Path("/tmp/hls")
+
+# ✅ Use system temp dir (compatible with Cloud Run & Windows)
+TEMP_DIR = Path(tempfile.gettempdir())
+HLS_TMP_DIR = TEMP_DIR / "hls"
 
 for d in [MEDIA_DIR, AVT_DIR, UPLOADS_DIR, HLS_TMP_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 app.mount("/media", StaticFiles(directory=str(MEDIA_DIR), html=False), name="media")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-app.mount("/tmp/hls", StaticFiles(directory="/tmp/hls"), name="tmp_hls")
+# ✅ Mount temp directory for HLS
+app.mount("/hls_static", StaticFiles(directory=str(HLS_TMP_DIR)), name="hls_static")
 
 # ==== 7. Routers Registration ====
 app.include_router(health_router, prefix=API_PREFIX)

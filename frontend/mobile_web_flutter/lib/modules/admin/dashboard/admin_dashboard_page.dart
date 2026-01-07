@@ -153,9 +153,26 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   _reload();
                 },
               ),
+              const SizedBox(width: 8),
+              // ✅ Nút Refresh thủ công
+              IconButton(
+                tooltip: 'Tải lại dữ liệu',
+                onPressed: _reload,
+                icon: const Icon(Icons.refresh),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
+          // ✅ Timestamp cập nhật
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 16),
+            child: Text(
+              'Cập nhật lúc: ${DateFormat('HH:mm:ss dd/MM/yyyy').format(DateTime.now())}',
+              style: textTheme.bodySmall?.copyWith(
+                color: Colors.grey.shade600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
 
           // Stat cards
           Wrap(

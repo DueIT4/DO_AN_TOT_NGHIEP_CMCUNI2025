@@ -18,7 +18,9 @@ _temp_procs = {}  # {key: {'proc': Popen, 'rtsp_url': str, 'log_file': file_obj}
 _capture_threads = {} # {device_id: {'stop_event': Event, 'thread': Thread}}
 _lock = threading.Lock()
 
-HLS_ROOT = Path("media/hls")
+import tempfile
+
+HLS_ROOT = Path(tempfile.gettempdir()) / "hls"
 HLS_ROOT.mkdir(parents=True, exist_ok=True)
 
 
@@ -29,7 +31,8 @@ def _hls_dir(device_id: int) -> Path:
 
 
 def hls_url_for(device_id: int) -> str:
-    return f"/media/hls/{device_id}/index.m3u8"
+    # ✅ Serving via StaticFiles mount in main.py: /hls_static -> TEMP_DIR/hls
+    return f"/hls_static/{device_id}/index.m3u8"
 
 
 def _hls_temp_dir(key: str) -> Path:
@@ -39,7 +42,7 @@ def _hls_temp_dir(key: str) -> Path:
 
 
 def hls_url_for_temp(key: str) -> str:
-    return f"/media/hls/temp-{key}/index.m3u8"
+    return f"/hls_static/temp-{key}/index.m3u8"
 
 
 # =========================================================================

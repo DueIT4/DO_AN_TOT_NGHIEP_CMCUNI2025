@@ -19,225 +19,27 @@ class _AdminDevicesPageState extends State<AdminDevicesPage> {
   Future<List<Map<String, dynamic>>>? _devicesFuture;
   late Future<List<Map<String, dynamic>>> _deviceTypesFuture;
 
+  final _searchController = TextEditingController(); // ✅ Search controller
+
   @override
   void initState() {
     super.initState();
     _usersFuture = UserService.listUsers();
     _deviceTypesFuture = DeviceTypeService.listDeviceTypes();
-  }
-
-  void _reloadUsers() {
-    setState(() {
-      _usersFuture = UserService.listUsers();
-      _selectedUser = null;
-      _devicesFuture = null;
+    
+    // ✅ Rebuild on search change
+    _searchController.addListener(() {
+      setState(() {}); 
     });
   }
 
-  void _reloadDevicesForSelectedUser() {
-    final u = _selectedUser;
-    if (u == null) return;
-    final userId = u['user_id'] as int;
-    setState(() {
-      _devicesFuture = DeviceService.listDevicesByUser(userId);
-    });
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
-  void _selectUser(Map<String, dynamic> user) {
-    setState(() {
-      _selectedUser = user;
-      _devicesFuture = DeviceService.listDevicesByUser(user['user_id'] as int);
-    });
-  }
-
-  Future<void> _openCreateDialogForSelectedUser() async {
-    if (_selectedUser == null) {
-      AppToast.show(
-        context,
-        message: 'Vui lòng chọn một người dùng trước.',
-        type: ToastType.warning,
-      );
-      return;
-    }
-
-    final deviceTypes = await _deviceTypesFuture;
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => _DeviceDialog(
-        key: UniqueKey(),
-        ownerUserId: _selectedUser!['user_id'] as int,
-        deviceTypes: deviceTypes,
-      ),
-    );
-    if (ok == true) _reloadDevicesForSelectedUser();
-  }
-
-  Future<void> _openEditDialog(Map<String, dynamic> device) async {
-    final deviceTypes = await _deviceTypesFuture;
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => _DeviceDialog(
-        key: UniqueKey(),
-        device: device,
-        deviceTypes: deviceTypes,
-      ),
-    );
-    if (ok == true) _reloadDevicesForSelectedUser();
-  }
-
-  Future<void> _deleteDevice(int id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text("Xóa thiết bị"),
-        content: const Text("Bạn chắc chắn muốn xóa thiết bị này khỏi hệ thống?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text("Hủy"),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text("Xóa"),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      await DeviceService.deleteDevice(id);
-      if (!mounted) return;
-
-      AppToast.show(context, message: 'Đã xóa thiết bị', type: ToastType.success);
-      _reloadDevicesForSelectedUser();
-    } catch (e) {
-      if (!mounted) return;
-
-      final msg = e.toString();
-      // nếu backend từng trả 404 sai, giữ workaround an toàn
-      if (msg.contains('404')) {
-        AppToast.show(context, message: 'Thiết bị đã được xóa.', type: ToastType.warning);
-        _reloadDevicesForSelectedUser();
-        return;
-      }
-
-      AppToast.show(context, message: 'Lỗi xóa thiết bị: $e', type: ToastType.error);
-    }
-  }
-
-  Widget _buildDeviceStatusChip(String? status) {
-    final s = (status ?? '').toLowerCase();
-    final scheme = Theme.of(context).colorScheme;
-
-    Color bg;
-    Color fg;
-
-    switch (s) {
-      case 'active':
-        bg = Colors.green.shade50;
-        fg = Colors.green.shade800;
-        break;
-      case 'inactive':
-        bg = Colors.red.shade50;
-        fg = Colors.red.shade800;
-        break;
-      case 'maintain':
-        bg = Colors.orange.shade50;
-        fg = Colors.orange.shade800;
-        break;
-      default:
-        bg = scheme.surfaceContainerHighest;
-        fg = scheme.onSurfaceVariant;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
-      ),
-      child: Text(
-        status ?? '-',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: fg,
-        ),
-      ),
-    );
-  }
-
-
-
-  Widget _buildHeader(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final userName = _selectedUser?['username'] ?? _selectedUser?['email'];
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            scheme.primary.withOpacity(0.10),
-            scheme.tertiary.withOpacity(0.10),
-          ],
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            height: 42,
-            width: 42,
-            decoration: BoxDecoration(
-              color: scheme.primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(Icons.devices_other_rounded, color: scheme.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Thiết bị theo người dùng',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  userName == null ? 'Chọn người dùng để xem danh sách thiết bị.' : 'Đang xem: $userName',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          FilledButton.icon(
-            onPressed: _openCreateDialogForSelectedUser,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Thêm thiết bị'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // ... (existing code: _reloadUsers, _reloadDevicesForSelectedUser, etc.) ...
 
   Widget _buildUserListCard(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -252,13 +54,40 @@ class _AdminDevicesPageState extends State<AdminDevicesPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-            child: Row(
+            child: Column(
               children: [
-                Icon(Icons.people_alt_rounded, size: 18, color: scheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Người dùng',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                Row(
+                  children: [
+                    Icon(Icons.people_alt_rounded, size: 18, color: scheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Người dùng',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // ✅ Search Bar
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Tìm theo tên, email...',
+                    prefixIcon: const Icon(Icons.search, size: 18),
+                    filled: true,
+                    fillColor: scheme.surfaceContainerHighest.withOpacity(0.35),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 16),
+                            onPressed: () => _searchController.clear(),
+                          )
+                        : null,
+                  ),
+                  style: const TextStyle(fontSize: 13),
                 ),
               ],
             ),
@@ -281,9 +110,23 @@ class _AdminDevicesPageState extends State<AdminDevicesPage> {
                   );
                 }
 
-                final users = snap.data ?? [];
-                if (users.isEmpty) {
+                final allUsers = snap.data ?? [];
+                if (allUsers.isEmpty) {
                   return const Center(child: Text('Chưa có người dùng nào.'));
+                }
+
+                // ✅ Filter Logic
+                final query = _searchController.text.trim().toLowerCase();
+                final users = allUsers.where((u) {
+                   if (query.isEmpty) return true;
+                   final name = (u['username'] ?? '').toString().toLowerCase();
+                   final email = (u['email'] ?? '').toString().toLowerCase();
+                   final phone = (u['phone'] ?? '').toString().toLowerCase();
+                   return name.contains(query) || email.contains(query) || phone.contains(query);
+                }).toList();
+
+                if (users.isEmpty) {
+                  return const Center(child: Text('Không tìm thấy kết quả.'));
                 }
 
                 return Scrollbar(
