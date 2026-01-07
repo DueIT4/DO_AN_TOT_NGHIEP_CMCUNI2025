@@ -68,7 +68,7 @@ class ZestGuardMobileApp extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
-            
+
             // 5️⃣ SỬ DỤNG SPLASH SCREEN ĐỂ KHỞI TẠO LOGIC
             home: const SplashPage(),
 

@@ -154,7 +154,15 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
+import logging
+
 from app.models.image_detection import Img, Detection, Disease
+from app.models.notification import Notifications
+from app.models.devices import Device
+from app.services.inference_service import VN_LABELS
+from app.services.cloudinary_service import upload_image_to_cloudinary
+
+logger = logging.getLogger(__name__)
 
 # Không còn dùng MEDIA_ROOT và save_image_to_disk để đảm bảo chạy được trên Cloud Run
 
@@ -213,8 +221,6 @@ def _normalize_bbox(det: Dict[str, Any]) -> Dict[str, Any]:
         "image_height": det.get("image_height"),
     }
 
-from app.services.cloudinary_service import upload_image_to_cloudinary
-
 def save_detection_result(
     db: Session,
     image_url: str | None,
@@ -235,17 +241,17 @@ def save_detection_result(
     # 0) Auto-Upload nếu chưa có URL
     if not image_url and raw:
         try:
-            image_url = upload_image_to_cloudinary(raw)
+            image_url = upload_image_to_cloudinary(raw, folder="zestguard/detections/2025")
             if not image_url:
-                print(f"[DetectService] ❌ Upload Cloudinary thất bại")
+                logger.warning("[DetectService] ❌ Upload Cloudinary thất bại")
         except Exception as e:
-            print(f"[DetectService] ❌ Lỗi upload ảnh: {e}")
+            logger.error(f"[DetectService] ❌ Lỗi upload ảnh: {e}")
 
     # ⚠️ CRITICAL FIX: Bảng Img yêu cầu file_url NOT NULL.
     # Nếu không có URL (do lỗi upload), ta dùng ảnh placeholder hoặc bỏ qua.
     # ⚠️ CRITICAL FIX: Nếu upload thất bại, DÙNG ẢNH PLACEHOLDER để vẫn lưu được lịch sử
     if not image_url:
-        print("[DetectService] ⚠️ Upload failed. Using placeholder to save detection result.")
+        logger.warning("[DetectService] ⚠️ Upload failed. Using placeholder to save detection result.")
         image_url = "https://placehold.co/600x400?text=Check+History+Details"
 
     # 1) Lưu thông tin ảnh
@@ -331,10 +337,6 @@ def save_detection_result(
                     # Rate Limit: Kiểm tra xem 30 phút qua đã báo bệnh này chưa
                     cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
                     
-                    # Lấy tên Device để check trong title hoặc query
-                    # (Ở đây ta check user_id + bệnh tương tự để đơn giản)
-                    from app.models.notification import Notifications 
-                    
                     recent_noti = db.query(Notifications).filter(
                         Notifications.user_id == user_id,
                         Notifications.created_at >= cutoff,
@@ -343,7 +345,6 @@ def save_detection_result(
                     
                     if not recent_noti:
                         # Lấy tên Device
-                        from app.models.devices import Device
                         device_obj = db.query(Device).filter(Device.device_id == device_id).first()
                         dev_name = device_obj.name if device_obj else f"Camera #{device_id}"
                         
@@ -354,10 +355,10 @@ def save_detection_result(
                             created_at=datetime.now(timezone.utc)
                         )
                         db.add(new_noti)
-                        db.commit()
+                        logger.info(f"[DetectService] ✅ Created notification for user {user_id}: {disease_record.name}")
         except Exception as e:
             # Không để lỗi notify làm hỏng luồng chính
-            print(f"[DetectService] Error creating notification: {e}")
+            logger.error(f"[DetectService] Error creating notification: {e}", exc_info=True)
 
     try:
         db.commit()
