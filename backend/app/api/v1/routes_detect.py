@@ -131,17 +131,24 @@ async def detect_image(
         return JSONResponse(response_data)
 
     # 4. Lưu vào DB cho thành viên
-    saved = save_detection_result(
-        db=db,
-        image_url=image_url, # Truyền URL thay vì raw bytes
-        filename=file.filename,
-        yolo_result=yolo_result,
-        user_id=current_user.user_id,
-        device_id=None,
-        model_version="v1.0",
-    )
-
-    response_data["saved_to_db"] = True
+    # 4. Lưu vào DB cho thành viên
+    try:
+        saved = save_detection_result(
+            db=db,
+            image_url=image_url, # Truyền URL thay vì raw bytes
+            filename=file.filename,
+            yolo_result=yolo_result,
+            user_id=current_user.user_id,
+            device_id=None,
+            model_version="v1.0",
+        )
+        response_data["saved_to_db"] = True
+        response_data["img"]["img_id"] = saved.img_id if hasattr(saved, 'img_id') else None
+    except Exception as e:
+        print(f"❌ Error saving detection to DB (Manual): {e}")
+        # Không raise 500, vẫn trả về kết quả cho user
+        response_data["saved_to_db"] = False
+        response_data["db_error"] = str(e)
     response_data["img"]["img_id"] = saved.img_id if hasattr(saved, 'img_id') else None
     
     return JSONResponse(response_data)
