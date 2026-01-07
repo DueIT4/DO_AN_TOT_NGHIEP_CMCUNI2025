@@ -27,7 +27,7 @@ class ApiBase {
   // 1. Android emulator dùng IP đặc biệt 10.0.2.2 để gọi về localhost của máy tính
   static const String _androidEmuHost = 'http://10.0.2.2:8000';
 
-  // 2. IP LAN cho thiết bị thật hoặc Web. 
+  // 2. IP LAN cho thiết bị thật hoặc Web.
   // Sau này khi Deploy lên Cloud Run, bạn chỉ cần truyền --dart-define API_LAN_HOST="https://tên-dịch-vụ.a.run.app"
   static const String _lanHost = String.fromEnvironment(
     'API_LAN_HOST',
@@ -45,7 +45,7 @@ class ApiBase {
     if (defaultTargetPlatform == TargetPlatform.android) {
       // ✅ Release Mode (APK đã build): Luôn trỏ về Cloud Run
       if (kReleaseMode) {
-        return _lanHost; 
+        return _lanHost;
       }
       // Debug Mode: Dùng 10.0.2.2 cho emulator hoặc LAN host nếu được set
       return _useAndroidLanHost ? _lanHost : _androidEmuHost;
@@ -63,14 +63,14 @@ class ApiBase {
   /// Trả về Uri chuẩn cho API
   static Uri uri(String path, {Map<String, String>? queryParameters}) {
     final p = path.startsWith('/') ? path : '/$path';
-    
+
     // Phân tách host và path để tránh lỗi parse khi host chứa path prefix
     final baseUri = Uri.parse(host);
-    
+
     // Nếu host có path sẵn (ví dụ http://ip/foo), ta phải cẩn thận
     // Nhưng ở đây host thường là protocol + domain + port
-    // Ta assume host chỉ là base host. 
-    
+    // Ta assume host chỉ là base host.
+
     return Uri(
       scheme: baseUri.scheme,
       host: baseUri.host,
@@ -137,14 +137,15 @@ class ApiBase {
   }
 
   /// POST JSON
-  static Future<dynamic> postJson(String path, Map<String, dynamic> body) async {
+  static Future<dynamic> postJson(
+      String path, Map<String, dynamic> body) async {
     // Lưu ý: path ở đây có thể là full URL (do hàm api() trả về) hoặc short path?
     // Code api_base.dart dùng: Uri.parse('$baseURL$path')
     // Nhưng auth_service gọi: ApiBase.postJson(ApiBase.api('/auth/login'), body) -> path là full URL string
     // Vì vậy ta cần xử lý 2 trường hợp:
     // 1. path là full URL (bắt đầu bằng http) -> Uri.parse(path)
     // 2. path là relative path -> dùng uri(path)
-    
+
     Uri u;
     if (path.startsWith('http')) {
       u = Uri.parse(path);
@@ -180,7 +181,8 @@ class ApiBase {
   }
 
   /// PATCH JSON
-  static Future<dynamic> patchJson(String path, Map<String, dynamic> body) async {
+  static Future<dynamic> patchJson(
+      String path, Map<String, dynamic> body) async {
     Uri u;
     if (path.startsWith('http')) {
       u = Uri.parse(path);
