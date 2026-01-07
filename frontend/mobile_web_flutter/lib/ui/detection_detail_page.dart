@@ -111,8 +111,9 @@ class _DetectionDetailPageState extends State<DetectionDetailPage> {
 
                 Text(
                   _record.diseaseName,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
                       ),
                   textAlign: TextAlign.center,
                 ),

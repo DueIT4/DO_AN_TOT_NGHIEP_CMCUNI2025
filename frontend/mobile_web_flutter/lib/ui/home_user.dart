@@ -894,7 +894,7 @@ class _NotificationCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.notifications_active_outlined,
+                    const Icon(Icons.warning_amber_rounded,
                         color: Color(0xFF7CCD2B)),
                     if (hasUnread) ...[
                       const SizedBox(width: 8),

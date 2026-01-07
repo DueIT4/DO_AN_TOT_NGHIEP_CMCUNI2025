@@ -502,7 +502,7 @@ Widget _buildRoleChip(String? roleType) {
                                 final status = (d['status'] ?? '').toString();
                                 final location = (d['location'] ?? '').toString();
 
-                                // ✅ Helper convert UTC -> Local
+                                // ✅ Helper convert UTC -> Local (Vietnam UTC+7)
                                 String formatTime(String iso) {
                                   if (iso.isEmpty || iso == '-') return '-';
                                   try {
@@ -510,7 +510,8 @@ Widget _buildRoleChip(String? roleType) {
                                     if (!iso.endsWith('Z') && !iso.contains('+')) {
                                        iso += 'Z';
                                     }
-                                    final dt = DateTime.parse(iso).toLocal();
+                                    // Parse as UTC then add 7 hours for Vietnam Time
+                                    final dt = DateTime.parse(iso).toUtc().add(const Duration(hours: 7));
                                     return '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year} ${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
                                   } catch (_) {
                                     return iso;

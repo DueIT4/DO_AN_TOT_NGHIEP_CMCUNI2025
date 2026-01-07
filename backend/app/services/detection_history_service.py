@@ -145,6 +145,7 @@ def get_detection_history_for_user(
                 disease_name=disease.name if disease else None,
                 confidence=_normalize_confidence(det.confidence),
                 created_at=img.created_at,  # ✅ dùng created_at của ảnh để ổn định
+                source_type=img.source_type,
             )
         )
 
@@ -259,6 +260,7 @@ def get_detection_history_all_users(
                 username=username,
                 email=safe_email,
                 phone=phone,
+                source_type=img.source_type,
             )
         )
 

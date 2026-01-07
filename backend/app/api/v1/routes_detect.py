@@ -1,7 +1,7 @@
 
 from typing import Optional
 import logging
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Header
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Header, Form
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,7 @@ async def detect_image(
     db: Session = Depends(get_db),
     current_user=Depends(get_optional_user),
     client_key: Optional[str] = Header(default=None, alias="X-Client-Key"),
+    source_type: str = Form(default="upload"), # ✅ NEW: Accept source type
 ):
     """
     ✅ FIXED: Luôn lưu lịch sử cho user đã đăng nhập, kể cả ảnh không phát hiện bệnh
@@ -132,7 +133,8 @@ async def detect_image(
             user_id=current_user.user_id,
             device_id=None,
             model_version="v1.0",
-            create_alert=False  # Upload từ web không cần thông báo
+            create_alert=False,  # Upload từ web không cần thông báo
+            source_type=source_type # ✅ Pass source type
         )
 
         # ✅ Cập nhật response với thông tin đã lưu

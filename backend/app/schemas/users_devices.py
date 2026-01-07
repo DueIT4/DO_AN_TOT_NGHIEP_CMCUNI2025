@@ -62,6 +62,7 @@ class DetectionHistoryItem(BaseModel):
     disease_name: Optional[str] = None
     confidence: Optional[float] = None
     created_at: datetime
+    source_type: Optional[str] = "upload"
 
     user_id: Optional[int] = None
     username: Optional[str] = None

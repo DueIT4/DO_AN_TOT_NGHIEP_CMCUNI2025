@@ -145,14 +145,19 @@ class _DevicesPageState extends State<DevicesPage> {
             final t = lm['updated_at'] ?? lm['created_at'];
             if (t != null) {
               try {
-                updatedAt = DateTime.parse(t.toString());
+                var s = t.toString();
+                if (!s.endsWith('Z') && !s.contains('+')) s += 'Z';
+                updatedAt = DateTime.parse(s);
               } catch (_) {}
             }
           } else {
             // nếu backend có updated_at ngay trên device list:
-            final updatedRaw = map['updated_at']?.toString();
+            var updatedRaw = map['updated_at']?.toString();
             if (updatedRaw != null) {
               try {
+                if (!updatedRaw.endsWith('Z') && !updatedRaw.contains('+')) {
+                   updatedRaw += 'Z';
+                }
                 updatedAt = DateTime.parse(updatedRaw);
               } catch (_) {}
             }
@@ -441,7 +446,9 @@ class _DeviceCard extends StatelessWidget {
   }
 
   String _lastUpdateText() {
-    final diff = DateTime.now().difference(device.updatedAt);
+    // Compare correctly in UTC domain to avoid local timezone issues
+    final diff = DateTime.now().toUtc().difference(device.updatedAt.toUtc());
+    if (diff.inSeconds < 0) return 'Vừa cập nhật'; // Handle slight clock skew
     if (diff.inMinutes < 1) return 'Cập nhật vài giây trước';
     if (diff.inMinutes < 60) return 'Cập nhật ${diff.inMinutes} phút trước';
     if (diff.inHours < 24) return 'Cập nhật ${diff.inHours} giờ trước';

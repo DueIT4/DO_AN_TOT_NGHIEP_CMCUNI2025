@@ -79,6 +79,7 @@ def save_detection_result(
     model_version: str = "v1.0",
     raw: Optional[bytes] = None,  # ✅ Restore: Chấp nhận raw bytes cho auto-detect
     create_alert: bool = True,    # ✅ NEW: Control notification creation (default True)
+    source_type: str = "upload"   # ✅ NEW: Explicit source type
 ) -> Dict[str, Any]:
     """
     LƯU vào DB chuẩn:
@@ -103,8 +104,9 @@ def save_detection_result(
         image_url = "https://placehold.co/600x400?text=Check+History+Details"
 
     # 1) Lưu thông tin ảnh
+    final_source_type = "camera" if device_id else source_type 
     img_row = Img(
-        source_type="upload" if device_id is None else "camera",
+        source_type=final_source_type,
         device_id=device_id,
         user_id=user_id,
         file_url=image_url,
@@ -202,7 +204,7 @@ def save_detection_result(
                     elif "không xác định" in d_name or "unknown" in d_name:
                         new_noti = Notifications(
                             user_id=user_id,
-                            title="📷 Thông báo ảnh tự động",
+                            title="⚠️ Thông báo ảnh tự động",
                             description=f"Hình ảnh thu được từ {dev_name} hệ thống không hỗ trợ phát hiện bệnh.",
                             created_at=datetime.now(timezone.utc)
                         )
@@ -212,10 +214,11 @@ def save_detection_result(
 
                     # CASE 3: Có bệnh -> Gửi thông báo hiện trạng
                     else:
+                        dev_loc = device_obj.location if (device_obj and device_obj.location) else "Chưa định vị"
                         new_noti = Notifications(
                             user_id=user_id,
-                            title="📢 Thông báo hiện trạng vườn",
-                            description=f"Đang phát hiện {disease_record.name} tại {dev_name}.\nVui lòng kiểm tra chi tiết trong lịch sử trang Phân tích.",
+                            title=f"⚠️ Phát hiện bệnh : {disease_record.name}",
+                            description=f"vị trí : {dev_loc}",
                             created_at=datetime.now(timezone.utc)
                         )
                         db.add(new_noti)

@@ -30,14 +30,77 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       ValueNotifier(null); // Lưu ảnh đã chọn
 
   List<DetectionRecord> _history = const [];
+  Timer? _timer;
 
-  // ✅ Add highlight ID state
-  String? _highlightId;
+  // ✅ Highlight IDs (Set to support multiple new items)
+  final Set<String> _highlightIds = {};
 
   @override
   void initState() {
     super.initState();
     _loadHistory();
+    // ✅ Start polling for auto-detections
+    _startPolling();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startPolling() {
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _pollHistory());
+  }
+
+  Future<void> _pollHistory() async {
+    try {
+      // Fetch latest history silently
+      final newData = await DetectionService.fetchHistory(skip: 0, limit: 50);
+      if (!mounted) return;
+      
+      if (_history.isEmpty) {
+        // First load or empty, just update if we have data now
+        if (newData.isNotEmpty) {
+           setState(() => _history = newData);
+        }
+        return;
+      }
+
+      // Check for new items (top of the list)
+      final currentTopId = _history.first.id;
+      final newItems = <DetectionRecord>[];
+      
+      for (final item in newData) {
+        if (item.id == currentTopId) break; // Reached known data
+        newItems.add(item);
+      }
+
+      if (newItems.isNotEmpty) {
+        // Found new auto-detected items
+        setState(() {
+          _history = newData;
+          // Add new IDs to highlight set
+          _highlightIds.addAll(newItems.map((e) => e.id));
+        });
+        
+        // Optional: Show snackbar or visual cue?
+        // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Có phát hiện mới!')));
+      } else {
+        // No new items, but we might want to update list in case other things changed (e.g. status),
+        // but generally we only care if list changed. 
+        // Syncing anyway is safer to keep consistency.
+        // Only update if length changed or first ID changed to avoid unnecessary rebuilds?
+        // For now, let's only update if we found new items to avoid flickering, 
+        // OR if the list size is different (e.g. deletion).
+        if (newData.length != _history.length) {
+            setState(() => _history = newData);
+        }
+      }
+
+    } catch (e) {
+      debugPrint('Polling error: $e');
+    }
   }
 
   Future<void> _loadHistory() async {
@@ -78,7 +141,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       
       // ✅ Set highlight for the new record
       setState(() {
-        _highlightId = record.id;
+        _highlightIds.add(record.id);
         // Prepend temporarily for immediate feedback
         _history = [record, ..._history]; 
       });
@@ -199,14 +262,14 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                       )
                     else
                       ..._history.map(
-                        (record) => _DetectionCard(
-                          record: record,
-                          isHighlighted: record.id == _highlightId, // ✅ Pass highlight status
-                          onTap: () async {
-                            // ✅ Clear highlight on tap
-                            if (record.id == _highlightId) {
-                                setState(() => _highlightId = null);
-                            }
+                          (record) => _DetectionCard(
+                            record: record,
+                            isHighlighted: _highlightIds.contains(record.id), // ✅ Check Set
+                            onTap: () async {
+                              // ✅ Clear highlight on tap
+                              if (_highlightIds.contains(record.id)) {
+                                  setState(() => _highlightIds.remove(record.id));
+                              }
 
                             try {
                               final detId = _parseDetectionId(record);
