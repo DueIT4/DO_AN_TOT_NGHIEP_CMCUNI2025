@@ -1,17 +1,18 @@
 
 from typing import Optional
+import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.services.inference_service import detector
-from app.services.llm_service import summarize_detections_with_llm, verify_image_is_plant
+from app.services.llm_service import summarize_detections_with_llm
 from app.services.detect_service import save_detection_result
-from app.services.cloudinary_service import upload_image_to_cloudinary # Thêm service mới
 from app.api.v1.deps import get_optional_user
 from app.services.detect_limit_service import check_guest_detect_limit
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Detection"])
 
 @router.post("/detect")
@@ -21,85 +22,73 @@ async def detect_image(
     current_user=Depends(get_optional_user),
     client_key: Optional[str] = Header(default=None, alias="X-Client-Key"),
 ):
-    # Kiểm tra model
+    """
+    ✅ FIXED: Luôn lưu lịch sử cho user đã đăng nhập, kể cả ảnh không phát hiện bệnh
+    ✅ FIXED: Trả về lỗi rõ ràng thay vì 500 chung chung
+    """
+    # 1. Kiểm tra model
     if detector is None:
-        raise HTTPException(status_code=500, detail="Model not loaded on server")
+        logger.error("[Detect API] Model not loaded on server")
+        raise HTTPException(
+            status_code=503,
+            detail="Model chưa được tải. Vui lòng thử lại sau hoặc liên hệ quản trị viên."
+        )
 
-    # Đọc dữ liệu file
-    raw = await file.read()
-    if not raw:
-        raise HTTPException(status_code=400, detail="Không đọc được nội dung file")
+    # 2. Đọc dữ liệu file
+    try:
+        raw = await file.read()
+        if not raw or len(raw) == 0:
+            raise HTTPException(status_code=400, detail="File rỗng hoặc không hợp lệ")
+    except Exception as e:
+        logger.error(f"[Detect API] Cannot read file: {e}")
+        raise HTTPException(status_code=400, detail=f"Không đọc được file: {str(e)}")
 
-    # Kiểm tra hạn mức cho khách vãng lai
+    # 3. Kiểm tra hạn mức cho khách vãng lai
     if current_user is None:
         if not client_key:
             raise HTTPException(
                 status_code=400,
                 detail="Thiếu header X-Client-Key cho khách không đăng nhập.",
             )
-        check_guest_detect_limit(db, client_key)
+        try:
+            check_guest_detect_limit(db, client_key)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[Detect API] Guest limit check failed: {e}")
+            raise HTTPException(status_code=500, detail="Lỗi kiểm tra hạn mức")
 
-    # Upload ảnh lên Cloudinary (có fallback)
-    image_url = None
-    try:
-        image_url = upload_image_to_cloudinary(raw, folder="zestguard/detections/2025")
-    except Exception as e:
-        print(f"Error uploading to Cloudinary: {e}")
-
-    # Nếu upload thất bại, dùng ảnh placeholder để không chặn luồng nhận diện
-    if not image_url:
-        print("Using placeholder image due to upload failure")
-        image_url = "https://placehold.co/600x400?text=Upload+Failed"   
-
-    # 2. Chạy nhận diện YOLO
+    # 4. Chạy nhận diện YOLO
     try:
         yolo_result = detector.predict_bytes(raw_bytes=raw, conf=0.5, iou=0.5)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Cannot process image: {e}")
+        logger.error(f"[Detect API] YOLO prediction failed: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Không thể xử lý ảnh: {str(e)}")
 
     detections_list = yolo_result.get("detections", [])
     num_detections = yolo_result.get("num_detections", 0)
     explanation = yolo_result.get("explanation")
 
-    # 🔥 AI CROSS-CHECK: Restore logic (with fixed Client)
-    # gemini_says_no = False
-    # if detections_list:
-    #     is_plant = verify_image_is_plant(raw)
-    #     if not is_plant:
-    #         gemini_says_no = True
-            
-    # Logic kết hợp: Gemini là trọng tài chính xác nhất về ngữ cảnh.
-    # Nếu Gemini bảo KHÔNG (gemini_says_no), ta sẽ hủy kết quả YOLO trừ khi YOLO cực kỳ chắc chắn (> 98%).
-    # Logo hoặc hình vẽ thường bị YOLO nhận nhầm với độ tin cậy cao (85-95%), nên ngưỡng 0.65 cũ quá thấp.
-    
-    # 🔥 FIX: Tính lại max_conf_check (bị mất ở bước trước)
-    # max_conf_check = max((d.get("confidence", 0) for d in detections_list), default=0.0) if detections_list else 0.0
-
-    # if gemini_says_no and max_conf_check < 0.98:
-    #         # Gemini bảo KHÔNG phải cây -> Hủy kết quả YOLO
-    #         detections_list = []
-    #         num_detections = 0
-    #         explanation = "Không phát hiện bệnh cây trồng trên ảnh (Ảnh không hợp lệ), vui lòng chụp lại."
-    #         yolo_result["detections"] = []
-    #         yolo_result["num_detections"] = 0
-    #         yolo_result["explanation"] = explanation
-
-    # 3. Gọi LLM để tóm tắt và hướng dẫn (Chỉ gọi nếu confidence >= 0.4)
+    # 5. Gọi LLM để tóm tắt (Chỉ gọi nếu confidence >= 0.4)
     max_conf = 0.0
     best_disease = "Không xác định"
     
     if detections_list:
-        # Sắp xếp giảm dần theo confidence
         detections_list.sort(key=lambda x: x.get("confidence", 0), reverse=True)
         top = detections_list[0]
         max_conf = top.get("confidence", 0)
         best_disease = top.get("class_name", "Không xác định")
 
     if max_conf < 0.4:
-         disease_summary = "Không phát hiện bệnh cây trồng trên ảnh, vui lòng chụp lại."
-         care_instructions = "Vui lòng chụp lại ảnh rõ nét, đúng chủ thể (lá/quả) và đủ sáng."
+        disease_summary = "Không phát hiện bệnh cây trồng trên ảnh, vui lòng chụp lại."
+        care_instructions = "Vui lòng chụp lại ảnh rõ nét, đúng chủ thể (lá/quả) và đủ sáng."
     else:
-         disease_summary, care_instructions = summarize_detections_with_llm(detections_list)
+        try:
+            disease_summary, care_instructions = summarize_detections_with_llm(detections_list)
+        except Exception as e:
+            logger.warning(f"[Detect API] LLM summary failed: {e}")
+            disease_summary = "Phát hiện bệnh nhưng chưa có phân tích chi tiết."
+            care_instructions = "Vui lòng kiểm tra lại sau."
 
     yolo_result["llm"] = {
         "disease_summary": disease_summary,
@@ -108,47 +97,58 @@ async def detect_image(
     if "explanation" not in yolo_result:
         yolo_result["explanation"] = explanation
 
+    # 6. Chuẩn bị response (chưa có URL vì chưa lưu)
     response_data = {
         "file_name": file.filename,
         "saved_to_db": False,
-        "url": image_url, 
+        "url": None,
+        "file_url": None,
         "img": {
             "img_id": None,
-            "file_url": image_url,
-            "source_type": "web_upload"
+            "file_url": None,
+            "source_type": "upload"
         },
         "num_detections": num_detections,
         "detections": detections_list,
         "explanation": explanation,
         "llm": yolo_result["llm"],
-        # ✅ FE Mobile cần 2 trường này ở root để hiển thị ngay
         "disease_name": best_disease,
         "confidence": max_conf
     }
 
-    # Phản hồi cho Guest (Không lưu DB)
+    # 7. Phản hồi cho Guest (Không lưu DB)
     if current_user is None:
+        logger.info(f"[Detect API] Guest detection: {best_disease} ({max_conf:.2f})")
         return JSONResponse(response_data)
 
-    # 4. Lưu vào DB cho thành viên
-    # 4. Lưu vào DB cho thành viên
+    # 8. User đã đăng nhập: LƯU VÀO DB (kể cả không phát hiện bệnh)
     try:
         saved = save_detection_result(
             db=db,
-            image_url=image_url, # Truyền URL thay vì raw bytes
+            image_url=None,  # Để service tự upload
+            raw=raw,  # Truyền raw bytes để service upload
             filename=file.filename,
             yolo_result=yolo_result,
             user_id=current_user.user_id,
             device_id=None,
             model_version="v1.0",
+            create_alert=False  # Upload từ web không cần thông báo
         )
+
+        # ✅ Cập nhật response với thông tin đã lưu
         response_data["saved_to_db"] = True
-        response_data["img"]["img_id"] = saved.img_id if hasattr(saved, 'img_id') else None
+        response_data["url"] = saved.get("file_url")
+        response_data["file_url"] = saved.get("file_url")
+        response_data["img"]["img_id"] = saved.get("img_id")
+        response_data["img"]["file_url"] = saved.get("file_url")
+
+        logger.info(f"[Detect API] Saved for user {current_user.user_id}: {best_disease} ({max_conf:.2f})")
+        
     except Exception as e:
-        print(f"❌ Error saving detection to DB (Manual): {e}")
-        # Không raise 500, vẫn trả về kết quả cho user
+        # ✅ CRITICAL: Không để lỗi lưu DB làm crash API
+        # Vẫn trả kết quả nhưng báo không lưu được
+        logger.error(f"[Detect API] Failed to save to DB: {e}", exc_info=True)
         response_data["saved_to_db"] = False
-        response_data["db_error"] = str(e)
-    response_data["img"]["img_id"] = saved.img_id if hasattr(saved, 'img_id') else None
-    
+        response_data["error"] = "Phát hiện thành công nhưng không lưu được lịch sử"
+
     return JSONResponse(response_data)
