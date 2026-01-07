@@ -1,4 +1,5 @@
 // lib/ui/camera_detection_page.dart
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
