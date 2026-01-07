@@ -39,7 +39,165 @@ class _AdminDevicesPageState extends State<AdminDevicesPage> {
     super.dispose();
   }
 
-  // ... (existing code: _reloadUsers, _reloadDevicesForSelectedUser, etc.) ...
+  Future<void> _reloadUsers() async {
+    setState(() {
+      _usersFuture = UserService.listUsers();
+    });
+  }
+
+  void _selectUser(Map<String, dynamic> user) {
+    setState(() {
+      _selectedUser = user;
+      _reloadDevicesForSelectedUser();
+    });
+  }
+
+  void _reloadDevicesForSelectedUser() {
+    if (_selectedUser == null) return;
+    setState(() {
+      final userId = _selectedUser!['user_id'] as int;
+      _devicesFuture = DeviceService.listDevicesByUser(userId);
+    });
+  }
+
+  Future<void> _deleteDevice(int deviceId) async {
+    final cur = context;
+    final confirm = await showDialog<bool>(
+      context: cur,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận xóa'),
+        content: const Text('Bạn có chắc chắn muốn xóa thiết bị này không?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      try {
+        await DeviceService.deleteDevice(deviceId);
+        if (mounted) {
+          AppToast.show(cur, message: 'Đã xóa thiết bị', type: ToastType.success);
+          _reloadDevicesForSelectedUser();
+        }
+      } catch (e) {
+        if (mounted) {
+          AppToast.show(cur, message: 'Lỗi xóa: $e', type: ToastType.error);
+        }
+      }
+    }
+  }
+
+  Future<void> _openEditDialog(Map<String, dynamic>? device) async {
+    if (_selectedUser == null && device == null) {
+      AppToast.show(context, message: 'Vui lòng chọn User trước khi thêm thiết bị', type: ToastType.warning);
+      return;
+    }
+
+    final List<Map<String, dynamic>> deviceTypes = await _deviceTypesFuture; // await list types
+
+    if (!mounted) return;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => _DeviceDialog(
+        device: device,
+        ownerUserId: _selectedUser?['user_id'],
+        deviceTypes: deviceTypes,
+      ),
+    );
+
+    if (result == true) {
+      _reloadDevicesForSelectedUser();
+    }
+  }
+
+Widget _buildDeviceStatusChip(String? status) {
+    Color bg = Colors.grey.shade200;
+    Color fg = Colors.grey.shade700;
+    String label = status ?? 'unknown';
+
+    if (status == 'active') {
+      bg = const Color(0xFFE6F4EA);
+      fg = const Color(0xFF1E8E3E);
+      label = 'Hoạt động';
+    } else if (status == 'inactive') {
+      bg = const Color(0xFFFCE8E6);
+      fg = const Color(0xFFD93025);
+      label = 'Ngưng';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.router_rounded, color: scheme.primary, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Quản lý thiết bị',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: scheme.onSurface,
+                      ),
+                ),
+                Text(
+                  'Cấu hình camera và gán thiết bị cho người dùng',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          FilledButton.icon(
+            onPressed: () => _openEditDialog(null),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Thêm thiết bị'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildUserListCard(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
