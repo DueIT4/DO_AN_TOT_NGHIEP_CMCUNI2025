@@ -217,7 +217,7 @@ def detect_from_camera_auto(
                  return {'success': False, 'error': f'Model load failed: {e}'}
         else:
             local_detector = detector
-            # logger.info("[AutoDetection] Using shared Global YOLO Detector.")
+            logger.info("[AutoDetection] Global detector instance retrieved OK.")
 
         all_detections = []
         best_detection = None
@@ -225,12 +225,15 @@ def detect_from_camera_auto(
 
         for i, img_data in enumerate(images):
             try:
-                # logger.debug(f"[AutoDetection] Predicting image {i+1}...")
+                logger.info(f"[AutoDetection] Start predicting image {i+1}/{len(images)} (Size: {len(img_data)} bytes)...")
+                
                 if local_detector:
                     pred = local_detector.predict_bytes(img_data)
                 else:
+                    logger.error("[AutoDetection] local_detector is None before predict!")
                     pred = None
-                # logger.debug(f"[AutoDetection] Prediction done for image {i+1}")
+                
+                logger.info(f"[AutoDetection] Prediction finished for image {i+1}. Result keys: {list(pred.keys()) if pred else 'None'}")
 
                 if not pred or pred.get('num_detections', 0) == 0:
                     class_name = 'Không xác định'
@@ -256,10 +259,10 @@ def detect_from_camera_auto(
                     best_confidence = confidence
                     best_detection = detection_item
             except Exception as e:
-                logger.error(f"[AutoDetection] Lỗi khi detect ảnh {i+1}: {e}")
+                logger.error(f"[AutoDetection] Lỗi khi detect ảnh {i+1}: {e}", exc_info=True)
                 continue
         
-        logger.info(f"[AutoDetection] Detection complete. Found {len(all_detections)} items.")
+        logger.info(f"[AutoDetection] Detection loop complete. Found {len(all_detections)} items.")
 
         sensor_data = get_recent_sensor_readings(db, device.device_id, hours=24)
         recent_detections = get_recent_detections(db, device.device_id, days=7)

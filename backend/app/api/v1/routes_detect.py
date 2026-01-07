@@ -39,10 +39,18 @@ async def detect_image(
             )
         check_guest_detect_limit(db, client_key)
 
-    image_url = upload_image_to_cloudinary(raw, folder="zestguard/detections/2025")
-    
+    # Upload ảnh lên Cloudinary (có fallback)
+    image_url = None
+    try:
+        image_url = upload_image_to_cloudinary(raw, folder="zestguard/detections/2025")
+    except Exception as e:
+        print(f"Error uploading to Cloudinary: {e}")
+
+    # Nếu upload thất bại, dùng ảnh placeholder để không chặn luồng nhận diện
     if not image_url:
-        raise HTTPException(status_code=500, detail="Lỗi khi upload ảnh lên Cloudinary")
+        print("Using placeholder image due to upload failure")
+        image_url = "https://placehold.co/600x400?text=Upload+Failed"   
+
     # 2. Chạy nhận diện YOLO
     try:
         yolo_result = detector.predict_bytes(raw_bytes=raw, conf=0.5, iou=0.5)

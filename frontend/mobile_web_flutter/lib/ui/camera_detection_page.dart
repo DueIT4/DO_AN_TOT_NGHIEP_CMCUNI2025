@@ -41,6 +41,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
     try {
       final data = await DetectionService.fetchHistory(skip: 0, limit: 50);
       if (!mounted) return;
+      debugPrint('[_CameraDetectionPageState] _loadHistory: Set ${data.length} items to state');
       setState(() => _history = data);
     } catch (e) {
       if (!mounted) return;

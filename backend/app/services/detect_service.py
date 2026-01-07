@@ -303,6 +303,7 @@ def save_detection_result(
     # Dữ liệu từ inference_service đã được map sang tiếng Việt (hoặc giữ nguyên tên gốc)
     # nên ta lưu thẳng vào DB.
 
+    print(f"[DetectService] Saving detection for Img ID: {img_row.img_id}")
     det_row = Detection(
         img_id=img_row.img_id,
         disease_id=primary_disease_id,
@@ -317,6 +318,8 @@ def save_detection_result(
         created_at=datetime.now(timezone.utc) 
     )
     db.add(det_row)
+    db.flush()
+    print(f"[DetectService] Added Detection ID: {det_row.detection_id}, Disease ID: {primary_disease_id}")
     
     # 5) Tự động tạo thông báo (Notification) nếu là Camera + Có bệnh + Không spam (30p/lần)
     if create_alert and device_id and primary_disease_id:

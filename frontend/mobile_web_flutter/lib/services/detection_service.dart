@@ -97,6 +97,7 @@ class DetectionService {
       } else if (raw is List) {
         items = raw;
       }
+      debugPrint('[DetectionService] fetchHistory: Received ${items.length} items');
 
       return items.map((it) {
         final m = Map<String, dynamic>.from(it);
