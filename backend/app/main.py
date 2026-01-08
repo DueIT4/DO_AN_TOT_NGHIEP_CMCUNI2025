@@ -64,6 +64,7 @@ from app.api.v1.routes_weather import router as weather_router
 from app.api.v1.routes_news import router as news_router
 from app.api.v1.routes_chatbot import router as chatbot_router
 from app.api.v1.routes_stream import router as stream_router
+from app.api.v1.routes_streams import router as streams_router
 
 API_PREFIX = getattr(settings, "API_V1", "/api/v1")
 
@@ -153,6 +154,7 @@ app.include_router(weather_router, prefix=API_PREFIX)
 app.include_router(news_router, prefix=API_PREFIX)
 app.include_router(chatbot_router, prefix=API_PREFIX)
 app.include_router(stream_router, prefix=API_PREFIX)
+app.include_router(streams_router, prefix=API_PREFIX)
 
 # ==== 8. Root & Tiện ích ====
 @app.get("/")
