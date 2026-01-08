@@ -24,17 +24,47 @@ router = APIRouter(prefix="/support", tags=["support"])
 # ===================== TICKETS =====================
 
 @router.post("/tickets/create_ticket", response_model=SupportTicketOut, status_code=status.HTTP_201_CREATED)
-def create_ticket(payload: SupportTicketCreate, db: Session = Depends(get_db), user: Users = Depends(get_current_user)):
-    """Người dùng đăng nhập tạo phiếu hỗ trợ"""
+async def create_ticket(
+    title: str = Form(...),
+    description: str = Form(...),
+    file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    user: Users = Depends(get_current_user)
+):
+    """
+    Người dùng đăng nhập tạo phiếu hỗ trợ (Hỗ trợ upload ảnh đính kèm)
+    """
+    # 1. Tạo Ticket
     ticket = SupportTicket(
         user_id=user.user_id,
-        title=payload.title,
-        description=payload.description,
+        title=title,
+        description=description,
         status=TicketStatus.processing
     )
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
+
+    # 2. Nếu có file đính kèm, tạo ngay 1 message đầu tiên
+    if file:
+        content = await file.read()
+        if content:
+            # Upload lên Cloudinary
+            attachment_url = upload_image_to_cloudinary(
+                content, 
+                folder=f"zestguard/support/ticket_{ticket.ticket_id}"
+            )
+            
+            if attachment_url:
+                msg = SupportMessage(
+                    ticket_id=ticket.ticket_id,
+                    sender_id=user.user_id,
+                    message="Hình ảnh đính kèm",
+                    attachment_url=attachment_url
+                )
+                db.add(msg)
+                db.commit()
+
     return ticket
 
 @router.get("/tickets/my_list", response_model=List[SupportTicketWithMessages])

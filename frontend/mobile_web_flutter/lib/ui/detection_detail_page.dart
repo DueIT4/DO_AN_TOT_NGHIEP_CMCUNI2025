@@ -147,13 +147,7 @@ class _DetectionDetailPageState extends State<DetectionDetailPage> {
                 ),
                 const SizedBox(height: 12),
 
-                if ((_record.explanation ?? '').trim().isNotEmpty) ...[
-                  _InfoCard(
-                    title: 'Giải thích từ hệ thống',
-                    body: _record.explanation!.trim(),
-                  ),
-                  const SizedBox(height: 12),
-                ],
+
 
                 if (_record.detections.isNotEmpty) ...[
                   _DetectionsCard(items: _record.detections),
@@ -249,7 +243,7 @@ class _InfoCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           if (!asBullets)
-            Text(body, style: const TextStyle(height: 1.45))
+            Text(body.replaceAll(RegExp(r'[*#]'), ''), style: const TextStyle(height: 1.45))
           else
             ...bulletItems.map(
               (e) => Padding(
@@ -258,7 +252,7 @@ class _InfoCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('•  ', style: TextStyle(height: 1.45)),
-                    Expanded(child: Text(e, style: const TextStyle(height: 1.45))),
+                    Expanded(child: Text(e.replaceAll(RegExp(r'[*#]'), ''), style: const TextStyle(height: 1.45))),
                   ],
                 ),
               ),
