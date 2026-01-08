@@ -83,10 +83,12 @@ def _build_prompt_from_detections(detections: List[Dict[str, Any]]) -> str:
         return (
             "AI nhận thấy các vùng quét đều thuộc nhóm khoẻ mạnh.\n\n"
             "Hãy trả lời theo đúng cấu trúc:\n\n"
-            "[DISEASE_SUMMARY]\n"
-            "- Nêu rõ cây đang khỏe.\n\n"
-            "[CARE_INSTRUCTIONS]\n"
+            "BEGIN_DISEASE_SUMMARY\n"
+            "- Nêu rõ cây đang khỏe.\n"
+            "END_DISEASE_SUMMARY\n\n"
+            "BEGIN_CARE_INSTRUCTIONS\n"
             "- Hướng dẫn bảo dưỡng, chăm sóc, phòng ngừa.\n"
+            "END_CARE_INSTRUCTIONS\n"
         )
 
     disease_counts = Counter(disease_items)
@@ -140,6 +142,7 @@ def summarize_detections_with_llm(
             model=GEMINI_MODEL,
             contents=prompt,
         )
+        logger.info(f"[LLM] Gemini response received. Token usage: {response.usage_metadata if hasattr(response, 'usage_metadata') else 'N/A'}")
 
         full_text = (response.text or "").strip()
         if not full_text:
