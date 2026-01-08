@@ -205,8 +205,8 @@ def save_detection_result(
                         new_noti = Notifications(
                             user_id=user_id,
                             title="⚠️ Thông báo ảnh tự động",
-                            description=f"Hình ảnh thu được từ {dev_name} hệ thống không hỗ trợ phát hiện bệnh.",
-                            created_at=datetime.now(timezone.utc)
+                            description=f"Hình ảnh thu được từ {dev_name} hệ thống không hỗ trợ phát hiện bệnh. Vui lòng check lịch sử tại trang phân tích.",
+                            created_at=datetime.now(timezone(timedelta(hours=7)))
                         )
                         db.add(new_noti)
                         db.commit()
@@ -218,8 +218,8 @@ def save_detection_result(
                         new_noti = Notifications(
                             user_id=user_id,
                             title=f"⚠️ Phát hiện bệnh : {disease_record.name}",
-                            description=f"vị trí : {dev_loc}",
-                            created_at=datetime.now(timezone.utc)
+                            description=f"vị trí camera : {dev_loc}. Vui lòng kiểm tra lịch sử tại trang phân tích.",
+                            created_at=datetime.now(timezone(timedelta(hours=7)))
                         )
                         db.add(new_noti)
                         db.commit()

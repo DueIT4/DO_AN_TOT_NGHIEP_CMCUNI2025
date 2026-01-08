@@ -92,59 +92,95 @@ class _WeatherContentState extends State<WeatherContent>
                     constraints: const BoxConstraints(maxWidth: 1100),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        return SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minHeight: constraints.maxHeight - 40,
+                        final isMobile = constraints.maxWidth < 800; // Breakpoint mobile
+
+                        if (isMobile) {
+                          // Mobile Layout: Column
+                          return SingleChildScrollView(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildHeader(),
+                                const SizedBox(height: 30),
+                                // 1. Nhiệt độ
+                                Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 20),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(color: Colors.blue.shade50),
+                                  ),
+                                  child: Center(child: _buildMainWeatherCard()),
+                                ),
+                                const SizedBox(height: 16),
+                                // 2. Chỉ số chi tiết
+                                _buildDetailedStats(),
+                                const SizedBox(height: 24),
+                                // 3. Dự báo
+                                Container(
+                                  height: 400, // Chiều cao cố định cho list view dự báo trên mobile
+                                  child: _buildForecastSection(),
+                                ),
+                              ],
                             ),
-                            child: IntrinsicHeight(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-                                child: Column(
-                                  children: [
-                                    _buildHeader(),
-                                    const SizedBox(height: 30),
-                                    Expanded(
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                                        children: [
-                                          Expanded(
-                                            flex: 6,
-                                            child: Column(
-                                              children: [
-                                                // Khối Nhiệt độ (Main)
-                                                Expanded(
-                                                  child: Container(
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.white,
-                                                      borderRadius: BorderRadius.circular(24),
-                                                      border: Border.all(color: Colors.blue.shade50),
+                          );
+                        } else {
+                          // Desktop/Tablet Layout: Row (Giữ nguyên)
+                          return SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: constraints.maxHeight - 40,
+                              ),
+                              child: IntrinsicHeight(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                                  child: Column(
+                                    children: [
+                                      _buildHeader(),
+                                      const SizedBox(height: 30),
+                                      Expanded(
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            Expanded(
+                                              flex: 6,
+                                              child: Column(
+                                                children: [
+                                                  // Khối Nhiệt độ (Main)
+                                                  Expanded(
+                                                    child: Container(
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white,
+                                                        borderRadius: BorderRadius.circular(24),
+                                                        border: Border.all(color: Colors.blue.shade50),
+                                                      ),
+                                                      child: Center(child: _buildMainWeatherCard()),
                                                     ),
-                                                    child: Center(child: _buildMainWeatherCard()),
                                                   ),
-                                                ),
-                                                const SizedBox(height: 16),
-                                                // Khối Chi tiết (Stats)
-                                                _buildDetailedStats(),
-                                                const SizedBox(height: 20),
-                                              ],
+                                                  const SizedBox(height: 16),
+                                                  // Khối Chi tiết (Stats)
+                                                  _buildDetailedStats(),
+                                                  const SizedBox(height: 20),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 24),
-                                          Expanded(
-                                            flex: 4,
-                                            child: _buildForecastSection(),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 24),
+                                            Expanded(
+                                              flex: 4,
+                                              child: _buildForecastSection(),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
+                          );
+                        }
                       }
                     ),
                   ),
