@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Optional, List, Dict
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -30,6 +31,9 @@ else:
 def send_message_to_gemini(question: str, chat_history: Optional[List[Dict[str, str]]] = None) -> str:
     """
     Gửi câu hỏi đến Gemini và nhận câu trả lời.
+    Có retry logic tự động nếu bị 429 (rate limit).
+    
+    OPTIMIZATION: Chỉ dùng 2-3 message gần nhất để giảm prompt size
     """
     if not client:
         raise ValueError("AI chưa được cấu hình. Kiểm tra GEMINI_API_KEY.")
@@ -41,41 +45,53 @@ def send_message_to_gemini(question: str, chat_history: Optional[List[Dict[str, 
         "Tập trung tư vấn về cây trồng, bệnh hại và kỹ thuật chăm sóc."
     )
     
-    try:
-        # Xây dựng Prompt tổng hợp từ lịch sử chat (Logic Stateless)
-        prompt_parts = [system_instruction]
-        
-        if chat_history:
-            for msg in chat_history:
-                prompt_parts.append(f"Người dùng: {msg['question']}")
-                prompt_parts.append(f"Trợ lý: {msg['answer']}")
-        
-        prompt_parts.append(f"Người dùng: {question}")
-        prompt_parts.append("Trợ lý:")
-        
-        full_prompt = "\n".join(prompt_parts)
-
-        # Gọi API qua SDK mới (client.models.generate_content)
-        response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=full_prompt
-        )
-        
-        answer = (response.text or "").strip()
-        if not answer:
-            raise ValueError("AI không trả về kết quả.")
-            
-        return answer
+    # Xây dựng Prompt tổng hợp từ lịch sử chat
+    prompt_parts = [system_instruction]
     
-    except Exception as e:
-        err_msg = str(e)
-        logger.error(f"[Chatbot] Gemini API Error: {err_msg}")
+    # ⭐ OPTIMIZATION: Chỉ lấy 2 message gần nhất (thay vì 5)
+    if chat_history:
+        recent_history = chat_history[-2:] if len(chat_history) > 2 else chat_history
+        for msg in recent_history:
+            prompt_parts.append(f"Người dùng: {msg['question']}")
+            prompt_parts.append(f"Trợ lý: {msg['answer']}")
+    
+    prompt_parts.append(f"Người dùng: {question}")
+    prompt_parts.append("Trợ lý:")
+    
+    full_prompt = "\n".join(prompt_parts)
+
+    # Retry logic - tối đa 3 lần nếu bị 429
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # Gọi API qua SDK mới (client.models.generate_content)
+            response = client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=full_prompt
+            )
+            
+            answer = (response.text or "").strip()
+            if not answer:
+                raise ValueError("AI không trả về kết quả.")
+                
+            return answer
         
-        # Xử lý lỗi Quota (429) thường gặp trên bản 2.0 Flash
-        if "429" in err_msg:
-            return "Hệ thống AI đang tạm thời quá tải (429). Bạn vui lòng đợi 60 giây và thử lại nhé."
-        
-        raise ValueError(f"Lỗi AI: {err_msg}")
+        except Exception as e:
+            err_msg = str(e)
+            logger.error(f"[Chatbot] Gemini API Error (Attempt {attempt+1}/{max_retries}): {err_msg}")
+            
+            # Nếu lỗi 429 (rate limit) và còn retry
+            if "429" in err_msg and attempt < max_retries - 1:
+                wait_time = 2 ** (attempt + 1)  # 2s, 4s, 8s
+                logger.warning(f"[Chatbot] Rate limited. Waiting {wait_time}s before retry...")
+                time.sleep(wait_time)
+                continue
+            
+            # Nếu là lần cuối hoặc không phải lỗi 429
+            if "429" in err_msg:
+                return "Hệ thống AI đang tạm thời quá tải. Vui lòng đợi 1-2 phút và thử lại."
+            
+            raise ValueError(f"Lỗi AI: {err_msg}")
 
 # =====================================================
 # 3. LOGIC DATABASE (Lưu trữ và lấy lịch sử)
@@ -103,12 +119,14 @@ def save_chat_message(chatbot_id: int, question: str, answer: str, db: Session) 
     db.refresh(detail)
     return detail
 
-def get_chat_history(chatbot_id: int, db: Session, limit: int = 20) -> List[Dict[str, str]]:
+def get_chat_history(chatbot_id: int, db: Session, limit: int = 5) -> List[Dict[str, str]]:
+    # Lấy 5 message gần nhất (DESC) để giảm prompt size và tránh 429 quota
     details = db.query(ChatbotDetail).filter(
         ChatbotDetail.chatbot_id == chatbot_id
-    ).order_by(ChatbotDetail.created_at.asc()).limit(limit).all()
+    ).order_by(ChatbotDetail.created_at.desc()).limit(limit).all()
     
-    return [{"question": d.question, "answer": d.answer} for d in details]
+    # Reverse để hiển thị theo thứ tự chronological (cũ → mới)
+    return [{"question": d.question, "answer": d.answer} for d in reversed(details)]
 
 def end_chatbot_session(chatbot_id: int, user_id: int, db: Session) -> Chatbot:
     chatbot = db.query(Chatbot).filter(
